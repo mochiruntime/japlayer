@@ -38,3 +38,6 @@ _pkginfo.txt
 *.msixbundle
 *.msixupload
 *.appxupload
+
+# Local Config
+appsettings.json.local

@@ -6,40 +6,60 @@ namespace Japlayer.Services
 {
     public class SettingsService
     {
-        private const string DefaultMediaType = "X:\\";
-        private const string DefaultImageType = "Y:\\";
         private const string ConfigFileName = "appsettings.json";
+        private const string LocalConfigFileName = "appsettings.json.local";
 
         public string MediaPath { get; private set; }
         public string ImagePath { get; private set; }
 
         public SettingsService()
         {
-            MediaPath = DefaultMediaType;
-            ImagePath = DefaultImageType;
             LoadSettings();
         }
 
         private void LoadSettings()
         {
             var configPath = Path.Combine(AppContext.BaseDirectory, ConfigFileName);
-            if (File.Exists(configPath))
+            
+            if (!File.Exists(configPath))
             {
-                try
+                configPath = FindLocalConfig(AppContext.BaseDirectory);
+            }
+
+            if (configPath == null || !File.Exists(configPath))
+            {
+                throw new FileNotFoundException($"Configuration file '{ConfigFileName}' not found in '{AppContext.BaseDirectory}' or as '{LocalConfigFileName}' in parent directories.", ConfigFileName);
+            }
+
+            var json = File.ReadAllText(configPath);
+            try 
+            {
+                var settings = JsonSerializer.Deserialize<AppSettings>(json);
+                if (settings != null)
                 {
-                    var json = File.ReadAllText(configPath);
-                    var settings = JsonSerializer.Deserialize<AppSettings>(json);
-                    if (settings != null)
-                    {
-                        if (!string.IsNullOrWhiteSpace(settings.MediaPath)) MediaPath = settings.MediaPath;
-                        if (!string.IsNullOrWhiteSpace(settings.ImagePath)) ImagePath = settings.ImagePath;
-                    }
-                }
-                catch
-                {
-                    // Ignore errors, use defaults
+                    if (!string.IsNullOrWhiteSpace(settings.MediaPath)) MediaPath = settings.MediaPath;
+                    if (!string.IsNullOrWhiteSpace(settings.ImagePath)) ImagePath = settings.ImagePath;
                 }
             }
+            catch (JsonException ex)
+            {
+                throw new Exception($"Error parsing configuration file at '{configPath}': {ex.Message}", ex); 
+            }
+        }
+
+        private string FindLocalConfig(string startPath)
+        {
+            var currentDir = new DirectoryInfo(startPath);
+            while (currentDir != null)
+            {
+                var localPath = Path.Combine(currentDir.FullName, LocalConfigFileName);
+                if (File.Exists(localPath))
+                {
+                    return localPath;
+                }
+                currentDir = currentDir.Parent;
+            }
+            return null;
         }
 
         private class AppSettings
