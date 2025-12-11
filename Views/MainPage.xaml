@@ -48,10 +48,16 @@
                       ItemsSource="{x:Bind ViewModel.MediaItems, Mode=OneWay}"
                       SelectionMode="Single"
                       IsItemClickEnabled="True"
+                      ItemClick="MediaGrid_ItemClick"
                       Padding="12">
             <GridView.ItemTemplate>
                 <DataTemplate x:DataType="vm:MediaItemViewModel">
-                    <Grid Width="300" Height="250" Margin="6" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8" ToolTipService.ToolTip="{x:Bind Title}">
+                    <Grid Width="300" Height="250" Margin="6" 
+                          Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" 
+                          CornerRadius="8" 
+                          ToolTipService.ToolTip="{x:Bind Title}"
+                          PointerEntered="MediaItem_PointerEntered"
+                          PointerExited="MediaItem_PointerExited">
 
                         <Grid.RowDefinitions>
                             <RowDefinition Height="*"/>

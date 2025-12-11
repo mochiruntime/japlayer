@@ -26,5 +26,23 @@ namespace Japlayer.Views
             base.OnNavigatedTo(e);
             await ViewModel.LoadDataAsync();
         }
+
+        private void MediaGrid_ItemClick(object sender, ItemClickEventArgs e)
+        {
+            if (e.ClickedItem is MediaItemViewModel item)
+            {
+                Frame.Navigate(typeof(MediaItemPage), item);
+            }
+        }
+
+        private void MediaItem_PointerEntered(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+        {
+            ProtectedCursor = Microsoft.UI.Input.InputSystemCursor.Create(Microsoft.UI.Input.InputSystemCursorShape.Hand);
+        }
+
+        private void MediaItem_PointerExited(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+        {
+            ProtectedCursor = null; // Revert to default
+        }
     }
 }
