@@ -1,5 +1,6 @@
 using Japlayer.Contracts;
 using Japlayer.Models;
+using System.Collections.Generic;
 
 namespace Japlayer.ViewModels
 {
@@ -18,6 +19,7 @@ namespace Japlayer.ViewModels
         public string Title => _mediaItem.Id + " " + _mediaItem.Title;
         public string CoverPath => _imageProvider.GetCoverPath(_mediaItem.Id);
         public string MdbId => _mediaItem.MdbId;
+        public IReadOnlyList<string> Genres => _mediaItem.Genres;
         
         // Helper for UI binding if path is null (fallback image could be handled here or in XAML)
         public string DisplayCover => CoverPath ?? "ms-appx:///Assets/StoreLogo.png"; 

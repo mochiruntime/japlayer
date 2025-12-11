@@ -1,5 +1,7 @@
 using Japlayer.Contracts;
 using System.Collections.ObjectModel;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace Japlayer.ViewModels
@@ -8,8 +10,10 @@ namespace Japlayer.ViewModels
     {
         private readonly IMediaProvider _mediaProvider;
         private readonly IImageProvider _imageProvider;
+        private List<MediaItemViewModel> _allMediaItems = new();
 
         public ObservableCollection<MediaItemViewModel> MediaItems { get; } = new();
+        public ObservableCollection<GenreViewModel> Genres { get; } = new();
 
         public MainViewModel(IMediaProvider mediaProvider, IImageProvider imageProvider)
         {
@@ -20,10 +24,46 @@ namespace Japlayer.ViewModels
         public async Task LoadDataAsync()
         {
             var items = await _mediaProvider.GetAllItemsAsync();
-            MediaItems.Clear();
-            foreach (var item in items)
+            _allMediaItems = items.Select(item => new MediaItemViewModel(item, _imageProvider)).ToList();
+            
+            // Extract all unique genres
+            var allGenres = _allMediaItems
+                .SelectMany(m => m.Genres)
+                .Distinct()
+                .OrderBy(g => g)
+                .ToList();
+
+            Genres.Clear();
+            foreach (var genreName in allGenres)
             {
-                MediaItems.Add(new MediaItemViewModel(item, _imageProvider));
+                var genreVm = new GenreViewModel(genreName);
+                genreVm.OnSelectionChanged += OnGenreSelectionChanged;
+                Genres.Add(genreVm);
+            }
+
+            ApplyFilter();
+        }
+
+        private void OnGenreSelectionChanged(GenreViewModel sender)
+        {
+            ApplyFilter();
+        }
+
+        private void ApplyFilter()
+        {
+            var selectedGenres = new HashSet<string>(Genres.Where(g => g.IsSelected).Select(g => g.Name));
+
+            var filteredItems = _allMediaItems.Where(item => 
+            {
+                // Strict subset: Item is displayed IF AND ONLY IF its set of genres is entirely selected.
+                // i.e. All genres of the item must be in the selectedGenres set.
+                return item.Genres.All(g => selectedGenres.Contains(g));
+            });
+
+            MediaItems.Clear();
+            foreach (var item in filteredItems)
+            {
+                MediaItems.Add(item);
             }
         }
     }

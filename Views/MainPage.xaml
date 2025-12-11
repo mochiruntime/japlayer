@@ -17,12 +17,38 @@
         <!-- Header -->
         <TextBlock Text="Library" Style="{StaticResource TitleTextBlockStyle}" Margin="24,24,0,12"/>
 
-        <!-- Media Grid -->
-        <GridView Grid.Row="1" 
-                  ItemsSource="{x:Bind ViewModel.MediaItems, Mode=OneWay}"
-                  SelectionMode="Single"
-                  IsItemClickEnabled="True"
-                  Padding="12">
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="250"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Genre Filter -->
+            <Grid Padding="24,0,12,0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+                <TextBlock Text="Genres" Style="{StaticResource TitleTextBlockStyle}" FontSize="20" Margin="0,0,0,12"/>
+                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                    <ItemsControl ItemsSource="{x:Bind ViewModel.Genres}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:GenreViewModel">
+                                <CheckBox Content="{x:Bind Name}" 
+                                          IsChecked="{x:Bind IsSelected, Mode=TwoWay}" 
+                                          Margin="0,2"/>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </Grid>
+
+            <!-- Media Grid -->
+            <GridView Grid.Column="1" 
+                      ItemsSource="{x:Bind ViewModel.MediaItems, Mode=OneWay}"
+                      SelectionMode="Single"
+                      IsItemClickEnabled="True"
+                      Padding="12">
             <GridView.ItemTemplate>
                 <DataTemplate x:DataType="vm:MediaItemViewModel">
                     <Grid Width="300" Height="250" Margin="6" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8" ToolTipService.ToolTip="{x:Bind Title}">
@@ -47,5 +73,6 @@
                 </DataTemplate>
             </GridView.ItemTemplate>
         </GridView>
+        </Grid>
     </Grid>
 </Page>
