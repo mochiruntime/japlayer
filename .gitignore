@@ -1,0 +1,40 @@
+# Visual Studio
+.vs/
+*.user
+*.userosscache
+*.sln.docstates
+
+# Build results
+[Bb]in/
+[Oo]bj/
+
+# NuGet Packages
+*.nupkg
+# The packages folder can generally be ignored because of Package Restore
+**/[Pp]ackages/
+# except build/, which is used as an MSBuild target.
+!**/[Pp]ackages/build/
+# If using Central Package Management...
+!**/[Pp]ackages/CentralPackageVersions/
+
+# MSTest test Results
+[Tt]est[Rr]esults/
+*.tr
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# WinUI / MSIX
+*_Test/
+AppPackages/
+BundleArtifacts/
+Package.StoreAssociation.xml
+_pkginfo.txt
+*.appx
+*.msix
+*.appxbundle
+*.msixbundle
+*.msixupload
+*.appxupload
