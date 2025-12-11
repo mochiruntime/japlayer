@@ -8,88 +8,113 @@
     mc:Ignorable="d"
     Background="Transparent">
 
-    <Grid MaxWidth="1200" HorizontalAlignment="Center">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/> <!-- Back Button -->
-            <RowDefinition Height="Auto"/> <!-- Top Section: Cover + Info -->
-            <RowDefinition Height="Auto"/>    <!-- Bottom Section: Gallery -->
-        </Grid.RowDefinitions>
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
 
-        <!-- Header -->
-        <Button x:Name="BackButton" Click="BackButton_Click" Style="{StaticResource NavigationBackButtonNormalStyle}" Margin="24,24,0,12"/>
+        <Grid MaxWidth="1200" HorizontalAlignment="Center">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/> <!-- Back Button -->
+                <RowDefinition Height="Auto"/> <!-- Top Section: Cover + Info -->
+                <RowDefinition Height="*"/>    <!-- Bottom Section: Gallery -->
+            </Grid.RowDefinitions>
 
-        <!-- Top Section Container -->
-        <Grid Grid.Row="1" Margin="24,0,24,24" ColumnSpacing="24">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto"/> <!-- Cover -->
-                <ColumnDefinition Width="*"/>    <!-- Details -->
-            </Grid.ColumnDefinitions>
+            <!-- Header -->
+            <Button x:Name="BackButton" Click="BackButton_Click" Style="{StaticResource NavigationBackButtonNormalStyle}" Margin="24,24,0,12"/>
 
-            <!-- Cover Image -->
-            <Image Grid.Column="0" 
-                   Source="{x:Bind ViewModel.DisplayCover, Mode=OneWay}" 
-                   Width="500" 
-                   Stretch="Uniform" 
-                   VerticalAlignment="Top"/>
+            <!-- Top Section Container -->
+            <Grid Grid.Row="1" Margin="24,0,24,24" ColumnSpacing="24">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/> <!-- Cover -->
+                    <ColumnDefinition Width="*"/>    <!-- Details -->
+                </Grid.ColumnDefinitions>
 
-            <!-- Metadata -->
-            <StackPanel Grid.Column="1" Spacing="8">
-                <TextBlock Text="{x:Bind ViewModel.Title, Mode=OneWay}" Style="{StaticResource TitleTextBlockStyle}" TextWrapping="Wrap"/>
-                
-                <StackPanel Orientation="Horizontal" Spacing="8" Opacity="0.8">
-                    <TextBlock Text="{x:Bind ViewModel.ReleaseDate, Mode=OneWay}"/>
-                    <TextBlock Text="•"/>
-                    <TextBlock Text="{x:Bind ViewModel.Runtime, Mode=OneWay}"/>
-                     <TextBlock Text="•"/>
-                     <TextBlock Text="{x:Bind ViewModel.MdbId, Mode=OneWay}"/>
+                <!-- Cover Image -->
+                <Image Grid.Column="0" 
+                    Source="{x:Bind ViewModel.DisplayCover, Mode=OneWay}" 
+                    Width="500" 
+                    Stretch="Uniform" 
+                    VerticalAlignment="Top"/>
+
+                <!-- Metadata -->
+                <StackPanel Grid.Column="1" Spacing="8">
+                    <TextBlock Text="{x:Bind ViewModel.Title, Mode=OneWay}" Style="{StaticResource TitleTextBlockStyle}" TextWrapping="Wrap"/>
+                    
+                    <StackPanel Orientation="Horizontal" Spacing="8" Opacity="0.8">
+                        <TextBlock Text="{x:Bind ViewModel.ReleaseDate, Mode=OneWay}"/>
+                        <TextBlock Text="•"/>
+                        <TextBlock Text="{x:Bind ViewModel.Runtime, Mode=OneWay}"/>
+                        <TextBlock Text="•"/>
+                        <TextBlock Text="{x:Bind ViewModel.MdbId, Mode=OneWay}"/>
+                    </StackPanel>
+
+                    <ItemsControl ItemsSource="{x:Bind ViewModel.Genres, Mode=OneWay}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal" Spacing="8"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="{ThemeResource SystemControlBackgroundChromeMediumLowBrush}" CornerRadius="4" Padding="8,4">
+                                    <TextBlock Text="{Binding}"/>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <TextBlock Text="Series:" Style="{StaticResource SubtitleTextBlockStyle}" Margin="0,12,0,0"/>
+                    <ItemsControl ItemsSource="{x:Bind ViewModel.Series, Mode=OneWay}"/>
+
+                    <TextBlock Text="Studios:" Style="{StaticResource SubtitleTextBlockStyle}" Margin="0,12,0,0"/>
+                    <ItemsControl ItemsSource="{x:Bind ViewModel.Studios, Mode=OneWay}"/>
+                    
+                    <TextBlock Text="Staff:" Style="{StaticResource SubtitleTextBlockStyle}" Margin="0,12,0,0"/>
+                    <ItemsControl ItemsSource="{x:Bind ViewModel.Staff, Mode=OneWay}"/>
+                    
+                    <TextBlock Text="Cast:" Style="{StaticResource SubtitleTextBlockStyle}" Margin="0,12,0,0"/>
+                    <ItemsControl ItemsSource="{x:Bind ViewModel.Cast, Mode=OneWay}"/>
                 </StackPanel>
+            </Grid>
 
-                <ItemsControl ItemsSource="{x:Bind ViewModel.Genres, Mode=OneWay}">
-                    <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <StackPanel Orientation="Horizontal" Spacing="8"/>
-                        </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <Border Background="{ThemeResource SystemControlBackgroundChromeMediumLowBrush}" CornerRadius="4" Padding="8,4">
-                                <TextBlock Text="{Binding}"/>
-                            </Border>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
+            <!-- Gallery Section -->
+            <Grid Grid.Row="2" Margin="0,0,0,24">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
 
-                <TextBlock Text="Series:" Style="{StaticResource SubtitleTextBlockStyle}" Margin="0,12,0,0"/>
-                <ItemsControl ItemsSource="{x:Bind ViewModel.Series, Mode=OneWay}"/>
+                <Button Grid.Column="0"
+                        Content="◀"
+                        Click="ScrollLeft_Click"
+                        PointerEntered="Button_PointerEntered"
+                        PointerExited="Button_PointerExited"/>
 
-                <TextBlock Text="Studios:" Style="{StaticResource SubtitleTextBlockStyle}" Margin="0,12,0,0"/>
-                <ItemsControl ItemsSource="{x:Bind ViewModel.Studios, Mode=OneWay}"/>
-                
-                <TextBlock Text="Staff:" Style="{StaticResource SubtitleTextBlockStyle}" Margin="0,12,0,0"/>
-                <ItemsControl ItemsSource="{x:Bind ViewModel.Staff, Mode=OneWay}"/>
-                
-                <TextBlock Text="Cast:" Style="{StaticResource SubtitleTextBlockStyle}" Margin="0,12,0,0"/>
-                <ItemsControl ItemsSource="{x:Bind ViewModel.Cast, Mode=OneWay}"/>
-            </StackPanel>
+                <ScrollViewer x:Name="GalleryScrollViewer"
+                            Grid.Column="1"
+                            HorizontalScrollBarVisibility="Auto"
+                            VerticalScrollBarVisibility="Disabled"
+                            Margin="12,0,12,0">
+                    <ItemsControl x:Name="GalleryItemsControl"
+                                ItemsSource="{x:Bind ViewModel.GalleryImages, Mode=OneWay}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal" Spacing="12"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Image Source="{Binding}" Height="300" Stretch="Uniform"/>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+
+                <Button Grid.Column="2"
+                        Content="▶"
+                        Click="ScrollRight_Click"
+                        PointerEntered="Button_PointerEntered"
+                        PointerExited="Button_PointerExited"/>
+            </Grid>
         </Grid>
-
-        <!-- Gallery Section -->
-        <ScrollViewer Grid.Row="2" 
-                      HorizontalScrollBarVisibility="Auto" 
-                      VerticalScrollBarVisibility="Disabled" 
-                      Margin="24,0,24,24">
-            <ItemsControl ItemsSource="{x:Bind ViewModel.GalleryImages, Mode=OneWay}">
-                <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <StackPanel Orientation="Horizontal" Spacing="12"/>
-                    </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate>
-                        <Image Source="{Binding}" Height="300" Stretch="Uniform"/>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
-        </ScrollViewer>
-    </Grid>
+    </ScrollViewer>
 </Page>
