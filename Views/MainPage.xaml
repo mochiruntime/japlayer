@@ -25,7 +25,8 @@
                   Padding="12">
             <GridView.ItemTemplate>
                 <DataTemplate x:DataType="vm:MediaItemViewModel">
-                    <Grid Width="150" Height="240" Margin="6" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8" ToolTipService.ToolTip="{x:Bind Title}">
+                    <Grid Width="300" Height="250" Margin="6" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8" ToolTipService.ToolTip="{x:Bind Title}">
+
                         <Grid.RowDefinitions>
                             <RowDefinition Height="*"/>
                             <RowDefinition Height="Auto"/>
