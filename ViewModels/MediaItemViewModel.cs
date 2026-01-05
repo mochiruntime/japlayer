@@ -8,11 +8,13 @@ namespace Japlayer.ViewModels
     {
         private readonly MediaItem _mediaItem;
         private readonly IImageProvider _imageProvider;
+        private readonly IMediaSceneProvider _sceneProvider;
 
-        public MediaItemViewModel(MediaItem mediaItem, IImageProvider imageProvider)
+        public MediaItemViewModel(MediaItem mediaItem, IImageProvider imageProvider, IMediaSceneProvider sceneProvider)
         {
             _mediaItem = mediaItem;
             _imageProvider = imageProvider;
+            _sceneProvider = sceneProvider;
         }
 
         public string Id => _mediaItem.Id;
@@ -28,6 +30,8 @@ namespace Japlayer.ViewModels
         public IReadOnlyList<string> Studios => _mediaItem.Studios;
         public IReadOnlyList<string> Staff => _mediaItem.Staff;
         public IReadOnlyList<string> Cast => _mediaItem.Cast;
+
+        public IEnumerable<MediaScene> Scenes => _sceneProvider.GetScenes(_mediaItem.Id);
 
         public IEnumerable<string> GalleryImages
         {

@@ -11,6 +11,7 @@ namespace Japlayer.Services
 
         public string MediaPath { get; private set; }
         public string ImagePath { get; private set; }
+        public string LocalMediaStorage { get; private set; }
 
         public SettingsService()
         {
@@ -39,6 +40,7 @@ namespace Japlayer.Services
                 {
                     if (!string.IsNullOrWhiteSpace(settings.MediaPath)) MediaPath = settings.MediaPath;
                     if (!string.IsNullOrWhiteSpace(settings.ImagePath)) ImagePath = settings.ImagePath;
+                    if (!string.IsNullOrWhiteSpace(settings.LocalMediaStorage)) LocalMediaStorage = settings.LocalMediaStorage;
                 }
             }
             catch (JsonException ex)
@@ -66,6 +68,7 @@ namespace Japlayer.Services
         {
             public string MediaPath { get; set; }
             public string ImagePath { get; set; }
+            public string LocalMediaStorage { get; set; }
         }
     }
 }

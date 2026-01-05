@@ -17,8 +17,9 @@ namespace Japlayer.Views
             var settings = new SettingsService();
             var mediaProvider = new FileSystemMediaProvider(settings);
             var imageProvider = new FileSystemImageProvider(settings);
+            var sceneProvider = new FileSystemMediaSceneProvider(settings);
             
-            ViewModel = new MainViewModel(mediaProvider, imageProvider);
+            ViewModel = new MainViewModel(mediaProvider, imageProvider, sceneProvider);
         }
 
         protected override async void OnNavigatedTo(NavigationEventArgs e)

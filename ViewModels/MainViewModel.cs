@@ -10,21 +10,23 @@ namespace Japlayer.ViewModels
     {
         private readonly IMediaProvider _mediaProvider;
         private readonly IImageProvider _imageProvider;
+        private readonly IMediaSceneProvider _sceneProvider;
         private List<MediaItemViewModel> _allMediaItems = new();
 
         public ObservableCollection<MediaItemViewModel> MediaItems { get; } = new();
         public ObservableCollection<GenreViewModel> Genres { get; } = new();
 
-        public MainViewModel(IMediaProvider mediaProvider, IImageProvider imageProvider)
+        public MainViewModel(IMediaProvider mediaProvider, IImageProvider imageProvider, IMediaSceneProvider sceneProvider)
         {
             _mediaProvider = mediaProvider;
             _imageProvider = imageProvider;
+            _sceneProvider = sceneProvider;
         }
 
         public async Task LoadDataAsync()
         {
             var items = await _mediaProvider.GetAllItemsAsync();
-            _allMediaItems = items.Select(item => new MediaItemViewModel(item, _imageProvider)).ToList();
+            _allMediaItems = items.Select(item => new MediaItemViewModel(item, _imageProvider, _sceneProvider)).ToList();
             
             // Extract all unique genres
             var allGenres = _allMediaItems

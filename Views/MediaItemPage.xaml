@@ -5,8 +5,14 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:vm="using:Japlayer.ViewModels"
+    xmlns:converters="using:Japlayer.Converters"
+    xmlns:models="using:Japlayer.Models"
     mc:Ignorable="d"
     Background="Transparent">
+
+    <Page.Resources>
+        <converters:PathToMediaSourceConverter x:Key="PathToMediaSourceConverter"/>
+    </Page.Resources>
 
     <ScrollViewer VerticalScrollBarVisibility="Auto">
 
@@ -14,7 +20,8 @@
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/> <!-- Back Button -->
                 <RowDefinition Height="Auto"/> <!-- Top Section: Cover + Info -->
-                <RowDefinition Height="*"/>    <!-- Bottom Section: Gallery -->
+                <RowDefinition Height="Auto"/>    <!-- Bottom Section: Gallery -->
+                <RowDefinition Height="*"/>    <!-- Scenes Section -->
             </Grid.RowDefinitions>
 
             <!-- Header -->
@@ -115,6 +122,25 @@
                         PointerEntered="Button_PointerEntered"
                         PointerExited="Button_PointerExited"/>
             </Grid>
+            
+            <!-- Scenes Section -->
+            <StackPanel Grid.Row="3" Margin="24,0,24,24" Spacing="12">
+                <TextBlock Text="Scenes" Style="{StaticResource SubtitleTextBlockStyle}"/>
+                <ItemsControl ItemsSource="{x:Bind ViewModel.Scenes, Mode=OneWay}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Spacing="4" Margin="0,0,0,12">
+                                <TextBlock Text="{Binding Scene, ConverterParameter='Scene {0}', Mode=OneWay}" FontWeight="SemiBold"/>
+                                <MediaPlayerElement Source="{Binding File, Converter={StaticResource PathToMediaSourceConverter}, Mode=OneWay}" 
+                                                  AreTransportControlsEnabled="True" 
+                                                  AutoPlay="False"
+                                                  Height="400"
+                                                  HorizontalAlignment="Left"/>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
         </Grid>
     </ScrollViewer>
 </Page>
