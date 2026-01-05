@@ -134,8 +134,9 @@
                                 <MediaPlayerElement Source="{Binding File, Converter={StaticResource PathToMediaSourceConverter}, Mode=OneWay}" 
                                                   AreTransportControlsEnabled="True" 
                                                   AutoPlay="False"
-                                                  Height="400"
-                                                  HorizontalAlignment="Left"/>
+                                                  HorizontalAlignment="Stretch"
+                                                  Stretch="Uniform"
+                                                  Loaded="MediaPlayerElement_Loaded"/>
                             </StackPanel>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>

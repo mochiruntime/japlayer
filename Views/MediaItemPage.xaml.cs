@@ -99,10 +99,35 @@ namespace Japlayer.Views
         {
             ProtectedCursor = Microsoft.UI.Input.InputSystemCursor.Create(Microsoft.UI.Input.InputSystemCursorShape.Hand);
         }
-
         private void Button_PointerExited(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
         {
             ProtectedCursor = null; // Revert to default
+        }
+
+        private void MediaPlayerElement_Loaded(object sender, RoutedEventArgs e)
+        {
+            if (sender is MediaPlayerElement mpe)
+            {
+                if (mpe.MediaPlayer != null)
+                {
+                    mpe.MediaPlayer.MediaOpened += (s, args) => 
+                    {
+                        mpe.DispatcherQueue.TryEnqueue(() => UpdateMediaPlayerHeight(mpe));
+                    };
+                }
+                
+                mpe.SizeChanged += (s, args) => UpdateMediaPlayerHeight(mpe);
+                UpdateMediaPlayerHeight(mpe);
+            }
+        }
+
+        private void UpdateMediaPlayerHeight(MediaPlayerElement mpe)
+        {
+            if (mpe.MediaPlayer != null && mpe.MediaPlayer.PlaybackSession.NaturalVideoWidth > 0)
+            {
+                double ratio = (double)mpe.MediaPlayer.PlaybackSession.NaturalVideoHeight / mpe.MediaPlayer.PlaybackSession.NaturalVideoWidth;
+                mpe.Height = mpe.ActualWidth * ratio;
+            }
         }
     }
 }
