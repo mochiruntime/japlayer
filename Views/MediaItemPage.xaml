@@ -32,7 +32,7 @@
         </Border>
 
         <!-- Main Content Area (Scrolls behind header) -->
-        <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <ScrollViewer x:Name="RootScrollViewer" VerticalScrollBarVisibility="Auto">
             <Grid MaxWidth="1200" HorizontalAlignment="Center" Margin="0,64,0,0" Padding="0,24,0,0">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/> <!-- Top Section: Cover + Info -->

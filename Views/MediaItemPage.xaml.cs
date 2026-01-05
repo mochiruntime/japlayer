@@ -14,6 +14,7 @@ namespace Japlayer.Views
         public MediaItemPage()
         {
             this.InitializeComponent();
+            GalleryScrollViewer.AddHandler(UIElement.PointerWheelChangedEvent, new Microsoft.UI.Xaml.Input.PointerEventHandler(GalleryScrollViewer_PointerWheelChanged), true);
         }
 
         protected override void OnNavigatedTo(NavigationEventArgs e)
@@ -93,6 +94,43 @@ namespace Japlayer.Views
             }
 
             GalleryScrollViewer.ChangeView(targetOffset, null, null, false);
+        }
+
+        private void GalleryScrollViewer_PointerWheelChanged(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+        {
+            var pointerPoint = e.GetCurrentPoint(GalleryScrollViewer);
+            if (pointerPoint.Properties.IsHorizontalMouseWheel)
+            {
+                return;
+            }
+
+            int delta = pointerPoint.Properties.MouseWheelDelta;
+
+            // Manual bubble up to parent if we've reached the ends
+            if (delta > 0 && GalleryScrollViewer.HorizontalOffset <= 0)
+            {
+                // Scroll Up (to the left) but already at the left edge
+                // Manually scroll RootScrollViewer UP
+                RootScrollViewer.ChangeView(null, RootScrollViewer.VerticalOffset - (delta * 0.5), null, false);
+                return;
+            }
+            if (delta < 0 && GalleryScrollViewer.HorizontalOffset >= GalleryScrollViewer.ScrollableWidth)
+            {
+                // Scroll Down (to the right) but already at the right edge
+                // Manually scroll RootScrollViewer DOWN
+                RootScrollViewer.ChangeView(null, RootScrollViewer.VerticalOffset - (delta * 0.5), null, false);
+                return;
+            }
+            
+            double scrollAmount = -delta * 5;
+            double newOffset = GalleryScrollViewer.HorizontalOffset + scrollAmount;
+            
+            GalleryScrollViewer.ChangeView(newOffset, null, null, false);
+
+            // Sync the target index for the manual buttons
+            _targetGalleryIndex = GetCurrentImageIndex();
+
+            e.Handled = true;
         }
 
         private void Button_PointerEntered(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
