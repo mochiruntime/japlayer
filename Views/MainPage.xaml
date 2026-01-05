@@ -6,7 +6,8 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:vm="using:Japlayer.ViewModels"
     mc:Ignorable="d"
-    Background="Transparent">
+    Background="Transparent"
+    NavigationCacheMode="Required">
 
     <Grid>
         <Grid.RowDefinitions>

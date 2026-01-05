@@ -15,6 +15,7 @@ namespace Japlayer.ViewModels
 
         public ObservableCollection<MediaItemViewModel> MediaItems { get; } = new();
         public ObservableCollection<GenreViewModel> Genres { get; } = new();
+        public bool IsDataLoaded { get; private set; }
 
         public MainViewModel(IMediaProvider mediaProvider, IImageProvider imageProvider, IMediaSceneProvider sceneProvider)
         {
@@ -44,6 +45,7 @@ namespace Japlayer.ViewModels
             }
 
             ApplyFilter();
+            IsDataLoaded = true;
         }
 
         private void OnGenreSelectionChanged(GenreViewModel sender)

@@ -25,7 +25,13 @@ namespace Japlayer.Views
         protected override async void OnNavigatedTo(NavigationEventArgs e)
         {
             base.OnNavigatedTo(e);
-            await ViewModel.LoadDataAsync();
+
+            // Only load data if this is a new navigation or data hasn't been loaded yet.
+            // When navigating back, NavigationCacheMode="Required" preserves the state.
+            if (e.NavigationMode == NavigationMode.New || !ViewModel.IsDataLoaded)
+            {
+                await ViewModel.LoadDataAsync();
+            }
         }
 
         private void MediaGrid_ItemClick(object sender, ItemClickEventArgs e)
