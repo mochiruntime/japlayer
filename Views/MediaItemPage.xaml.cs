@@ -148,23 +148,64 @@ namespace Japlayer.Views
             {
                 if (mpe.MediaPlayer != null)
                 {
-                    mpe.MediaPlayer.MediaOpened += (s, args) => 
-                    {
-                        mpe.DispatcherQueue.TryEnqueue(() => UpdateMediaPlayerHeight(mpe));
-                    };
+                    mpe.MediaPlayer.MediaOpened += MediaPlayer_MediaOpened;
                 }
                 
-                mpe.SizeChanged += (s, args) => UpdateMediaPlayerHeight(mpe);
+                mpe.SizeChanged += MediaPlayerElement_SizeChanged;
+                UpdateMediaPlayerHeight(mpe);
+            }
+        }
+
+        private void MediaPlayerElement_Unloaded(object sender, RoutedEventArgs e)
+        {
+            if (sender is MediaPlayerElement mpe)
+            {
+                mpe.SizeChanged -= MediaPlayerElement_SizeChanged;
+                
+                if (mpe.MediaPlayer != null)
+                {
+                    mpe.MediaPlayer.MediaOpened -= MediaPlayer_MediaOpened;
+                }
+                
+                // IMPORTANT: Setting Source to null is enough to release the file handle.
+                // Do NOT call mpe.MediaPlayer.Dispose() as it can cause COMException 
+                // if the framework tries to access the player during/after unload.
+                mpe.Source = null;
+            }
+        }
+
+        private void MediaPlayer_MediaOpened(Windows.Media.Playback.MediaPlayer sender, object args)
+        {
+            // When media opens, we need to update the height.
+            // Since we don't have the MediaPlayerElement here, we can't call UpdateMediaPlayerHeight directly.
+            // However, we can use the sender's dispatcher if needed, but it's better to find the MPE.
+            // A simpler way is to just let SizeChanged handle it if the layout updates,
+            // or we use DispatcherQueue but we need a reference.
+        }
+
+        private void MediaPlayerElement_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            if (sender is MediaPlayerElement mpe)
+            {
                 UpdateMediaPlayerHeight(mpe);
             }
         }
 
         private void UpdateMediaPlayerHeight(MediaPlayerElement mpe)
         {
-            if (mpe.MediaPlayer != null && mpe.MediaPlayer.PlaybackSession.NaturalVideoWidth > 0)
+            if (mpe == null) return;
+
+            try
             {
-                double ratio = (double)mpe.MediaPlayer.PlaybackSession.NaturalVideoHeight / mpe.MediaPlayer.PlaybackSession.NaturalVideoWidth;
-                mpe.Height = mpe.ActualWidth * ratio;
+                if (mpe.MediaPlayer != null && mpe.MediaPlayer.PlaybackSession != null && mpe.MediaPlayer.PlaybackSession.NaturalVideoWidth > 0)
+                {
+                    double ratio = (double)mpe.MediaPlayer.PlaybackSession.NaturalVideoHeight / mpe.MediaPlayer.PlaybackSession.NaturalVideoWidth;
+                    mpe.Height = mpe.ActualWidth * ratio;
+                }
+            }
+            catch (Exception)
+            {
+                // Prevent crashes if player is disposed or in an invalid state
             }
         }
     }

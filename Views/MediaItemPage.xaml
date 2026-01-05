@@ -148,7 +148,8 @@
                                                       AutoPlay="False"
                                                       HorizontalAlignment="Stretch"
                                                       Stretch="Uniform"
-                                                      Loaded="MediaPlayerElement_Loaded"/>
+                                                      Loaded="MediaPlayerElement_Loaded"
+                                                      Unloaded="MediaPlayerElement_Unloaded"/>
                                 </StackPanel>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
