@@ -10,10 +10,10 @@ namespace Japlayer.Services
 {
     public class FileSystemMediaSceneProvider : IMediaSceneProvider
     {
-        private readonly SettingsService _settings;
+        private readonly ISettingsService _settings;
         private List<MediaScene> _cachedScenes;
 
-        public FileSystemMediaSceneProvider(SettingsService settings)
+        public FileSystemMediaSceneProvider(ISettingsService settings)
         {
             _settings = settings;
         }

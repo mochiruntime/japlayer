@@ -2,6 +2,7 @@ using Japlayer.Services;
 using Japlayer.ViewModels;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Navigation;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Japlayer.Views
 {
@@ -12,14 +13,7 @@ namespace Japlayer.Views
         public MainPage()
         {
             this.InitializeComponent();
-            
-            // Manual DI wire-up (ideally this should be done in App.xaml.cs or a factory)
-            var settings = new SettingsService();
-            var mediaProvider = new FileSystemMediaProvider(settings);
-            var imageProvider = new FileSystemImageProvider(settings);
-            var sceneProvider = new FileSystemMediaSceneProvider(settings);
-            
-            ViewModel = new MainViewModel(mediaProvider, imageProvider, sceneProvider);
+            ViewModel = App.GetService<MainViewModel>();
         }
 
         protected override async void OnNavigatedTo(NavigationEventArgs e)

@@ -1,10 +1,11 @@
 using System;
 using System.IO;
 using System.Text.Json;
+using Japlayer.Contracts;
 
 namespace Japlayer.Services
 {
-    public class SettingsService
+    public class SettingsService : ISettingsService
     {
         private const string ConfigFileName = "appsettings.json";
         private const string LocalConfigFileName = "appsettings.json.local";
@@ -21,7 +22,7 @@ namespace Japlayer.Services
         private void LoadSettings()
         {
             var configPath = Path.Combine(AppContext.BaseDirectory, ConfigFileName);
-            
+
             if (!File.Exists(configPath))
             {
                 configPath = FindLocalConfig(AppContext.BaseDirectory);
@@ -33,7 +34,7 @@ namespace Japlayer.Services
             }
 
             var json = File.ReadAllText(configPath);
-            try 
+            try
             {
                 var settings = JsonSerializer.Deserialize<AppSettings>(json);
                 if (settings != null)
@@ -45,7 +46,7 @@ namespace Japlayer.Services
             }
             catch (JsonException ex)
             {
-                throw new Exception($"Error parsing configuration file at '{configPath}': {ex.Message}", ex); 
+                throw new Exception($"Error parsing configuration file at '{configPath}': {ex.Message}", ex);
             }
         }
 

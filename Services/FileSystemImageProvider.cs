@@ -9,10 +9,10 @@ namespace Japlayer.Services
 {
     public class FileSystemImageProvider : IImageProvider
     {
-        private readonly SettingsService _settingsService;
+        private readonly ISettingsService _settingsService;
         private readonly ReadOnlyCollection<string> _allowedExtensions;
 
-        public FileSystemImageProvider(SettingsService settingsService)
+        public FileSystemImageProvider(ISettingsService settingsService)
         {
             _settingsService = settingsService;
             _allowedExtensions = new ReadOnlyCollection<string>(new string[] { ".webp", ".jpg", ".jpeg", ".png" });
@@ -21,7 +21,8 @@ namespace Japlayer.Services
         public string GetCoverPath(string id)
         {
             var path = _settingsService.ImagePath;
-            foreach (var extension in _allowedExtensions) {
+            foreach (var extension in _allowedExtensions)
+            {
                 var coverPath = Path.Combine(path, $"{id}_cover{extension}");
                 if (File.Exists(coverPath)) return coverPath;
             }
@@ -30,8 +31,9 @@ namespace Japlayer.Services
 
         public string GetThumbPath(string id)
         {
-             var path = _settingsService.ImagePath;
-            foreach (var extension in _allowedExtensions) {
+            var path = _settingsService.ImagePath;
+            foreach (var extension in _allowedExtensions)
+            {
                 var thumbPath = Path.Combine(path, $"{id}_thumb{extension}");
                 if (File.Exists(thumbPath)) return thumbPath;
             }
@@ -46,9 +48,9 @@ namespace Japlayer.Services
             // naming convention: ID_0.jpg, ID_1.jpg ...
 
             // Build regex to match: id_ + digits + allowed extension
-            string pattern = $@"^{Regex.Escape(id)}_\d+({string.Join("|", _allowedExtensions.Select(e => Regex.Escape(e)) )})$";
+            string pattern = $@"^{Regex.Escape(id)}_\d+({string.Join("|", _allowedExtensions.Select(e => Regex.Escape(e)))})$";
             var regex = new Regex(pattern, RegexOptions.IgnoreCase);
-            
+
             // Use prefix wildcard to reduce number of files enumerated
             var images = _allowedExtensions
                 .SelectMany(ext => Directory.EnumerateFiles(path, $"{id}_*{ext}"))

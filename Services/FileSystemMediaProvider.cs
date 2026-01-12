@@ -10,9 +10,9 @@ namespace Japlayer.Services
 {
     public class FileSystemMediaProvider : IMediaProvider
     {
-        private readonly SettingsService _settingsService;
+        private readonly ISettingsService _settingsService;
 
-        public FileSystemMediaProvider(SettingsService settingsService)
+        public FileSystemMediaProvider(ISettingsService settingsService)
         {
             _settingsService = settingsService;
         }
@@ -57,7 +57,7 @@ namespace Japlayer.Services
             // Naive implementation: scan all. Optimization would be caching or specific file lookup if ID maps to filename exactly.
             // Based on user prompt: filename = "ABF-054.json", ID = "ABF-054".
             // So we can try to look up directly.
-            
+
             var path = _settingsService.MediaPath;
             var filePath = Path.Combine(path, $"{id}.json");
 
