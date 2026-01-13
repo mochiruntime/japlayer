@@ -12,13 +12,13 @@ namespace Japlayer
             SystemBackdrop = new Microsoft.UI.Xaml.Media.MicaBackdrop();
             ExtendsContentIntoTitleBar = true;
             SetTitleBar(AppTitleBar);
-            
+
             // Set window size
             IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
             Microsoft.UI.WindowId windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(hWnd);
             Microsoft.UI.Windowing.AppWindow appWindow = Microsoft.UI.Windowing.AppWindow.GetFromWindowId(windowId);
             appWindow.Resize(new Windows.Graphics.SizeInt32(1950, 1080));
-            
+
             Title = "Japlayer";
             ContentFrame.Navigate(typeof(Views.MainPage));
         }

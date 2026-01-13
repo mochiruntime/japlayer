@@ -24,7 +24,7 @@ namespace Japlayer.ViewModels
         public string MdbId => _mediaItem.MdbId;
         public string ReleaseDate => _mediaItem.ReleaseDate;
         public string Runtime => _mediaItem.Runtime;
-        
+
         public IReadOnlyList<string> Genres => _mediaItem.Genres;
         public IReadOnlyList<string> Series => _mediaItem.Series;
         public IReadOnlyList<string> Studios => _mediaItem.Studios;
@@ -40,15 +40,15 @@ namespace Japlayer.ViewModels
                 var list = new List<string>();
                 var thumb = _imageProvider.GetThumbPath(_mediaItem.Id);
                 if (!string.IsNullOrEmpty(thumb)) list.Add(thumb);
-                
+
                 var gallery = _imageProvider.GetGalleryPaths(_mediaItem.Id);
                 if (gallery != null) list.AddRange(gallery);
-                
+
                 return list;
             }
         }
 
         // Helper for UI binding
-        public string DisplayCover => CoverPath ?? "ms-appx:///Assets/StoreLogo.png";  
+        public string DisplayCover => CoverPath ?? "ms-appx:///Assets/StoreLogo.png";
     }
 }

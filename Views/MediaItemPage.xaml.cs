@@ -121,10 +121,10 @@ namespace Japlayer.Views
                 RootScrollViewer.ChangeView(null, RootScrollViewer.VerticalOffset - (delta * 0.5), null, false);
                 return;
             }
-            
+
             double scrollAmount = -delta * 5;
             double newOffset = GalleryScrollViewer.HorizontalOffset + scrollAmount;
-            
+
             GalleryScrollViewer.ChangeView(newOffset, null, null, false);
 
             // Sync the target index for the manual buttons
@@ -150,7 +150,7 @@ namespace Japlayer.Views
                 {
                     mpe.MediaPlayer.MediaOpened += MediaPlayer_MediaOpened;
                 }
-                
+
                 mpe.SizeChanged += MediaPlayerElement_SizeChanged;
                 UpdateMediaPlayerHeight(mpe);
             }
@@ -161,12 +161,12 @@ namespace Japlayer.Views
             if (sender is MediaPlayerElement mpe)
             {
                 mpe.SizeChanged -= MediaPlayerElement_SizeChanged;
-                
+
                 if (mpe.MediaPlayer != null)
                 {
                     mpe.MediaPlayer.MediaOpened -= MediaPlayer_MediaOpened;
                 }
-                
+
                 // IMPORTANT: Setting Source to null is enough to release the file handle.
                 // Do NOT call mpe.MediaPlayer.Dispose() as it can cause COMException 
                 // if the framework tries to access the player during/after unload.

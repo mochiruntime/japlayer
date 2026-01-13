@@ -17,7 +17,7 @@ namespace Japlayer.Converters
                     {
                         return MediaSource.CreateFromUri(new Uri(path));
                     }
-                    
+
                     if (Uri.TryCreate(path, UriKind.Absolute, out var uri))
                     {
                         return MediaSource.CreateFromUri(uri);
