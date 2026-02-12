@@ -21,7 +21,7 @@ namespace Japlayer.ViewModels
         public string Title => _mediaItem.Id + " " + _mediaItem.Title;
         public string OriginalTitle => _mediaItem.Title; // Explicit title without ID prefix
         public string CoverPath => _imageProvider.GetCoverPath(_mediaItem.Id);
-        public string MdbId => _mediaItem.MdbId;
+        public string ContentId => _mediaItem.ContentId;
         public string ReleaseDate => _mediaItem.ReleaseDate;
         public string Runtime => _mediaItem.Runtime;
 

@@ -63,7 +63,7 @@
                             <TextBlock Text="•"/>
                             <TextBlock Text="{x:Bind ViewModel.Runtime, Mode=OneWay}"/>
                             <TextBlock Text="•"/>
-                            <TextBlock Text="{x:Bind ViewModel.MdbId, Mode=OneWay}"/>
+                            <TextBlock Text="{x:Bind ViewModel.ContentId, Mode=OneWay}"/>
                         </StackPanel>
 
                         <ItemsControl ItemsSource="{x:Bind ViewModel.Genres, Mode=OneWay}">

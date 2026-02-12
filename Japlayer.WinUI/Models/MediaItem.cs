@@ -15,8 +15,8 @@ namespace Japlayer.Models
         [JsonPropertyName("series")]
         public List<string> Series { get; set; } = new();
 
-        [JsonPropertyName("mdbId")]
-        public string MdbId { get; set; }
+        [JsonPropertyName("contentId")]
+        public string ContentId { get; set; }
 
         [JsonPropertyName("releaseDate")]
         public string ReleaseDate { get; set; }
