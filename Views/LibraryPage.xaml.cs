@@ -6,14 +6,14 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Japlayer.Views
 {
-    public sealed partial class MainPage : Page
+    public sealed partial class LibraryPage : Page
     {
-        public MainViewModel ViewModel { get; private set; }
+        public LibraryViewModel ViewModel { get; private set; }
 
-        public MainPage()
+        public LibraryPage()
         {
+            ViewModel = App.GetService<LibraryViewModel>();
             this.InitializeComponent();
-            ViewModel = App.GetService<MainViewModel>();
         }
 
         protected override async void OnNavigatedTo(NavigationEventArgs e)

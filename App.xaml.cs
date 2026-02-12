@@ -34,7 +34,7 @@ namespace Japlayer
             services.AddSingleton<IMediaSceneProvider, FileSystemMediaSceneProvider>();
 
             // ViewModels
-            services.AddTransient<MainViewModel>();
+            services.AddTransient<LibraryViewModel>();
             services.AddTransient<MediaItemViewModel>();
 
             // Views
