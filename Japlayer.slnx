@@ -1,0 +1,6 @@
+<Solution>
+  <Folder Name="/Japlayer.WinUI/">
+    <Project Path="Japlayer.WinUI/Japlayer.csproj" />
+  </Folder>
+  <Project Path="Japlayer.Data/Japlayer.Data.csproj" />
+</Solution>
