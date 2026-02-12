@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace Japlayer.Data.Models;
+namespace Japlayer.Data.Entities;
 
 public partial class MediaImage
 {

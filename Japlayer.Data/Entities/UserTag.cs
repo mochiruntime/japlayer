@@ -1,9 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace Japlayer.Data.Models;
+namespace Japlayer.Data.Entities;
 
-public partial class MediaSeries
+public partial class UserTag
 {
     public int Id { get; set; }
 
