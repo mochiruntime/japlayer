@@ -1,5 +1,6 @@
 using Japlayer.Data.Context;
 using Japlayer.Data.Entities;
+using Japlayer.Data.Services;
 using Microsoft.EntityFrameworkCore;
 
 // Validate command line arguments
@@ -106,6 +107,65 @@ try
     foreach (var location in locations)
     {
         Console.WriteLine($"  - {location.MediaId} @ {location.Hostname}:{location.Path} (Scene {location.Scene})");
+    }
+
+    Console.WriteLine("\n--------------------------------------------------");
+    Console.WriteLine("Testing Services...");
+    Console.WriteLine("--------------------------------------------------\n");
+
+    // Test DatabaseMediaProviderService
+    var mediaProvider = new DatabaseMediaProvider(context);
+
+    Console.WriteLine("1. Testing GetLibraryItemsAsync...");
+    var libraryItems = (await mediaProvider.GetLibraryItemsAsync()).ToList();
+    Console.WriteLine($"   Retrieved {libraryItems.Count} library items.");
+
+    var firstItem = libraryItems.FirstOrDefault(item => !string.IsNullOrEmpty(item.Title));
+
+    if (firstItem != null)
+    {
+        Console.WriteLine($"   First Item with Metadata: [{firstItem.MediaId}] {firstItem.Title} (Cover: {firstItem.CoverImagePath})");
+
+        Console.WriteLine($"\n2. Testing GetMediaItemAsync for ID: {firstItem.MediaId}...");
+        var mediaItem = await mediaProvider.GetMediaItemAsync(firstItem.MediaId);
+        Console.WriteLine($"   Title: {mediaItem.Title}");
+        Console.WriteLine($"   Release Date: {mediaItem.ReleaseDate}");
+        Console.WriteLine($"   Runtime: {mediaItem.Runtime}");
+        Console.WriteLine($"   Studios: {string.Join(", ", mediaItem.Studios)}");
+        Console.WriteLine($"   Cast: {string.Join(", ", mediaItem.Cast.Take(3))}{(mediaItem.Cast.Count > 3 ? "..." : "")}");
+
+        // Test DatabaseMediaSceneProviderService
+        var sceneProvider = new DatabaseMediaSceneProvider(context);
+        Console.WriteLine($"\n3. Testing GetMediaScenesAsync for ID: {firstItem.MediaId}...");
+        var scenes = (await sceneProvider.GetMediaScenesAsync(firstItem.MediaId)).ToList();
+        Console.WriteLine($"   Retrieved {scenes.Count} scenes.");
+        foreach (var scene in scenes)
+        {
+            Console.WriteLine($"   - Scene {scene.SceneNumber}: {scene.FilePaths.Count} file(s)");
+            if (scene.FilePaths.Any())
+            {
+                Console.WriteLine($"     -> {scene.FilePaths.First()}");
+            }
+        }
+
+        // Test DatabaseImageProvider
+        var imageProvider = new DatabaseImageProvider(context);
+        Console.WriteLine($"\n4. Testing GetGalleryPathsAsync for ID: {firstItem.MediaId}...");
+        var galleryPaths = (await imageProvider.GetGalleryPathsAsync(firstItem.MediaId)).ToList();
+        Console.WriteLine($"   Retrieved {galleryPaths.Count} gallery images.");
+
+        if (galleryPaths.Any())
+        {
+            Console.WriteLine($"   First 3 paths:");
+            foreach (var path in galleryPaths.Take(3))
+            {
+                Console.WriteLine($"     -> {path}");
+            }
+        }
+    }
+    else
+    {
+        Console.WriteLine("   No library items found to test GetMediaItemAsync or GetMediaScenesAsync.");
     }
 
     Console.WriteLine("\n✓ All tests completed successfully!");
