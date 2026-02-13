@@ -12,14 +12,14 @@ namespace Japlayer.Data.Models
 
         public TimeSpan? Runtime { get; init; }
 
-        public List<string> Series { get; init; } = new();
+        public List<string> Series { get; init; } = [];
 
-        public List<string> Studios { get; init; } = new();
+        public List<string> Studios { get; init; } = [];
 
-        public List<string> Cast { get; init; } = new();
+        public List<string> Cast { get; init; } = [];
 
-        public List<string> Staff { get; init; } = new();
+        public List<string> Staff { get; init; } = [];
 
-        public List<string> Genres { get; init; } = new();
+        public List<string> Genres { get; init; } = [];
     }
 }

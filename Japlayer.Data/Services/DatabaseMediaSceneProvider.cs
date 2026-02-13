@@ -8,14 +8,9 @@ using System.Threading.Tasks;
 
 namespace Japlayer.Data.Services
 {
-    public class DatabaseMediaSceneProvider : IMediaSceneProvider
+    public class DatabaseMediaSceneProvider(DatabaseContext context) : IMediaSceneProvider
     {
-        private readonly DatabaseContext _context;
-
-        public DatabaseMediaSceneProvider(DatabaseContext context)
-        {
-            _context = context;
-        }
+        private readonly DatabaseContext _context = context;
 
         public async Task<IEnumerable<MediaScene>> GetMediaScenesAsync(string mediaId)
         {

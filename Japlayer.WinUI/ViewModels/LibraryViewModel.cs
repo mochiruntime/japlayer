@@ -9,25 +9,19 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Japlayer.ViewModels
 {
-    public class LibraryViewModel
+    public class LibraryViewModel(IMediaProvider mediaProvider, IServiceProvider serviceProvider)
     {
-        private readonly IMediaProvider _mediaProvider;
-        private readonly IServiceProvider _serviceProvider;
-        private List<MediaItemViewModel> _allMediaItems = new();
+        private readonly IMediaProvider _mediaProvider = mediaProvider;
+        private readonly IServiceProvider _serviceProvider = serviceProvider;
+        private List<MediaItemViewModel> _allMediaItems = [];
 
-        public ObservableCollection<MediaItemViewModel> MediaItems { get; } = new();
+        public ObservableCollection<MediaItemViewModel> MediaItems { get; } = [];
         public bool IsDataLoaded { get; private set; }
-
-        public LibraryViewModel(IMediaProvider mediaProvider, IServiceProvider serviceProvider)
-        {
-            _mediaProvider = mediaProvider;
-            _serviceProvider = serviceProvider;
-        }
 
         public async Task LoadDataAsync()
         {
             var items = await _mediaProvider.GetLibraryItemsAsync();
-            _allMediaItems = items.Select(item => ActivatorUtilities.CreateInstance<MediaItemViewModel>(_serviceProvider, item)).ToList();
+            _allMediaItems = [.. items.Select(item => ActivatorUtilities.CreateInstance<MediaItemViewModel>(_serviceProvider, item))];
 
             ApplyFilter();
             IsDataLoaded = true;

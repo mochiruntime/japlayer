@@ -7,14 +7,9 @@ using System.Threading.Tasks;
 
 namespace Japlayer.Data.Services
 {
-    public class DatabaseImageProvider : IImageProvider
+    public class DatabaseImageProvider(DatabaseContext context) : IImageProvider
     {
-        private readonly DatabaseContext _context;
-
-        public DatabaseImageProvider(DatabaseContext context)
-        {
-            _context = context;
-        }
+        private readonly DatabaseContext _context = context;
 
         public async Task<IEnumerable<string>> GetGalleryPathsAsync(string mediaId)
         {

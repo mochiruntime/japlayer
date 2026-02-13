@@ -7,19 +7,19 @@ public partial class Media
 {
     public string MediaId { get; set; } = null!;
 
-    public virtual ICollection<MediaImage> MediaImages { get; set; } = new List<MediaImage>();
+    public virtual ICollection<MediaImage> MediaImages { get; set; } = [];
 
-    public virtual ICollection<MediaMetadata> MediaMetadata { get; set; } = new List<MediaMetadata>();
+    public virtual ICollection<MediaMetadata> MediaMetadata { get; set; } = [];
 
-    public virtual ICollection<MediaGenre> Genres { get; set; } = new List<MediaGenre>();
+    public virtual ICollection<MediaGenre> Genres { get; set; } = [];
 
-    public virtual ICollection<MediaPerson> People { get; set; } = new List<MediaPerson>();
+    public virtual ICollection<MediaPerson> People { get; set; } = [];
 
-    public virtual ICollection<MediaPerson> PeopleNavigation { get; set; } = new List<MediaPerson>();
+    public virtual ICollection<MediaPerson> PeopleNavigation { get; set; } = [];
 
-    public virtual ICollection<MediaSeries> Series { get; set; } = new List<MediaSeries>();
+    public virtual ICollection<MediaSeries> Series { get; set; } = [];
 
-    public virtual ICollection<MediaStudio> Studios { get; set; } = new List<MediaStudio>();
+    public virtual ICollection<MediaStudio> Studios { get; set; } = [];
 
-    public virtual ICollection<UserTag> UserTags { get; set; } = new List<UserTag>();
+    public virtual ICollection<UserTag> UserTags { get; set; } = [];
 }

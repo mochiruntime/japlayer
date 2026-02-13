@@ -13,7 +13,7 @@ public partial class MediaImage
 
     public virtual Media Media { get; set; } = null!;
 
-    public virtual ICollection<MediaMetadata> MediaMetadataCoverNavigations { get; set; } = new List<MediaMetadata>();
+    public virtual ICollection<MediaMetadata> MediaMetadataCoverNavigations { get; set; } = [];
 
-    public virtual ICollection<MediaMetadata> MediaMetadataThumbnailNavigations { get; set; } = new List<MediaMetadata>();
+    public virtual ICollection<MediaMetadata> MediaMetadataThumbnailNavigations { get; set; } = [];
 }

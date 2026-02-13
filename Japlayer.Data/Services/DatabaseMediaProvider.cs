@@ -9,14 +9,9 @@ using System.Threading.Tasks;
 
 namespace Japlayer.Data.Services
 {
-    public class DatabaseMediaProvider : IMediaProvider
+    public class DatabaseMediaProvider(DatabaseContext context) : IMediaProvider
     {
-        private readonly DatabaseContext _context;
-
-        public DatabaseMediaProvider(DatabaseContext context)
-        {
-            _context = context;
-        }
+        private readonly DatabaseContext _context = context;
 
         public async Task<IEnumerable<LibraryItem>> GetLibraryItemsAsync()
         {
@@ -76,11 +71,11 @@ namespace Japlayer.Data.Services
                 ContentId = metadata?.ContentId,
                 ReleaseDate = metadata?.ReleaseDate,
                 Runtime = metadata?.RuntimeMinutes.HasValue == true ? TimeSpan.FromMinutes(metadata.RuntimeMinutes.Value) : null,
-                Series = media?.Series.Select(s => s.Name).ToList() ?? new List<string>(),
-                Studios = media?.Studios.Select(s => s.Name).ToList() ?? new List<string>(),
-                Cast = media?.People.Select(p => p.Name).ToList() ?? new List<string>(),
-                Staff = media?.PeopleNavigation.Select(p => p.Name).ToList() ?? new List<string>(),
-                Genres = media?.Genres.Select(g => g.Name).ToList() ?? new List<string>()
+                Series = media?.Series.Select(s => s.Name).ToList() ?? [],
+                Studios = media?.Studios.Select(s => s.Name).ToList() ?? [],
+                Cast = media?.People.Select(p => p.Name).ToList() ?? [],
+                Staff = media?.PeopleNavigation.Select(p => p.Name).ToList() ?? [],
+                Genres = media?.Genres.Select(g => g.Name).ToList() ?? []
             };
         }
     }

@@ -9,5 +9,5 @@ public partial class MediaGenre
 
     public string Name { get; set; } = null!;
 
-    public virtual ICollection<Media> Media { get; set; } = new List<Media>();
+    public virtual ICollection<Media> Media { get; set; } = [];
 }

@@ -11,28 +11,19 @@ using System.Threading.Tasks;
 
 namespace Japlayer.ViewModels
 {
-    public class MediaItemViewModel : INotifyPropertyChanged
+    public class MediaItemViewModel(LibraryItem libraryItem, IImageProvider imageProvider, IMediaSceneProvider sceneProvider, IMediaProvider mediaProvider, ISettingsService settingsService) : INotifyPropertyChanged
     {
-        private readonly LibraryItem _libraryItem;
-        private readonly IImageProvider _imageProvider;
-        private readonly IMediaSceneProvider _sceneProvider;
-        private readonly IMediaProvider _mediaProvider;
-        private readonly ISettingsService _settingsService;
+        private readonly LibraryItem _libraryItem = libraryItem;
+        private readonly IImageProvider _imageProvider = imageProvider;
+        private readonly IMediaSceneProvider _sceneProvider = sceneProvider;
+        private readonly IMediaProvider _mediaProvider = mediaProvider;
+        private readonly ISettingsService _settingsService = settingsService;
 
         private MediaItem _mediaItem;
         private ObservableCollection<MediaSceneViewModel> _scenes;
         private ObservableCollection<string> _galleryImages;
 
         public event PropertyChangedEventHandler PropertyChanged;
-
-        public MediaItemViewModel(LibraryItem libraryItem, IImageProvider imageProvider, IMediaSceneProvider sceneProvider, IMediaProvider mediaProvider, ISettingsService settingsService)
-        {
-            _libraryItem = libraryItem;
-            _imageProvider = imageProvider;
-            _sceneProvider = sceneProvider;
-            _mediaProvider = mediaProvider;
-            _settingsService = settingsService;
-        }
 
         public string Id => _libraryItem.MediaId;
         public string Title => _libraryItem.MediaId + " " + _libraryItem.Title;
@@ -51,11 +42,11 @@ namespace Japlayer.ViewModels
         public string ReleaseDate => _mediaItem?.ReleaseDate?.ToString();
         public string Runtime => _mediaItem?.Runtime?.ToString();
 
-        public IReadOnlyList<string> Genres => _mediaItem?.Genres ?? new List<string>();
-        public IReadOnlyList<string> Series => _mediaItem?.Series ?? new List<string>();
-        public IReadOnlyList<string> Studios => _mediaItem?.Studios ?? new List<string>();
-        public IReadOnlyList<string> Staff => _mediaItem?.Staff ?? new List<string>();
-        public IReadOnlyList<string> Cast => _mediaItem?.Cast ?? new List<string>();
+        public IReadOnlyList<string> Genres => _mediaItem?.Genres ?? [];
+        public IReadOnlyList<string> Series => _mediaItem?.Series ?? [];
+        public IReadOnlyList<string> Studios => _mediaItem?.Studios ?? [];
+        public IReadOnlyList<string> Staff => _mediaItem?.Staff ?? [];
+        public IReadOnlyList<string> Cast => _mediaItem?.Cast ?? [];
 
         public ObservableCollection<MediaSceneViewModel> Scenes
         {

@@ -3,14 +3,9 @@ using System.Linq;
 
 namespace Japlayer.ViewModels
 {
-    public class MediaSceneViewModel
+    public class MediaSceneViewModel(MediaScene scene)
     {
-        private readonly MediaScene _scene;
-
-        public MediaSceneViewModel(MediaScene scene)
-        {
-            _scene = scene;
-        }
+        private readonly MediaScene _scene = scene;
 
         public string MediaId => _scene.MediaId;
         public int? SceneNumber => _scene.SceneNumber;
