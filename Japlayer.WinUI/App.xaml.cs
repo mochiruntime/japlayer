@@ -3,9 +3,12 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Navigation;
 using System;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.EntityFrameworkCore;
 using Japlayer.Contracts;
 using Japlayer.Services;
 using Japlayer.ViewModels;
+using Japlayer.Data.Context;
+using Japlayer.Data.Services;
 
 namespace Japlayer
 {
@@ -28,10 +31,17 @@ namespace Japlayer
             var services = new ServiceCollection();
 
             // Services
-            services.AddSingleton<ISettingsService, SettingsService>();
-            services.AddSingleton<IMediaProvider, FileSystemMediaProvider>();
-            services.AddSingleton<IImageProvider, FileSystemImageProvider>();
-            services.AddSingleton<IMediaSceneProvider, FileSystemMediaSceneProvider>();
+            var settingsService = new SettingsService();
+            services.AddSingleton<ISettingsService>(settingsService);
+
+            services.AddDbContext<DatabaseContext>(options =>
+            {
+                options.UseSqlite($"Data Source={settingsService.SqliteDatabasePath}");
+            });
+
+            services.AddSingleton<Data.Contracts.IMediaProvider, DatabaseMediaProvider>();
+            services.AddSingleton<Data.Contracts.IImageProvider, DatabaseImageProvider>();
+            services.AddSingleton<Data.Contracts.IMediaSceneProvider, DatabaseMediaSceneProvider>();
 
             // ViewModels
             services.AddTransient<LibraryViewModel>();

@@ -1,5 +1,5 @@
-using Japlayer.Contracts;
-using Japlayer.Models;
+using Japlayer.Data.Contracts;
+using Japlayer.ViewModels;
 using System;
 using System.Collections.ObjectModel;
 using System.Collections.Generic;
@@ -26,7 +26,7 @@ namespace Japlayer.ViewModels
 
         public async Task LoadDataAsync()
         {
-            var items = await _mediaProvider.GetAllItemsAsync();
+            var items = await _mediaProvider.GetLibraryItemsAsync();
             _allMediaItems = items.Select(item => ActivatorUtilities.CreateInstance<MediaItemViewModel>(_serviceProvider, item)).ToList();
 
             ApplyFilter();

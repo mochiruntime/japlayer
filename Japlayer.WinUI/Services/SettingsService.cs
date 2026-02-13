@@ -10,9 +10,8 @@ namespace Japlayer.Services
         private const string ConfigFileName = "appsettings.json";
         private const string LocalConfigFileName = "appsettings.json.local";
 
-        public string MediaPath { get; private set; }
         public string ImagePath { get; private set; }
-        public string LocalMediaStorage { get; private set; }
+        public string SqliteDatabasePath { get; private set; }
 
         public SettingsService()
         {
@@ -30,6 +29,8 @@ namespace Japlayer.Services
 
             if (configPath == null || !File.Exists(configPath))
             {
+                // Just log or ignore if not critical, but ImagePath is needed.
+                // Assuming existing behavior is fine.
                 throw new FileNotFoundException($"Configuration file '{ConfigFileName}' not found in '{AppContext.BaseDirectory}' or as '{LocalConfigFileName}' in parent directories.", ConfigFileName);
             }
 
@@ -39,9 +40,8 @@ namespace Japlayer.Services
                 var settings = JsonSerializer.Deserialize<AppSettings>(json);
                 if (settings != null)
                 {
-                    if (!string.IsNullOrWhiteSpace(settings.MediaPath)) MediaPath = settings.MediaPath;
                     if (!string.IsNullOrWhiteSpace(settings.ImagePath)) ImagePath = settings.ImagePath;
-                    if (!string.IsNullOrWhiteSpace(settings.LocalMediaStorage)) LocalMediaStorage = settings.LocalMediaStorage;
+                    if (!string.IsNullOrWhiteSpace(settings.SqliteDatabasePath)) SqliteDatabasePath = settings.SqliteDatabasePath;
                 }
             }
             catch (JsonException ex)
@@ -67,9 +67,8 @@ namespace Japlayer.Services
 
         private class AppSettings
         {
-            public string MediaPath { get; set; }
             public string ImagePath { get; set; }
-            public string LocalMediaStorage { get; set; }
+            public string SqliteDatabasePath { get; set; }
         }
     }
 }

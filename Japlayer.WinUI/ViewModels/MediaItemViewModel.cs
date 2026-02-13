@@ -1,54 +1,114 @@
 using Japlayer.Contracts;
-using Japlayer.Models;
+using Japlayer.Data.Contracts;
+using Japlayer.Data.Models;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.IO;
+using System.Linq;
+using System.Runtime.CompilerServices;
+using System.Threading.Tasks;
 
 namespace Japlayer.ViewModels
 {
-    public class MediaItemViewModel
+    public class MediaItemViewModel : INotifyPropertyChanged
     {
-        private readonly MediaItem _mediaItem;
+        private readonly LibraryItem _libraryItem;
         private readonly IImageProvider _imageProvider;
         private readonly IMediaSceneProvider _sceneProvider;
+        private readonly IMediaProvider _mediaProvider;
+        private readonly ISettingsService _settingsService;
 
-        public MediaItemViewModel(MediaItem mediaItem, IImageProvider imageProvider, IMediaSceneProvider sceneProvider)
+        private MediaItem _mediaItem;
+        private ObservableCollection<MediaSceneViewModel> _scenes;
+        private ObservableCollection<string> _galleryImages;
+
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        public MediaItemViewModel(LibraryItem libraryItem, IImageProvider imageProvider, IMediaSceneProvider sceneProvider, IMediaProvider mediaProvider, ISettingsService settingsService)
         {
-            _mediaItem = mediaItem;
+            _libraryItem = libraryItem;
             _imageProvider = imageProvider;
             _sceneProvider = sceneProvider;
+            _mediaProvider = mediaProvider;
+            _settingsService = settingsService;
         }
 
-        public string Id => _mediaItem.Id;
-        public string Title => _mediaItem.Id + " " + _mediaItem.Title;
-        public string OriginalTitle => _mediaItem.Title; // Explicit title without ID prefix
-        public string CoverPath => _imageProvider.GetCoverPath(_mediaItem.Id);
-        public string ContentId => _mediaItem.ContentId;
-        public string ReleaseDate => _mediaItem.ReleaseDate;
-        public string Runtime => _mediaItem.Runtime;
+        public string Id => _libraryItem.MediaId;
+        public string Title => _libraryItem.MediaId + " " + _libraryItem.Title;
+        public string OriginalTitle => _libraryItem.Title;
 
-        public IReadOnlyList<string> Genres => _mediaItem.Genres;
-        public IReadOnlyList<string> Series => _mediaItem.Series;
-        public IReadOnlyList<string> Studios => _mediaItem.Studios;
-        public IReadOnlyList<string> Staff => _mediaItem.Staff;
-        public IReadOnlyList<string> Cast => _mediaItem.Cast;
-
-        public IEnumerable<MediaScene> Scenes => _sceneProvider.GetScenes(_mediaItem.Id);
-
-        public IEnumerable<string> GalleryImages
+        public string CoverPath
         {
             get
             {
-                var list = new List<string>();
-                var thumb = _imageProvider.GetThumbPath(_mediaItem.Id);
-                if (!string.IsNullOrEmpty(thumb)) list.Add(thumb);
-
-                var gallery = _imageProvider.GetGalleryPaths(_mediaItem.Id);
-                if (gallery != null) list.AddRange(gallery);
-
-                return list;
+                if (string.IsNullOrEmpty(_libraryItem.CoverImagePath)) return null;
+                return Path.Combine(_settingsService.ImagePath, _libraryItem.CoverImagePath);
             }
         }
 
-        // Helper for UI binding
+        public string ContentId => _mediaItem?.ContentId;
+        public string ReleaseDate => _mediaItem?.ReleaseDate?.ToString();
+        public string Runtime => _mediaItem?.Runtime?.ToString();
+
+        public IReadOnlyList<string> Genres => _mediaItem?.Genres ?? new List<string>();
+        public IReadOnlyList<string> Series => _mediaItem?.Series ?? new List<string>();
+        public IReadOnlyList<string> Studios => _mediaItem?.Studios ?? new List<string>();
+        public IReadOnlyList<string> Staff => _mediaItem?.Staff ?? new List<string>();
+        public IReadOnlyList<string> Cast => _mediaItem?.Cast ?? new List<string>();
+
+        public ObservableCollection<MediaSceneViewModel> Scenes
+        {
+            get => _scenes;
+            private set => SetProperty(ref _scenes, value);
+        }
+
+        public ObservableCollection<string> GalleryImages
+        {
+            get => _galleryImages;
+            private set => SetProperty(ref _galleryImages, value);
+        }
+
         public string DisplayCover => CoverPath ?? "ms-appx:///Assets/StoreLogo.png";
+
+        public bool IsDetailsLoaded => _mediaItem != null;
+
+        public async Task LoadDetailsAsync()
+        {
+            if (IsDetailsLoaded) return;
+
+            _mediaItem = await _mediaProvider.GetMediaItemAsync(_libraryItem.MediaId);
+            OnPropertyChanged(nameof(ContentId));
+            OnPropertyChanged(nameof(ReleaseDate));
+            OnPropertyChanged(nameof(Runtime));
+            OnPropertyChanged(nameof(Genres));
+            OnPropertyChanged(nameof(Series));
+            OnPropertyChanged(nameof(Studios));
+            OnPropertyChanged(nameof(Staff));
+            OnPropertyChanged(nameof(Cast));
+            OnPropertyChanged(nameof(IsDetailsLoaded));
+
+            var scenes = await _sceneProvider.GetMediaScenesAsync(_libraryItem.MediaId);
+            var viewModels = scenes.Select(s => new MediaSceneViewModel(s));
+            Scenes = new ObservableCollection<MediaSceneViewModel>(viewModels);
+
+            var gallery = await _imageProvider.GetGalleryPathsAsync(_libraryItem.MediaId);
+            // Combine with ImagePath
+            var fullPaths = gallery.Select(p => Path.Combine(_settingsService.ImagePath, p));
+            GalleryImages = new ObservableCollection<string>(fullPaths);
+        }
+
+        protected void OnPropertyChanged([CallerMemberName] string propertyName = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+
+        protected bool SetProperty<T>(ref T storage, T value, [CallerMemberName] string propertyName = null)
+        {
+            if (Equals(storage, value)) return false;
+            storage = value;
+            OnPropertyChanged(propertyName);
+            return true;
+        }
     }
 }

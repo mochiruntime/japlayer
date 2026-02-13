@@ -3,4 +3,5 @@
     <Project Path="Japlayer.WinUI/Japlayer.csproj" />
   </Folder>
   <Project Path="Japlayer.Data/Japlayer.Data.csproj" />
+  <Project Path="Japlayer.Console/Japlayer.Console.csproj" />
 </Solution>

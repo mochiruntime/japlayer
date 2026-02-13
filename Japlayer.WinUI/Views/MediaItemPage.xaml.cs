@@ -17,13 +17,14 @@ namespace Japlayer.Views
             GalleryScrollViewer.AddHandler(UIElement.PointerWheelChangedEvent, new Microsoft.UI.Xaml.Input.PointerEventHandler(GalleryScrollViewer_PointerWheelChanged), true);
         }
 
-        protected override void OnNavigatedTo(NavigationEventArgs e)
+        protected override async void OnNavigatedTo(NavigationEventArgs e)
         {
             base.OnNavigatedTo(e);
 
             if (e.Parameter is MediaItemViewModel vm)
             {
                 ViewModel = vm;
+                await ViewModel.LoadDetailsAsync();
             }
         }
 
