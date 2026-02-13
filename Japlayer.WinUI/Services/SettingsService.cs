@@ -29,8 +29,6 @@ namespace Japlayer.Services
 
             if (configPath == null || !File.Exists(configPath))
             {
-                // Just log or ignore if not critical, but ImagePath is needed.
-                // Assuming existing behavior is fine.
                 throw new FileNotFoundException($"Configuration file '{ConfigFileName}' not found in '{AppContext.BaseDirectory}' or as '{LocalConfigFileName}' in parent directories.", ConfigFileName);
             }
 

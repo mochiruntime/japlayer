@@ -140,18 +140,13 @@ namespace Japlayer.Views
         }
         private void Button_PointerExited(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
         {
-            ProtectedCursor = null; // Revert to default
+            ProtectedCursor = null; // Revert to default cursor
         }
 
         private void MediaPlayerElement_Loaded(object sender, RoutedEventArgs e)
         {
             if (sender is MediaPlayerElement mpe)
             {
-                if (mpe.MediaPlayer != null)
-                {
-                    mpe.MediaPlayer.MediaOpened += MediaPlayer_MediaOpened;
-                }
-
                 mpe.SizeChanged += MediaPlayerElement_SizeChanged;
                 UpdateMediaPlayerHeight(mpe);
             }
@@ -163,25 +158,11 @@ namespace Japlayer.Views
             {
                 mpe.SizeChanged -= MediaPlayerElement_SizeChanged;
 
-                if (mpe.MediaPlayer != null)
-                {
-                    mpe.MediaPlayer.MediaOpened -= MediaPlayer_MediaOpened;
-                }
-
                 // IMPORTANT: Setting Source to null is enough to release the file handle.
                 // Do NOT call mpe.MediaPlayer.Dispose() as it can cause COMException 
                 // if the framework tries to access the player during/after unload.
                 mpe.Source = null;
             }
-        }
-
-        private void MediaPlayer_MediaOpened(Windows.Media.Playback.MediaPlayer sender, object args)
-        {
-            // When media opens, we need to update the height.
-            // Since we don't have the MediaPlayerElement here, we can't call UpdateMediaPlayerHeight directly.
-            // However, we can use the sender's dispatcher if needed, but it's better to find the MPE.
-            // A simpler way is to just let SizeChanged handle it if the layout updates,
-            // or we use DispatcherQueue but we need a reference.
         }
 
         private void MediaPlayerElement_SizeChanged(object sender, SizeChangedEventArgs e)
