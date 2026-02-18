@@ -26,7 +26,7 @@ namespace Japlayer.ViewModels
             }
         }
 
-        public string DisplayCover => CoverPath ?? "ms-appx:///Assets/StoreLogo.png";
+        public string DisplayCover => CoverPath ?? "ms-appx:///Assets/NoCover.png";
 
         // For convenience if we need the original item later
         public LibraryItem LibraryItem => _libraryItem;

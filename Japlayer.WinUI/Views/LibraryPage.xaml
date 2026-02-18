@@ -5,6 +5,7 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:vm="using:Japlayer.ViewModels"
+    xmlns:controls="using:Japlayer.Controls"
     mc:Ignorable="d"
     Background="Transparent"
     NavigationCacheMode="Required">
@@ -49,7 +50,10 @@
                         </Grid.RowDefinitions>
                         
                         <!-- Cover Image -->
-                        <Image Source="{x:Bind DisplayCover}" Stretch="UniformToFill" VerticalAlignment="Top"/>
+                        <controls:MediaCoverView Grid.Row="0" 
+                                                 Source="{x:Bind DisplayCover, Mode=OneWay}" 
+                                                 Stretch="UniformToFill"
+                                                 CornerRadius="8" />
 
                         <!-- Title Application -->
                         <Grid Grid.Row="1" Padding="8" Background="{ThemeResource AcrylicBackgroundFillColorDefaultBrush}">

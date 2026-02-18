@@ -7,6 +7,7 @@
     xmlns:vm="using:Japlayer.ViewModels"
     xmlns:converters="using:Japlayer.Converters"
     xmlns:models="using:Japlayer.Models"
+    xmlns:controls="using:Japlayer.Controls"
     mc:Ignorable="d"
     Background="Transparent">
 
@@ -48,9 +49,10 @@
                     </Grid.ColumnDefinitions>
 
                     <!-- Cover Image -->
-                    <Image Grid.Column="0" 
+                    <controls:MediaCoverView Grid.Column="0" 
                         Source="{x:Bind ViewModel.LibraryItem.DisplayCover, Mode=OneWay}" 
                         Width="500" 
+                        CornerRadius="4"
                         Stretch="Uniform" 
                         VerticalAlignment="Top"/>
 
