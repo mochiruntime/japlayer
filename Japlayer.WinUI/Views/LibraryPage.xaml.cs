@@ -30,7 +30,7 @@ namespace Japlayer.Views
 
         private void MediaGrid_ItemClick(object sender, ItemClickEventArgs e)
         {
-            if (e.ClickedItem is MediaItemViewModel item)
+            if (e.ClickedItem is LibraryItemViewModel item)
             {
                 Frame.Navigate(typeof(MediaItemPage), item);
             }

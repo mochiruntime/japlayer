@@ -13,15 +13,15 @@ namespace Japlayer.ViewModels
     {
         private readonly IMediaProvider _mediaProvider = mediaProvider;
         private readonly IServiceProvider _serviceProvider = serviceProvider;
-        private List<MediaItemViewModel> _allMediaItems = [];
+        private List<LibraryItemViewModel> _allMediaItems = [];
 
-        public ObservableCollection<MediaItemViewModel> MediaItems { get; } = [];
+        public ObservableCollection<LibraryItemViewModel> MediaItems { get; } = [];
         public bool IsDataLoaded { get; private set; }
 
         public async Task LoadDataAsync()
         {
             var items = await _mediaProvider.GetLibraryItemsAsync();
-            _allMediaItems = [.. items.Select(item => ActivatorUtilities.CreateInstance<MediaItemViewModel>(_serviceProvider, item))];
+            _allMediaItems = [.. items.Select(item => ActivatorUtilities.CreateInstance<LibraryItemViewModel>(_serviceProvider, item))];
 
             ApplyFilter();
             IsDataLoaded = true;

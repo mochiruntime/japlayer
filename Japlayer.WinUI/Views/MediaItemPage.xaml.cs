@@ -21,9 +21,9 @@ namespace Japlayer.Views
         {
             base.OnNavigatedTo(e);
 
-            if (e.Parameter is MediaItemViewModel vm)
+            if (e.Parameter is LibraryItemViewModel libraryItem)
             {
-                ViewModel = vm;
+                ViewModel = Microsoft.Extensions.DependencyInjection.ActivatorUtilities.CreateInstance<MediaItemViewModel>(App.Current.Services, libraryItem);
                 await ViewModel.LoadDetailsAsync();
             }
         }

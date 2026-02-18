@@ -49,14 +49,14 @@
 
                     <!-- Cover Image -->
                     <Image Grid.Column="0" 
-                        Source="{x:Bind ViewModel.DisplayCover, Mode=OneWay}" 
+                        Source="{x:Bind ViewModel.LibraryItem.DisplayCover, Mode=OneWay}" 
                         Width="500" 
                         Stretch="Uniform" 
                         VerticalAlignment="Top"/>
 
                     <!-- Metadata -->
                     <StackPanel Grid.Column="1" Spacing="8">
-                        <TextBlock Text="{x:Bind ViewModel.Title, Mode=OneWay}" Style="{StaticResource TitleTextBlockStyle}" TextWrapping="Wrap"/>
+                        <TextBlock Text="{x:Bind ViewModel.LibraryItem.Title, Mode=OneWay}" Style="{StaticResource TitleTextBlockStyle}" TextWrapping="Wrap"/>
                         
                         <StackPanel Orientation="Horizontal" Spacing="8" Opacity="0.8">
                             <TextBlock Text="{x:Bind ViewModel.ReleaseDate, Mode=OneWay}"/>

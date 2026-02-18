@@ -11,9 +11,9 @@ using System.Threading.Tasks;
 
 namespace Japlayer.ViewModels
 {
-    public class MediaItemViewModel(LibraryItem libraryItem, IImageProvider imageProvider, IMediaSceneProvider sceneProvider, IMediaProvider mediaProvider, ISettingsService settingsService) : INotifyPropertyChanged
+    public class MediaItemViewModel(LibraryItemViewModel libraryItemViewModel, IImageProvider imageProvider, IMediaSceneProvider sceneProvider, IMediaProvider mediaProvider, ISettingsService settingsService) : INotifyPropertyChanged
     {
-        private readonly LibraryItem _libraryItem = libraryItem;
+        private readonly LibraryItemViewModel _libraryItemViewModel = libraryItemViewModel;
         private readonly IImageProvider _imageProvider = imageProvider;
         private readonly IMediaSceneProvider _sceneProvider = sceneProvider;
         private readonly IMediaProvider _mediaProvider = mediaProvider;
@@ -25,18 +25,7 @@ namespace Japlayer.ViewModels
 
         public event PropertyChangedEventHandler PropertyChanged;
 
-        public string Id => _libraryItem.MediaId;
-        public string Title => _libraryItem.MediaId + " " + _libraryItem.Title;
-        public string OriginalTitle => _libraryItem.Title;
-
-        public string CoverPath
-        {
-            get
-            {
-                if (string.IsNullOrEmpty(_libraryItem.CoverImagePath)) return null;
-                return Path.Combine(_settingsService.ImagePath, _libraryItem.CoverImagePath);
-            }
-        }
+        public LibraryItemViewModel LibraryItem => _libraryItemViewModel;
 
         public string ContentId => _mediaItem?.ContentId;
         public string ReleaseDate => _mediaItem?.ReleaseDate?.ToString();
@@ -60,15 +49,13 @@ namespace Japlayer.ViewModels
             private set => SetProperty(ref _galleryImages, value);
         }
 
-        public string DisplayCover => CoverPath ?? "ms-appx:///Assets/StoreLogo.png";
-
         public bool IsDetailsLoaded => _mediaItem != null;
 
         public async Task LoadDetailsAsync()
         {
             if (IsDetailsLoaded) return;
 
-            _mediaItem = await _mediaProvider.GetMediaItemAsync(_libraryItem.MediaId);
+            _mediaItem = await _mediaProvider.GetMediaItemAsync(_libraryItemViewModel.Id);
             OnPropertyChanged(nameof(ContentId));
             OnPropertyChanged(nameof(ReleaseDate));
             OnPropertyChanged(nameof(Runtime));
@@ -79,11 +66,11 @@ namespace Japlayer.ViewModels
             OnPropertyChanged(nameof(Cast));
             OnPropertyChanged(nameof(IsDetailsLoaded));
 
-            var scenes = await _sceneProvider.GetMediaScenesAsync(_libraryItem.MediaId);
+            var scenes = await _sceneProvider.GetMediaScenesAsync(_libraryItemViewModel.Id);
             var viewModels = scenes.Select(s => new MediaSceneViewModel(s));
             Scenes = new ObservableCollection<MediaSceneViewModel>(viewModels);
 
-            var gallery = await _imageProvider.GetGalleryPathsAsync(_libraryItem.MediaId);
+            var gallery = await _imageProvider.GetGalleryPathsAsync(_libraryItemViewModel.Id);
             // Combine with ImagePath
             var fullPaths = gallery.Select(p => Path.Combine(_settingsService.ImagePath, p));
             GalleryImages = new ObservableCollection<string>(fullPaths);
