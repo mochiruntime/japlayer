@@ -11,9 +11,9 @@ using System.Threading.Tasks;
 
 namespace Japlayer.ViewModels
 {
-    public class MediaItemViewModel(LibraryItemViewModel libraryItemViewModel, IImageProvider imageProvider, IMediaSceneProvider sceneProvider, IMediaProvider mediaProvider, ISettingsService settingsService) : INotifyPropertyChanged
+    public class MediaItemViewModel(LibraryItem libraryItem, IImageProvider imageProvider, IMediaSceneProvider sceneProvider, IMediaProvider mediaProvider, ISettingsService settingsService) : INotifyPropertyChanged
     {
-        private readonly LibraryItemViewModel _libraryItemViewModel = libraryItemViewModel;
+        private readonly LibraryItem _libraryItem = libraryItem;
         private readonly IImageProvider _imageProvider = imageProvider;
         private readonly IMediaSceneProvider _sceneProvider = sceneProvider;
         private readonly IMediaProvider _mediaProvider = mediaProvider;
@@ -25,7 +25,16 @@ namespace Japlayer.ViewModels
 
         public event PropertyChangedEventHandler PropertyChanged;
 
-        public LibraryItemViewModel LibraryItem => _libraryItemViewModel;
+        public string Id => _libraryItem.MediaId;
+        public string Title => _libraryItem.MediaId + " " + _libraryItem.Title;
+        public string DisplayCover
+        {
+            get
+            {
+                if (string.IsNullOrEmpty(_libraryItem.CoverImagePath)) return "ms-appx:///Assets/NoCover.png";
+                return Path.Combine(_settingsService.ImagePath, _libraryItem.CoverImagePath);
+            }
+        }
 
         public string ContentId => _mediaItem?.ContentId;
         public string ReleaseDate => _mediaItem?.ReleaseDate?.ToString();
@@ -55,7 +64,7 @@ namespace Japlayer.ViewModels
         {
             if (IsDetailsLoaded) return;
 
-            _mediaItem = await _mediaProvider.GetMediaItemAsync(_libraryItemViewModel.Id);
+            _mediaItem = await _mediaProvider.GetMediaItemAsync(Id);
             OnPropertyChanged(nameof(ContentId));
             OnPropertyChanged(nameof(ReleaseDate));
             OnPropertyChanged(nameof(Runtime));
@@ -66,11 +75,11 @@ namespace Japlayer.ViewModels
             OnPropertyChanged(nameof(Cast));
             OnPropertyChanged(nameof(IsDetailsLoaded));
 
-            var scenes = await _sceneProvider.GetMediaScenesAsync(_libraryItemViewModel.Id);
+            var scenes = await _sceneProvider.GetMediaScenesAsync(Id);
             var viewModels = scenes.Select(s => new MediaSceneViewModel(s));
             Scenes = new ObservableCollection<MediaSceneViewModel>(viewModels);
 
-            var gallery = await _imageProvider.GetGalleryPathsAsync(_libraryItemViewModel.Id);
+            var gallery = await _imageProvider.GetGalleryPathsAsync(Id);
             // Combine with ImagePath
             var fullPaths = gallery.Select(p => Path.Combine(_settingsService.ImagePath, p));
             GalleryImages = new ObservableCollection<string>(fullPaths);
