@@ -7,7 +7,7 @@
             "type": "process",
             "args": [
                 "build",
-                "${workspaceFolder}/Japlayer.WinUI/Japlayer.csproj",
+                "${workspaceFolder}",
                 "/property:GenerateFullPaths=true",
                 "/consoleloggerparameters:NoSummary"
             ],
@@ -19,7 +19,7 @@
             "type": "process",
             "args": [
                 "publish",
-                "${workspaceFolder}/Japlayer.WinUI/Japlayer.csproj",
+                "${workspaceFolder}",
                 "/property:GenerateFullPaths=true",
                 "/consoleloggerparameters:NoSummary"
             ],
@@ -31,7 +31,7 @@
             "type": "process",
             "args": [
                 "clean",
-                "${workspaceFolder}/Japlayer.WinUI/Japlayer.csproj",
+                "${workspaceFolder}",
                 "/property:GenerateFullPaths=true",
                 "/consoleloggerparameters:NoSummary"
             ],
@@ -43,8 +43,8 @@
             "type": "process",
             "args": [
                 "watch",
-                "run",
-                "${workspaceFolder}/Japlayer.WinUI/Japlayer.csproj",
+                "--project",
+                "${workspaceFolder}\\Japlayer.WinUI\\Japlayer.csproj",
                 "/property:GenerateFullPaths=true",
                 "/consoleloggerparameters:NoSummary"
             ],
@@ -57,7 +57,7 @@
             "args": [
                 "run",
                 "--project",
-                "${workspaceFolder}/Japlayer.WinUI/Japlayer.csproj",
+                "${workspaceFolder}\\Japlayer.WinUI\\Japlayer.csproj",
                 "/property:GenerateFullPaths=true",
                 "/consoleloggerparameters:NoSummary"
             ],
