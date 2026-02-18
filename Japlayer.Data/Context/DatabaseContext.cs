@@ -73,9 +73,10 @@ public partial class DatabaseContext : DbContext
                 .HasColumnName("scene");
             entity.Property(e => e.Hostname).HasColumnName("hostname");
             entity.Property(e => e.Path).HasColumnName("path");
-            entity.Property(e => e.Uuid)
-                .HasColumnType("BINARY(16)")
-                .HasColumnName("uuid");
+
+            entity.HasOne(d => d.Media).WithMany(p => p.MediaLocations)
+                .HasForeignKey(d => d.MediaId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<MediaMetadata>(entity =>

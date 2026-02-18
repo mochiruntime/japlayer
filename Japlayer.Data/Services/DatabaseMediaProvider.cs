@@ -3,6 +3,7 @@ using Japlayer.Data.Contracts;
 using Japlayer.Data.Entities;
 using Japlayer.Data.Models;
 using Microsoft.EntityFrameworkCore;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -15,54 +16,38 @@ namespace Japlayer.Data.Services
 
         public async Task<IEnumerable<LibraryItem>> GetLibraryItemsAsync()
         {
-            // Get all unique media IDs from MediaLocations
-            var mediaIds = await _context.MediaLocations
+            // Use projection to fetch exactly what we need in one query.
+            // We start from Media and only include those that have associated locations (files).
+            return await _context.Media
                 .AsNoTracking()
-                .Select(ml => ml.MediaId)
-                .Distinct()
-                .ToListAsync();
-
-            // Fetch metadata for these IDs
-            var metadataList = await _context.MediaMetadata
-                .AsNoTracking()
-                .Where(m => mediaIds.Contains(m.MediaId))
-                .ToListAsync();
-
-            var metadataMap = metadataList
-                .GroupBy(m => m.MediaId)
-                .ToDictionary(g => g.Key, g => g.First());
-
-            // Construct LibraryItems
-            var libraryItems = mediaIds.Select(mediaId =>
-            {
-                var hasMetadata = metadataMap.TryGetValue(mediaId, out var metadata);
-                return new LibraryItem
+                .Where(m => m.MediaLocations.Any())
+                .Select(m => new LibraryItem
                 {
-                    MediaId = mediaId,
-                    Title = hasMetadata ? metadata!.Title : null,
-                    CoverImagePath = hasMetadata ? metadata!.Cover : null
-                };
-            });
-
-            return libraryItems;
+                    MediaId = m.MediaId,
+                    // We take the title and cover from the first metadata entry
+                    Title = m.MediaMetadata.Select(md => md.Title).FirstOrDefault(),
+                    CoverImagePath = m.MediaMetadata.Select(md => md.Cover).FirstOrDefault()
+                })
+                .OrderBy(m => m.MediaId)
+                .ToListAsync();
         }
 
         public async Task<MediaItem> GetMediaItemAsync(string mediaId)
         {
-            // Fetch Metadata
-            var metadata = await _context.MediaMetadata
-                .AsNoTracking()
-                .FirstOrDefaultAsync(m => m.MediaId == mediaId);
-
-            // Fetch Relationships via Media entity because relationships are stored there
+            // Fetch everything in one single query using navigation properties
             var media = await _context.Media
                 .AsNoTracking()
+                .Include(m => m.MediaMetadata)
                 .Include(m => m.Series)
                 .Include(m => m.Studios)
-                .Include(m => m.People) // Cast
-                .Include(m => m.PeopleNavigation) // Staff
+                .Include(m => m.People)
+                .Include(m => m.PeopleNavigation)
                 .Include(m => m.Genres)
                 .FirstOrDefaultAsync(m => m.MediaId == mediaId);
+
+            if (media == null) return null!;
+
+            var metadata = media.MediaMetadata.FirstOrDefault();
 
             return new MediaItem
             {
@@ -70,12 +55,14 @@ namespace Japlayer.Data.Services
                 Title = metadata?.Title,
                 ContentId = metadata?.ContentId,
                 ReleaseDate = metadata?.ReleaseDate,
-                Runtime = metadata?.RuntimeMinutes.HasValue == true ? TimeSpan.FromMinutes(metadata.RuntimeMinutes.Value) : null,
-                Series = media?.Series.Select(s => s.Name).ToList() ?? [],
-                Studios = media?.Studios.Select(s => s.Name).ToList() ?? [],
-                Cast = media?.People.Select(p => p.Name).ToList() ?? [],
-                Staff = media?.PeopleNavigation.Select(p => p.Name).ToList() ?? [],
-                Genres = media?.Genres.Select(g => g.Name).ToList() ?? []
+                Runtime = metadata?.RuntimeMinutes.HasValue == true
+                    ? TimeSpan.FromMinutes(metadata.RuntimeMinutes.Value)
+                    : null,
+                Series = media.Series.Select(s => s.Name).ToList(),
+                Studios = media.Studios.Select(s => s.Name).ToList(),
+                Cast = media.People.Select(p => p.Name).ToList(),
+                Staff = media.PeopleNavigation.Select(p => p.Name).ToList(),
+                Genres = media.Genres.Select(g => g.Name).ToList()
             };
         }
     }

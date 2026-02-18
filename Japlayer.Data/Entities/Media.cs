@@ -22,4 +22,6 @@ public partial class Media
     public virtual ICollection<MediaStudio> Studios { get; set; } = [];
 
     public virtual ICollection<UserTag> UserTags { get; set; } = [];
+
+    public virtual ICollection<MediaLocation> MediaLocations { get; set; } = [];
 }

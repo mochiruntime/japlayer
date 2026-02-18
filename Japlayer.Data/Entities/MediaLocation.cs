@@ -13,5 +13,5 @@ public partial class MediaLocation
 
     public string Path { get; set; } = null!;
 
-    public byte[] Uuid { get; set; } = null!;
+    public virtual Media Media { get; set; } = null!;
 }
