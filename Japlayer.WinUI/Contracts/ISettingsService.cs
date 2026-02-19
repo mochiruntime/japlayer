@@ -6,7 +6,6 @@ namespace Japlayer.Contracts
     {
         string ImagePath { get; set; }
         string SqliteDatabasePath { get; set; }
-        bool IsConfigured { get; }
 
         Task LoadAsync();
         Task SaveAsync();

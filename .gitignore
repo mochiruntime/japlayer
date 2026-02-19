@@ -40,4 +40,4 @@ _pkginfo.txt
 *.appxupload
 
 # Local Config
-japlayer.settings.json
+japlayer.settings.json*

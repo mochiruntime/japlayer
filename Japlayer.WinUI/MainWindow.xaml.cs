@@ -1,5 +1,4 @@
 using System;
-using Japlayer.Contracts;
 using Microsoft.UI.Xaml;
 
 
@@ -22,16 +21,7 @@ namespace Japlayer
             Microsoft.UI.Windowing.AppWindow appWindow = Microsoft.UI.Windowing.AppWindow.GetFromWindowId(windowId);
             appWindow.Resize(new Windows.Graphics.SizeInt32(1960, 1080));
 
-            var settingsService = App.GetService<ISettingsService>();
-
-            if (settingsService.IsConfigured)
-            {
-                ContentFrame.Navigate(typeof(Views.LibraryPage));
-            }
-            else
-            {
-                ContentFrame.Navigate(typeof(Views.SetupPage));
-            }
+            ContentFrame.Navigate(typeof(Views.LibraryPage));
         }
 
     }

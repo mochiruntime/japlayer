@@ -31,7 +31,6 @@ namespace Japlayer
             // Services
             var settingsService = new SettingsService();
             services.AddSingleton<ISettingsService>(settingsService);
-            services.AddTransient<SetupViewModel>();
 
             services.AddDbContext<DatabaseContext>((serviceProvider, options) =>
             {
@@ -78,8 +77,18 @@ namespace Japlayer
 
         protected override void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
         {
+            EnsureDatabaseCreated();
             m_window = GetService<MainWindow>();
             m_window.Activate();
+        }
+
+        private void EnsureDatabaseCreated()
+        {
+            using (var scope = Services.CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<DatabaseContext>();
+                context.Database.EnsureCreated();
+            }
         }
     }
 }

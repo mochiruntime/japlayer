@@ -14,26 +14,39 @@ namespace Japlayer.Services
         private const string ConfigFileName = "japlayer.settings.json";
 
         [ObservableProperty]
-        [NotifyPropertyChangedFor(nameof(IsConfigured))]
         public partial string ImagePath { get; set; } = string.Empty;
 
         [ObservableProperty]
-        [NotifyPropertyChangedFor(nameof(IsConfigured))]
         public partial string SqliteDatabasePath { get; set; } = string.Empty;
-
-        public bool IsConfigured => !string.IsNullOrWhiteSpace(ImagePath) &&
-                                   !string.IsNullOrWhiteSpace(SqliteDatabasePath) &&
-                                   File.Exists(SqliteDatabasePath);
 
         public SettingsService()
         {
-            // Initial load Attempt (Sync for DI if needed, but LoadAsync is preferred)
             LoadSettings();
+            InitializeDefaults();
+        }
+
+        private string BaseAppDataPath => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Japlayer");
+
+        private void InitializeDefaults()
+        {
+            EnsureDirectoryExists(BaseAppDataPath);
+
+            if (string.IsNullOrWhiteSpace(ImagePath))
+            {
+                ImagePath = Path.Combine(BaseAppDataPath, "images");
+                EnsureDirectoryExists(ImagePath);
+            }
+
+            if (string.IsNullOrWhiteSpace(SqliteDatabasePath))
+            {
+                SqliteDatabasePath = Path.Combine(BaseAppDataPath, "medias.db");
+            }
         }
 
         public async Task LoadAsync()
         {
             await Task.Run(LoadSettings);
+            InitializeDefaults();
         }
 
         public async Task SaveAsync()
@@ -56,7 +69,7 @@ namespace Japlayer.Services
 
             if (configPath == null || !File.Exists(configPath))
             {
-                return; // Settings not found, IsConfigured will be false
+                return;
             }
 
             try
@@ -82,7 +95,7 @@ namespace Japlayer.Services
             if (localDevConfig != null) return localDevConfig;
 
             // 2. Check in AppData (User specific)
-            var appDataPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Japlayer", ConfigFileName);
+            var appDataPath = Path.Combine(BaseAppDataPath, ConfigFileName);
             if (File.Exists(appDataPath)) return appDataPath;
 
             // 3. Check in BaseDirectory
@@ -94,13 +107,16 @@ namespace Japlayer.Services
 
         private string GetWritableConfigPath()
         {
-            // Prefer saving to AppData to avoid permission issues in Program Files
-            var appDataDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Japlayer");
-            if (!Directory.Exists(appDataDir))
+            EnsureDirectoryExists(BaseAppDataPath);
+            return Path.Combine(BaseAppDataPath, ConfigFileName);
+        }
+
+        private void EnsureDirectoryExists(string? path)
+        {
+            if (!string.IsNullOrEmpty(path) && !Directory.Exists(path))
             {
-                Directory.CreateDirectory(appDataDir);
+                Directory.CreateDirectory(path);
             }
-            return Path.Combine(appDataDir, ConfigFileName);
         }
 
         private string? FindLocalConfig(string startPath)
