@@ -1,22 +1,25 @@
-using Japlayer.Data.Contracts;
-using Japlayer.ViewModels;
+#nullable enable
 using System;
-using System.Collections.ObjectModel;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
+using CommunityToolkit.Mvvm.ComponentModel;
+using Japlayer.Data.Contracts;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Japlayer.ViewModels
 {
-    public class LibraryViewModel(IMediaProvider mediaProvider, IServiceProvider serviceProvider)
+    public partial class LibraryViewModel(IMediaProvider mediaProvider, IServiceProvider serviceProvider) : ObservableObject
     {
         private readonly IMediaProvider _mediaProvider = mediaProvider;
         private readonly IServiceProvider _serviceProvider = serviceProvider;
         private List<LibraryItemViewModel> _allMediaItems = [];
 
         public ObservableCollection<LibraryItemViewModel> MediaItems { get; } = [];
-        public bool IsDataLoaded { get; private set; }
+
+        [ObservableProperty]
+        public partial bool IsDataLoaded { get; set; }
 
         public async Task LoadDataAsync()
         {

@@ -1,5 +1,5 @@
-using Japlayer.Data.Models;
 using System.Linq;
+using Japlayer.Data.Models;
 
 namespace Japlayer.ViewModels
 {

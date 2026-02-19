@@ -1,12 +1,7 @@
 using Japlayer.Data.Context;
 using Japlayer.Data.Contracts;
-using Japlayer.Data.Entities;
 using Japlayer.Data.Models;
 using Microsoft.EntityFrameworkCore;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 
 namespace Japlayer.Data.Services
 {
@@ -58,11 +53,11 @@ namespace Japlayer.Data.Services
                 Runtime = metadata?.RuntimeMinutes.HasValue == true
                     ? TimeSpan.FromMinutes(metadata.RuntimeMinutes.Value)
                     : null,
-                Series = media.Series.Select(s => s.Name).ToList(),
-                Studios = media.Studios.Select(s => s.Name).ToList(),
-                Cast = media.People.Select(p => p.Name).ToList(),
-                Staff = media.PeopleNavigation.Select(p => p.Name).ToList(),
-                Genres = media.Genres.Select(g => g.Name).ToList()
+                Series = [.. media.Series.Select(s => s.Name)],
+                Studios = [.. media.Studios.Select(s => s.Name)],
+                Cast = [.. media.People.Select(p => p.Name)],
+                Staff = [.. media.PeopleNavigation.Select(p => p.Name)],
+                Genres = [.. media.Genres.Select(g => g.Name)]
             };
         }
     }

@@ -1,7 +1,6 @@
-using Microsoft.UI.Xaml.Data;
 using System;
+using Microsoft.UI.Xaml.Data;
 using Windows.Media.Core;
-using Windows.Media.Playback;
 
 namespace Japlayer.Converters
 {

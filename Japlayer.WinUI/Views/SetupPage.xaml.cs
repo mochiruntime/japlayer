@@ -1,6 +1,6 @@
-using Microsoft.UI.Xaml.Controls;
-using Japlayer.ViewModels;
 using System;
+using Japlayer.ViewModels;
+using Microsoft.UI.Xaml.Controls;
 
 namespace Japlayer.Views
 {

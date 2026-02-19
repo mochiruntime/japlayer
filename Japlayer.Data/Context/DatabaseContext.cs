@@ -1,6 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using Japlayer.Data.Entities;
+﻿using Japlayer.Data.Entities;
 using Microsoft.EntityFrameworkCore;
 
 namespace Japlayer.Data.Context;

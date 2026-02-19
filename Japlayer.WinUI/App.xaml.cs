@@ -1,14 +1,12 @@
-using Microsoft.UI.Xaml;
-using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Navigation;
 using System;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.EntityFrameworkCore;
 using Japlayer.Contracts;
-using Japlayer.Services;
-using Japlayer.ViewModels;
 using Japlayer.Data.Context;
 using Japlayer.Data.Services;
+using Japlayer.Services;
+using Japlayer.ViewModels;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.UI.Xaml;
 
 namespace Japlayer
 {

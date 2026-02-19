@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-
-namespace Japlayer.Data.Entities;
+﻿namespace Japlayer.Data.Entities;
 
 public partial class Media
 {

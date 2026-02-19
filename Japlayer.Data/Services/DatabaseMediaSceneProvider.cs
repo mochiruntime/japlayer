@@ -2,9 +2,6 @@ using Japlayer.Data.Context;
 using Japlayer.Data.Contracts;
 using Japlayer.Data.Models;
 using Microsoft.EntityFrameworkCore;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 
 namespace Japlayer.Data.Services
 {

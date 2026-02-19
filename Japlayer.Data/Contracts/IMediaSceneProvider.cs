@@ -1,5 +1,4 @@
 using Japlayer.Data.Models;
-using System.Collections.Generic;
 
 namespace Japlayer.Data.Contracts
 {

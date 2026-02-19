@@ -1,17 +1,17 @@
+#nullable enable
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.IO;
+using System.Linq;
+using System.Threading.Tasks;
+using CommunityToolkit.Mvvm.ComponentModel;
 using Japlayer.Contracts;
 using Japlayer.Data.Contracts;
 using Japlayer.Data.Models;
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.ComponentModel;
-using System.IO;
-using System.Linq;
-using System.Runtime.CompilerServices;
-using System.Threading.Tasks;
 
 namespace Japlayer.ViewModels
 {
-    public class MediaItemViewModel(LibraryItem libraryItem, IImageProvider imageProvider, IMediaSceneProvider sceneProvider, IMediaProvider mediaProvider, ISettingsService settingsService) : INotifyPropertyChanged
+    public partial class MediaItemViewModel(LibraryItem libraryItem, IImageProvider imageProvider, IMediaSceneProvider sceneProvider, IMediaProvider mediaProvider, ISettingsService settingsService) : ObservableObject
     {
         private readonly LibraryItem _libraryItem = libraryItem;
         private readonly IImageProvider _imageProvider = imageProvider;
@@ -19,11 +19,23 @@ namespace Japlayer.ViewModels
         private readonly IMediaProvider _mediaProvider = mediaProvider;
         private readonly ISettingsService _settingsService = settingsService;
 
-        private MediaItem _mediaItem;
-        private ObservableCollection<MediaSceneViewModel> _scenes;
-        private ObservableCollection<string> _galleryImages;
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(ContentId))]
+        [NotifyPropertyChangedFor(nameof(ReleaseDate))]
+        [NotifyPropertyChangedFor(nameof(Runtime))]
+        [NotifyPropertyChangedFor(nameof(Genres))]
+        [NotifyPropertyChangedFor(nameof(Series))]
+        [NotifyPropertyChangedFor(nameof(Studios))]
+        [NotifyPropertyChangedFor(nameof(Staff))]
+        [NotifyPropertyChangedFor(nameof(Cast))]
+        [NotifyPropertyChangedFor(nameof(IsDetailsLoaded))]
+        public partial MediaItem? MediaItemData { get; set; }
 
-        public event PropertyChangedEventHandler PropertyChanged;
+        [ObservableProperty]
+        public partial ObservableCollection<MediaSceneViewModel>? Scenes { get; set; }
+
+        [ObservableProperty]
+        public partial ObservableCollection<string>? GalleryImages { get; set; }
 
         public string Id => _libraryItem.MediaId;
         public string Title => _libraryItem.MediaId + " " + _libraryItem.Title;
@@ -36,44 +48,23 @@ namespace Japlayer.ViewModels
             }
         }
 
-        public string ContentId => _mediaItem?.ContentId;
-        public string ReleaseDate => _mediaItem?.ReleaseDate?.ToString();
-        public string Runtime => _mediaItem?.Runtime?.ToString();
+        public string? ContentId => MediaItemData?.ContentId;
+        public string? ReleaseDate => MediaItemData?.ReleaseDate?.ToString();
+        public string? Runtime => MediaItemData?.Runtime?.ToString();
 
-        public IReadOnlyList<string> Genres => _mediaItem?.Genres ?? [];
-        public IReadOnlyList<string> Series => _mediaItem?.Series ?? [];
-        public IReadOnlyList<string> Studios => _mediaItem?.Studios ?? [];
-        public IReadOnlyList<string> Staff => _mediaItem?.Staff ?? [];
-        public IReadOnlyList<string> Cast => _mediaItem?.Cast ?? [];
+        public IReadOnlyList<string> Genres => MediaItemData?.Genres ?? [];
+        public IReadOnlyList<string> Series => MediaItemData?.Series ?? [];
+        public IReadOnlyList<string> Studios => MediaItemData?.Studios ?? [];
+        public IReadOnlyList<string> Staff => MediaItemData?.Staff ?? [];
+        public IReadOnlyList<string> Cast => MediaItemData?.Cast ?? [];
 
-        public ObservableCollection<MediaSceneViewModel> Scenes
-        {
-            get => _scenes;
-            private set => SetProperty(ref _scenes, value);
-        }
-
-        public ObservableCollection<string> GalleryImages
-        {
-            get => _galleryImages;
-            private set => SetProperty(ref _galleryImages, value);
-        }
-
-        public bool IsDetailsLoaded => _mediaItem != null;
+        public bool IsDetailsLoaded => MediaItemData != null;
 
         public async Task LoadDetailsAsync()
         {
             if (IsDetailsLoaded) return;
 
-            _mediaItem = await _mediaProvider.GetMediaItemAsync(Id);
-            OnPropertyChanged(nameof(ContentId));
-            OnPropertyChanged(nameof(ReleaseDate));
-            OnPropertyChanged(nameof(Runtime));
-            OnPropertyChanged(nameof(Genres));
-            OnPropertyChanged(nameof(Series));
-            OnPropertyChanged(nameof(Studios));
-            OnPropertyChanged(nameof(Staff));
-            OnPropertyChanged(nameof(Cast));
-            OnPropertyChanged(nameof(IsDetailsLoaded));
+            MediaItemData = await _mediaProvider.GetMediaItemAsync(Id);
 
             var scenes = await _sceneProvider.GetMediaScenesAsync(Id);
             var viewModels = scenes.Select(s => new MediaSceneViewModel(s));
@@ -83,19 +74,6 @@ namespace Japlayer.ViewModels
             // Combine with ImagePath
             var fullPaths = gallery.Select(p => Path.Combine(_settingsService.ImagePath, p));
             GalleryImages = new ObservableCollection<string>(fullPaths);
-        }
-
-        protected void OnPropertyChanged([CallerMemberName] string propertyName = null)
-        {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-        }
-
-        protected bool SetProperty<T>(ref T storage, T value, [CallerMemberName] string propertyName = null)
-        {
-            if (Equals(storage, value)) return false;
-            storage = value;
-            OnPropertyChanged(propertyName);
-            return true;
         }
     }
 }
