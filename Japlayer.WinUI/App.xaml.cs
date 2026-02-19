@@ -33,10 +33,12 @@ namespace Japlayer
             // Services
             var settingsService = new SettingsService();
             services.AddSingleton<ISettingsService>(settingsService);
+            services.AddTransient<SetupViewModel>();
 
-            services.AddDbContext<DatabaseContext>(options =>
+            services.AddDbContext<DatabaseContext>((serviceProvider, options) =>
             {
-                options.UseSqlite($"Data Source={settingsService.SqliteDatabasePath}");
+                var settings = serviceProvider.GetRequiredService<ISettingsService>();
+                options.UseSqlite($"Data Source={settings.SqliteDatabasePath}");
             });
 
             services.AddSingleton<Data.Contracts.IMediaProvider, DatabaseMediaProvider>();
@@ -54,7 +56,8 @@ namespace Japlayer
         }
 
         public static T GetService<T>() where T : class
-            => Current.Services.GetService<T>();
+            => Current.Services.GetRequiredService<T>();
+
 
         private void App_UnhandledException(object sender, Microsoft.UI.Xaml.UnhandledExceptionEventArgs e)
         {

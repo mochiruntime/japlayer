@@ -1,0 +1,50 @@
+<Page
+    x:Class="Japlayer.Views.SetupPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:Japlayer.Views"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:converters="using:Japlayer.Converters"
+    mc:Ignorable="d"
+    Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+
+    <Page.Resources>
+        <converters:StringToVisibilityConverter x:Key="StringToVisibilityConverter"/>
+    </Page.Resources>
+
+    <Grid VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="600">
+        <StackPanel Spacing="20" Padding="40" Background="{ThemeResource LayerFillColorDefaultBrush}" 
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8">
+            
+            <TextBlock Text="Welcome to Japlayer" Style="{StaticResource TitleLargeTextBlockStyle}" HorizontalAlignment="Center"/>
+            <TextBlock Text="Please configure the paths to your media database and image assets to get started." 
+                       TextWrapping="Wrap" HorizontalAlignment="Center" TextAlignment="Center"/>
+
+            <StackPanel Spacing="10">
+                <TextBlock Text="SQLite Database Path" Style="{StaticResource BodyStrongTextBlockStyle}"/>
+                <Grid ColumnDefinitions="*, Auto">
+                    <TextBox Text="{x:Bind ViewModel.SqliteDatabasePath, Mode=TwoWay}" IsReadOnly="True" PlaceholderText="Select medias.db..."/>
+                    <Button Grid.Column="1" Command="{x:Bind ViewModel.PickDatabaseCommand}" Margin="8,0,0,0">
+                        <FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" Glyph="&#xE8B5;"/>
+                    </Button>
+                </Grid>
+            </StackPanel>
+
+            <StackPanel Spacing="10">
+                <TextBlock Text="Media Images Folder Path" Style="{StaticResource BodyStrongTextBlockStyle}"/>
+                <Grid ColumnDefinitions="*, Auto">
+                    <TextBox Text="{x:Bind ViewModel.ImagePath, Mode=TwoWay}" IsReadOnly="True" PlaceholderText="Select images folder..."/>
+                    <Button Grid.Column="1" Command="{x:Bind ViewModel.PickImagePathCommand}" Margin="8,0,0,0">
+                        <FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" Glyph="&#xE8B5;"/>
+                    </Button>
+                </Grid>
+            </StackPanel>
+
+            <TextBlock Text="{x:Bind ViewModel.ErrorMessage, Mode=OneWay}" Foreground="Red" Visibility="{x:Bind ViewModel.ErrorMessage, Converter={StaticResource StringToVisibilityConverter}, Mode=OneWay}"/>
+
+            <Button Content="Finish Setup" Command="{x:Bind ViewModel.SaveCommand}" 
+                    Style="{StaticResource AccentButtonStyle}" HorizontalAlignment="Stretch" Padding="12"/>
+        </StackPanel>
+    </Grid>
+</Page>
