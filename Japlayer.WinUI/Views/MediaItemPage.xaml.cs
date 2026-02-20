@@ -1,8 +1,14 @@
 using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using Japlayer.Helpers;
 using Japlayer.ViewModels;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media.Imaging;
 using Microsoft.UI.Xaml.Navigation;
+using Windows.Storage;
+using Windows.System;
 
 namespace Japlayer.Views
 {
@@ -189,6 +195,174 @@ namespace Japlayer.Views
             {
                 // Prevent crashes if player is disposed or in an invalid state
             }
+        }
+        private async void OpenIn_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not FrameworkElement element || element.DataContext is not MediaSceneViewModel sceneVm)
+                return;
+
+            if (string.IsNullOrEmpty(sceneVm.File)) return;
+
+            try
+            {
+                var file = await StorageFile.GetFileFromPathAsync(sceneVm.File);
+                var uwpHandlers = await Launcher.FindFileHandlersAsync(file.FileType);
+                var win32Handlers = FileAssociationResolver.GetHandlers(file.FileType);
+
+                var menu = new MenuFlyout();
+                var addedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+                // Add UWP Handlers
+                foreach (var handler in uwpHandlers)
+                {
+                    if (!addedNames.Add(handler.DisplayInfo.DisplayName)) continue;
+
+                    var item = new MenuFlyoutItem { Text = handler.DisplayInfo.DisplayName };
+                    LoadUwpIconAsync(item, handler);
+
+                    item.Click += async (s, args) =>
+                    {
+                        var options = new LauncherOptions { TargetApplicationPackageFamilyName = handler.PackageFamilyName };
+                        await Launcher.LaunchFileAsync(file, options);
+                    };
+                    menu.Items.Add(item);
+                }
+
+                // Add Win32 Handlers
+                foreach (var handler in win32Handlers)
+                {
+                    if (!addedNames.Add(handler.Name)) continue;
+
+                    var item = new MenuFlyoutItem { Text = handler.Name };
+                    if (!string.IsNullOrEmpty(handler.ExePath))
+                    {
+                        LoadWin32IconAsync(item, handler.ExePath);
+                    }
+
+                    item.Click += (s, args) =>
+                    {
+                        try
+                        {
+                            handler.Invoke(sceneVm.File);
+                        }
+                        catch (Exception ex)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"Win32 Launch error: {ex.Message}");
+                        }
+                    };
+                    menu.Items.Add(item);
+                }
+
+                if (menu.Items.Count > 0)
+                {
+                    menu.Items.Add(new MenuFlyoutSeparator());
+                }
+
+                var moreItem = new MenuFlyoutItem
+                {
+                    Text = "Choose another app...",
+                    Icon = new SymbolIcon { Symbol = Symbol.OpenWith }
+                };
+                moreItem.Click += async (s, args) =>
+                {
+                    var options = new LauncherOptions { DisplayApplicationPicker = true };
+                    await Launcher.LaunchFileAsync(file, options);
+                };
+                menu.Items.Add(moreItem);
+
+                menu.ShowAt(element);
+            }
+            catch (Exception ex)
+            {
+                await ShowErrorDialogAsync($"Could not open file handlers: {ex.Message}");
+            }
+        }
+
+        private void LoadUwpIconAsync(MenuFlyoutItem item, Windows.ApplicationModel.AppInfo handler)
+        {
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    // Request a high-res source for maximum sharp detail
+                    var logoStream = await handler.DisplayInfo.GetLogo(new Windows.Foundation.Size(256, 256)).OpenReadAsync();
+                    DispatcherQueue.TryEnqueue(async () =>
+                    {
+                        var bitmap = new BitmapImage();
+                        // High-res decode to avoid soft edges and aliasing
+                        bitmap.DecodePixelHeight = 72;
+                        await bitmap.SetSourceAsync(logoStream);
+
+                        // Use 48x48 with -14 margin to "zoom in" natively by effectively 2.4x.
+                        // This crops out the huge transparent borders common in MSIX app logos.
+                        item.Icon = new ImageIcon
+                        {
+                            Source = bitmap,
+                            Width = 48,
+                            Height = 48,
+                            Margin = new Thickness(-14)
+                        };
+                    });
+                }
+                catch
+                {
+                    // Fallback to smaller icon if high-res fails
+                    try
+                    {
+                        var logoStream = await handler.DisplayInfo.GetLogo(new Windows.Foundation.Size(64, 64)).OpenReadAsync();
+                        DispatcherQueue.TryEnqueue(async () =>
+                        {
+                            var bitmap = new BitmapImage();
+                            bitmap.DecodePixelHeight = 20;
+                            await bitmap.SetSourceAsync(logoStream);
+                            item.Icon = new ImageIcon { Source = bitmap, Width = 20, Height = 20 };
+                        });
+                    }
+                    catch { }
+                }
+            });
+        }
+
+        private void LoadWin32IconAsync(MenuFlyoutItem item, string exePath)
+        {
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    var exeFile = await StorageFile.GetFileFromPathAsync(exePath);
+                    // Request 48x48 to avoid extreme downscaling aliasing
+                    var thumbnail = await exeFile.GetThumbnailAsync(Windows.Storage.FileProperties.ThumbnailMode.SingleItem, 48);
+                    if (thumbnail != null)
+                    {
+                        DispatcherQueue.TryEnqueue(async () =>
+                        {
+                            var bitmap = new BitmapImage();
+                            // Decode specifically to 20px for maximum sharpness
+                            bitmap.DecodePixelHeight = 20;
+                            await bitmap.SetSourceAsync(thumbnail);
+                            item.Icon = new ImageIcon
+                            {
+                                Source = bitmap,
+                                Width = 20,
+                                Height = 20
+                            };
+                        });
+                    }
+                }
+                catch { }
+            });
+        }
+
+        private async Task ShowErrorDialogAsync(string message)
+        {
+            var dialog = new ContentDialog
+            {
+                Title = "Error",
+                Content = message,
+                CloseButtonText = "OK",
+                XamlRoot = this.XamlRoot
+            };
+            await dialog.ShowAsync();
         }
     }
 }

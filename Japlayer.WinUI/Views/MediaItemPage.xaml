@@ -138,21 +138,49 @@
                             PointerExited="Button_PointerExited"/>
                 </Grid>
                 
-                <!-- Scenes Section -->
                 <StackPanel Grid.Row="2" Margin="24,0,24,24" Spacing="12">
                     <TextBlock Text="Scenes" Style="{StaticResource SubtitleTextBlockStyle}"/>
                     <ItemsControl ItemsSource="{x:Bind ViewModel.Scenes, Mode=OneWay}">
                         <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <StackPanel Spacing="4" Margin="0,0,0,12">
-                                    <MediaPlayerElement Source="{Binding File, Converter={StaticResource PathToMediaSourceConverter}, Mode=OneWay}" 
-                                                      AreTransportControlsEnabled="True" 
-                                                      AutoPlay="False"
-                                                      HorizontalAlignment="Stretch"
-                                                      Stretch="Uniform"
-                                                      Loaded="MediaPlayerElement_Loaded"
-                                                      Unloaded="MediaPlayerElement_Unloaded"/>
-                                </StackPanel>
+                            <DataTemplate x:DataType="vm:MediaSceneViewModel">
+                                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="8"
+                                        Margin="0,0,0,24"
+                                        Padding="0">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="*"/>
+                                        </Grid.RowDefinitions>
+
+                                        <Grid Grid.Row="0" Margin="16,8,8,8">
+                                            <TextBlock Text="{x:Bind SceneNumber, Mode=OneWay}"
+                                                       VerticalAlignment="Center"
+                                                       Style="{StaticResource BodyStrongTextBlockStyle}"/>
+                                            
+                                            <Button Content="Open in..."
+                                                    HorizontalAlignment="Right"
+                                                    Click="OpenIn_Click"
+                                                    Style="{StaticResource SubtleButtonStyle}">
+                                                <Button.KeyboardAccelerators>
+                                                    <KeyboardAccelerator Key="O" Modifiers="Control"/>
+                                                </Button.KeyboardAccelerators>
+                                            </Button>
+                                        </Grid>
+
+                                        <MediaPlayerElement Grid.Row="1"
+                                                          Source="{x:Bind File, Converter={StaticResource PathToMediaSourceConverter}, Mode=OneWay}" 
+                                                          AreTransportControlsEnabled="True" 
+                                                          AutoPlay="False"
+                                                          HorizontalAlignment="Stretch"
+                                                          Stretch="Uniform"
+                                                          Loaded="MediaPlayerElement_Loaded"
+                                                          Unloaded="MediaPlayerElement_Unloaded"
+                                                          Margin="1,0,1,1"/>
+                                    </Grid>
+                                </Border>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
