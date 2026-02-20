@@ -21,9 +21,20 @@ namespace Japlayer.Data.Services
                     MediaId = m.MediaId,
                     // We take the title and cover from the first metadata entry
                     Title = m.MediaMetadata.Select(md => md.Title).FirstOrDefault(),
-                    CoverImagePath = m.MediaMetadata.Select(md => md.Cover).FirstOrDefault()
+                    CoverImagePath = m.MediaMetadata.Select(md => md.Cover).FirstOrDefault(),
+                    UserTags = m.UserTags.Select(ut => ut.Name).ToList()
                 })
                 .OrderBy(m => m.MediaId)
+                .ToListAsync();
+        }
+
+        public async Task<IEnumerable<string>> GetUserTagsAsync()
+        {
+            return await _context.UserTags
+                .AsNoTracking()
+                .Select(ut => ut.Name)
+                .Distinct()
+                .OrderBy(name => name)
                 .ToListAsync();
         }
 

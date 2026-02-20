@@ -26,7 +26,46 @@
             </Grid.ColumnDefinitions>
 
             <!-- Sidebar Container -->
-            <Grid Padding="24,0,12,0"/>
+            <Grid Grid.Column="0" Padding="24,0,12,0">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" VerticalScrollMode="Auto">
+                    <StackPanel Spacing="16" Margin="0,0,0,24">
+                        <!-- UserTag Filter Card -->
+                        <Grid Padding="16" 
+                              Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" 
+                              CornerRadius="8" 
+                              BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" 
+                              BorderThickness="1">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            
+                            <TextBlock Text="User Tags" 
+                                       Style="{StaticResource BodyStrongTextBlockStyle}" 
+                                       Margin="0,0,0,12"/>
+                            
+                            <TextBox Grid.Row="1" 
+                                     Text="{x:Bind ViewModel.TagSearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" 
+                                     PlaceholderText="Filter tags..." 
+                                     Margin="0,0,0,12"/>
+                            
+                            <ItemsControl Grid.Row="2" 
+                                         ItemsSource="{x:Bind ViewModel.TagFilterItems, Mode=OneWay}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:UserTagFilterItem">
+                                        <CheckBox Content="{x:Bind Name}" 
+                                                  IsChecked="{x:Bind IsSelected, Mode=TwoWay}" 
+                                                  IsThreeState="True"
+                                                  Margin="0,0,0,4"
+                                                  HorizontalAlignment="Stretch"/>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </Grid>
+                    </StackPanel>
+                </ScrollViewer>
+            </Grid>
 
             <!-- Media Grid -->
             <GridView Grid.Column="1" 
