@@ -21,3 +21,7 @@ After making changes to the codebase:
     ```
 
 Always perform these steps before submitting or concluding a task.
+
+# Coding style
+
+Avoid abbreviating variable names to maintain readability and explicitness

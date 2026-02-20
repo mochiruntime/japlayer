@@ -1,4 +1,3 @@
-using System;
 using Microsoft.UI.Xaml;
 
 
@@ -18,7 +17,7 @@ namespace Japlayer
             // Set window size
             var hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
             Microsoft.UI.WindowId windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(hWnd);
-            Microsoft.UI.Windowing.AppWindow appWindow = Microsoft.UI.Windowing.AppWindow.GetFromWindowId(windowId);
+            var appWindow = Microsoft.UI.Windowing.AppWindow.GetFromWindowId(windowId);
             appWindow.Resize(new Windows.Graphics.SizeInt32(1960, 1080));
 
             ContentFrame.Navigate(typeof(Views.LibraryPage));

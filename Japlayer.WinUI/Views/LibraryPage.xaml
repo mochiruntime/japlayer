@@ -41,7 +41,7 @@
                                 <RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
                             
-                            <TextBlock Text="User Tags" 
+                            <TextBlock Text="Tags" 
                                        Style="{StaticResource BodyStrongTextBlockStyle}" 
                                        Margin="0,0,0,12"/>
                             
@@ -50,18 +50,19 @@
                                      PlaceholderText="Filter tags..." 
                                      Margin="0,0,0,12"/>
                             
-                            <ItemsControl Grid.Row="2" 
-                                         ItemsSource="{x:Bind ViewModel.TagFilterItems, Mode=OneWay}">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate x:DataType="vm:FilterItem">
-                                        <CheckBox Content="{x:Bind Name}" 
-                                                  IsChecked="{x:Bind IsSelected, Mode=TwoWay}" 
-                                                  IsThreeState="True"
-                                                  Margin="0,0,0,4"
-                                                  HorizontalAlignment="Stretch"/>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
+                            <ScrollViewer Grid.Row="2" MaxHeight="320" VerticalScrollBarVisibility="Auto">
+                                <ItemsControl ItemsSource="{x:Bind ViewModel.TagFilterItems, Mode=OneWay}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:FilterItem">
+                                            <CheckBox Content="{x:Bind Name}" 
+                                                      IsChecked="{x:Bind IsSelected, Mode=TwoWay}" 
+                                                      IsThreeState="True"
+                                                      Margin="0,0,0,4"
+                                                      HorizontalAlignment="Stretch"/>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
                         </Grid>
 
                         <!-- Genres Filter Card -->
@@ -85,18 +86,19 @@
                                      PlaceholderText="Filter genres..." 
                                      Margin="0,0,0,12"/>
                             
-                            <ItemsControl Grid.Row="2" 
-                                         ItemsSource="{x:Bind ViewModel.GenreFilterItems, Mode=OneWay}">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate x:DataType="vm:FilterItem">
-                                        <CheckBox Content="{x:Bind Name}" 
-                                                  IsChecked="{x:Bind IsSelected, Mode=TwoWay}" 
-                                                  IsThreeState="True"
-                                                  Margin="0,0,0,4"
-                                                  HorizontalAlignment="Stretch"/>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
+                            <ScrollViewer Grid.Row="2" MaxHeight="320" VerticalScrollBarVisibility="Auto">
+                                <ItemsControl ItemsSource="{x:Bind ViewModel.GenreFilterItems, Mode=OneWay}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:FilterItem">
+                                            <CheckBox Content="{x:Bind Name}" 
+                                                      IsChecked="{x:Bind IsSelected, Mode=TwoWay}" 
+                                                      IsThreeState="True"
+                                                      Margin="0,0,0,4"
+                                                      HorizontalAlignment="Stretch"/>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
                         </Grid>
                     </StackPanel>
                 </ScrollViewer>
