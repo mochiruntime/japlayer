@@ -19,7 +19,11 @@ namespace Japlayer.ViewModels
         {
             get
             {
-                if (string.IsNullOrEmpty(_libraryItem.CoverImagePath)) return null;
+                if (string.IsNullOrEmpty(_libraryItem.CoverImagePath))
+                {
+                    return null;
+                }
+
                 return Path.Combine(_settingsService.ImagePath, _libraryItem.CoverImagePath);
             }
         }

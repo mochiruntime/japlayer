@@ -4,6 +4,6 @@ namespace Japlayer.Data.Contracts
 {
     public interface IMediaSceneProvider
     {
-        Task<IEnumerable<MediaScene>> GetMediaScenesAsync(string mediaId);
+        public Task<IEnumerable<MediaScene>> GetMediaScenesAsync(string mediaId);
     }
 }

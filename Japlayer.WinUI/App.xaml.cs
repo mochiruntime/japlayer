@@ -75,7 +75,7 @@ namespace Japlayer
             }
         }
 
-        protected override void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
+        protected override void OnLaunched(LaunchActivatedEventArgs args)
         {
             EnsureDatabaseCreated();
             m_window = GetService<MainWindow>();
@@ -84,11 +84,9 @@ namespace Japlayer
 
         private void EnsureDatabaseCreated()
         {
-            using (var scope = Services.CreateScope())
-            {
-                var context = scope.ServiceProvider.GetRequiredService<DatabaseContext>();
-                context.Database.EnsureCreated();
-            }
+            using var scope = Services.CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<DatabaseContext>();
+            context.Database.EnsureCreated();
         }
     }
 }

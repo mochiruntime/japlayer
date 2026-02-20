@@ -10,18 +10,11 @@ namespace Japlayer.Helpers;
 /// <summary>
 /// Represents a Win32 application capable of handling a specific file association.
 /// </summary>
-public class Win32FileHandler
+public class Win32FileHandler(string name, string command, string? exePath = null)
 {
-    public string Name { get; set; }
-    public string Command { get; set; }
-    public string? ExePath { get; set; }
-
-    public Win32FileHandler(string name, string command, string? exePath = null)
-    {
-        Name = name;
-        Command = command;
-        ExePath = exePath;
-    }
+    public string Name { get; set; } = name;
+    public string Command { get; set; } = command;
+    public string? ExePath { get; set; } = exePath;
 
     /// <summary>
     /// Invokes the handler for the specified file path.
@@ -30,7 +23,10 @@ public class Win32FileHandler
     {
         try
         {
-            if (string.IsNullOrEmpty(Command)) return;
+            if (string.IsNullOrEmpty(Command))
+            {
+                return;
+            }
 
             var (exe, args) = ParseCommand(Command, filePath);
 
@@ -55,12 +51,12 @@ public class Win32FileHandler
         string exe;
         string args;
 
-        string trimmedCommand = command.Trim();
+        var trimmedCommand = command.Trim();
 
         // Handle quoted executable paths
         if (trimmedCommand.StartsWith('\"'))
         {
-            int endQuote = trimmedCommand.IndexOf('\"', 1);
+            var endQuote = trimmedCommand.IndexOf('\"', 1);
             if (endQuote > 0)
             {
                 exe = trimmedCommand[1..endQuote];
@@ -74,7 +70,7 @@ public class Win32FileHandler
         }
         else
         {
-            int firstSpace = trimmedCommand.IndexOf(' ');
+            var firstSpace = trimmedCommand.IndexOf(' ');
             if (firstSpace > 0)
             {
                 exe = trimmedCommand[..firstSpace];
@@ -136,14 +132,12 @@ public static class FileAssociationResolver
             }
 
             // 5. Check SystemFileAssociations (Modern Windows association mechanism)
-            string systemKeyPath = $@"SystemFileAssociations\{extension}\shell\open\command";
-            using (var sysKey = Registry.ClassesRoot.OpenSubKey(systemKeyPath))
+            var systemKeyPath = $@"SystemFileAssociations\{extension}\shell\open\command";
+            using var sysKey = Registry.ClassesRoot.OpenSubKey(systemKeyPath);
+            if (sysKey?.GetValue("") is string cmd)
             {
-                if (sysKey?.GetValue("") is string cmd)
-                {
-                    string name = extension[1..].ToUpperInvariant() + " Viewer";
-                    AddHandlerWithValidation(name, cmd, handlers, addedCommands);
-                }
+                var name = extension[1..].ToUpperInvariant() + " Viewer";
+                AddHandlerWithValidation(name, cmd, handlers, addedCommands);
             }
         }
         catch (Exception ex)
@@ -165,9 +159,12 @@ public static class FileAssociationResolver
 
     private static void AddHandlerWithValidation(string name, string cmd, List<Win32FileHandler> handlers, HashSet<string> addedCommands)
     {
-        if (string.IsNullOrEmpty(cmd) || !addedCommands.Add(cmd)) return;
+        if (string.IsNullOrEmpty(cmd) || !addedCommands.Add(cmd))
+        {
+            return;
+        }
 
-        string exe = ExtractExePath(cmd);
+        var exe = ExtractExePath(cmd);
 
         if (!string.IsNullOrEmpty(exe) && File.Exists(exe))
         {
@@ -191,13 +188,13 @@ public static class FileAssociationResolver
 
     private static string ExtractExePath(string cmd)
     {
-        string trimmed = cmd.TrimStart();
+        var trimmed = cmd.TrimStart();
         if (trimmed.StartsWith('\"'))
         {
-            int endQuote = trimmed.IndexOf('\"', 1);
+            var endQuote = trimmed.IndexOf('\"', 1);
             return endQuote > 0 ? trimmed[1..endQuote] : trimmed[1..];
         }
-        int firstSpace = trimmed.IndexOf(' ');
+        var firstSpace = trimmed.IndexOf(' ');
         return firstSpace > 0 ? trimmed[..firstSpace] : trimmed;
     }
 
@@ -211,19 +208,26 @@ public static class FileAssociationResolver
 
     private static void QueryOpenWithList(RegistryKey root, string extension, List<Win32FileHandler> handlers, HashSet<string> addedCommands)
     {
-        string path = $@"Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\{extension}\OpenWithList";
+        var path = $@"Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\{extension}\OpenWithList";
         using var key = root.OpenSubKey(path);
-        if (key == null) return;
+        if (key == null)
+        {
+            return;
+        }
 
         foreach (var valName in key.GetValueNames())
         {
-            if (valName == "MRUList") continue;
+            if (valName == "MRUList")
+            {
+                continue;
+            }
+
             if (key.GetValue(valName) is string appName)
             {
                 using var appKey = Registry.ClassesRoot.OpenSubKey($@"Applications\{appName}\shell\open\command");
                 if (appKey?.GetValue("") is string cmd)
                 {
-                    string friendlyName = GetFriendlyNameForApp(appName);
+                    var friendlyName = GetFriendlyNameForApp(appName);
                     AddHandlerWithValidation(friendlyName, cmd, handlers, addedCommands);
                 }
             }
@@ -232,12 +236,15 @@ public static class FileAssociationResolver
 
     private static void QueryOpenWithProgids(RegistryKey root, string extension, List<Win32FileHandler> handlers, HashSet<string> addedCommands)
     {
-        string path = root == Registry.ClassesRoot
+        var path = root == Registry.ClassesRoot
             ? $@"{extension}\OpenWithProgids"
             : $@"Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\{extension}\OpenWithProgids";
 
         using var key = root.OpenSubKey(path);
-        if (key == null) return;
+        if (key == null)
+        {
+            return;
+        }
 
         foreach (var progId in key.GetValueNames())
         {
@@ -263,7 +270,11 @@ public static class FileAssociationResolver
     private static string GetFriendlyNameForApp(string appName)
     {
         using var key = Registry.ClassesRoot.OpenSubKey($@"Applications\{appName}");
-        if (key?.GetValue("FriendlyAppName") is string name) return name;
+        if (key?.GetValue("FriendlyAppName") is string name)
+        {
+            return name;
+        }
+
         return Path.GetFileNameWithoutExtension(appName);
     }
 }

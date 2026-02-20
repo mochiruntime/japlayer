@@ -57,21 +57,23 @@ namespace Japlayer.Views
         private int GetCurrentImageIndex()
         {
             if (GalleryItemsControl.ItemsPanelRoot is not StackPanel panel)
+            {
                 return 0;
+            }
 
-            double scrollOffset = GalleryScrollViewer.HorizontalOffset;
+            var scrollOffset = GalleryScrollViewer.HorizontalOffset;
 
             // Loop through the children and find the first one that begins AFTER the offset
             double cumulative = 0;
-            for (int i = 0; i < panel.Children.Count; i++)
+            for (var i = 0; i < panel.Children.Count; i++)
             {
                 UIElement element = panel.Children[i];
 
-                double elementWidth = ((FrameworkElement)element).ActualWidth;
-                double spacing = (panel.Spacing);
+                var elementWidth = ((FrameworkElement)element).ActualWidth;
+                var spacing = (panel.Spacing);
 
-                double elementStart = cumulative;
-                double elementEnd = cumulative + elementWidth;
+                var elementStart = cumulative;
+                var elementEnd = cumulative + elementWidth;
 
                 if (scrollOffset < elementEnd)
                 {
@@ -88,13 +90,15 @@ namespace Japlayer.Views
         private void ScrollToImage(int index)
         {
             if (GalleryItemsControl.ItemsPanelRoot is not StackPanel panel)
+            {
                 return;
+            }
 
             index = Math.Clamp(index, 0, panel.Children.Count - 1);
 
             double targetOffset = 0;
 
-            for (int i = 0; i < index; i++)
+            for (var i = 0; i < index; i++)
             {
                 var element = (FrameworkElement)panel.Children[i];
                 targetOffset += element.ActualWidth + panel.Spacing;
@@ -111,7 +115,7 @@ namespace Japlayer.Views
                 return;
             }
 
-            int delta = pointerPoint.Properties.MouseWheelDelta;
+            var delta = pointerPoint.Properties.MouseWheelDelta;
 
             // Manual bubble up to parent if we've reached the ends
             if (delta > 0 && GalleryScrollViewer.HorizontalOffset <= 0)
@@ -130,7 +134,7 @@ namespace Japlayer.Views
             }
 
             double scrollAmount = -delta * 5;
-            double newOffset = GalleryScrollViewer.HorizontalOffset + scrollAmount;
+            var newOffset = GalleryScrollViewer.HorizontalOffset + scrollAmount;
 
             GalleryScrollViewer.ChangeView(newOffset, null, null, false);
 
@@ -140,14 +144,8 @@ namespace Japlayer.Views
             e.Handled = true;
         }
 
-        private void Button_PointerEntered(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
-        {
-            ProtectedCursor = Microsoft.UI.Input.InputSystemCursor.Create(Microsoft.UI.Input.InputSystemCursorShape.Hand);
-        }
-        private void Button_PointerExited(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
-        {
-            ProtectedCursor = null; // Revert to default cursor
-        }
+        private void Button_PointerEntered(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e) => ProtectedCursor = Microsoft.UI.Input.InputSystemCursor.Create(Microsoft.UI.Input.InputSystemCursorShape.Hand);
+        private void Button_PointerExited(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e) => ProtectedCursor = null; // Revert to default cursor
 
         private void MediaPlayerElement_Loaded(object sender, RoutedEventArgs e)
         {
@@ -181,13 +179,16 @@ namespace Japlayer.Views
 
         private void UpdateMediaPlayerHeight(MediaPlayerElement mpe)
         {
-            if (mpe == null) return;
+            if (mpe == null)
+            {
+                return;
+            }
 
             try
             {
                 if (mpe.MediaPlayer != null && mpe.MediaPlayer.PlaybackSession != null && mpe.MediaPlayer.PlaybackSession.NaturalVideoWidth > 0)
                 {
-                    double ratio = (double)mpe.MediaPlayer.PlaybackSession.NaturalVideoHeight / mpe.MediaPlayer.PlaybackSession.NaturalVideoWidth;
+                    var ratio = (double)mpe.MediaPlayer.PlaybackSession.NaturalVideoHeight / mpe.MediaPlayer.PlaybackSession.NaturalVideoWidth;
                     mpe.Height = mpe.ActualWidth * ratio;
                 }
             }
@@ -199,9 +200,14 @@ namespace Japlayer.Views
         private async void OpenIn_Click(object sender, RoutedEventArgs e)
         {
             if (sender is not FrameworkElement element || element.DataContext is not MediaSceneViewModel sceneVm)
+            {
                 return;
+            }
 
-            if (string.IsNullOrEmpty(sceneVm.File)) return;
+            if (string.IsNullOrEmpty(sceneVm.File))
+            {
+                return;
+            }
 
             try
             {
@@ -215,7 +221,10 @@ namespace Japlayer.Views
                 // Add UWP Handlers
                 foreach (var handler in uwpHandlers)
                 {
-                    if (!addedNames.Add(handler.DisplayInfo.DisplayName)) continue;
+                    if (!addedNames.Add(handler.DisplayInfo.DisplayName))
+                    {
+                        continue;
+                    }
 
                     var item = new MenuFlyoutItem { Text = handler.DisplayInfo.DisplayName };
                     LoadUwpIconAsync(item, handler);
@@ -231,7 +240,10 @@ namespace Japlayer.Views
                 // Add Win32 Handlers
                 foreach (var handler in win32Handlers)
                 {
-                    if (!addedNames.Add(handler.Name)) continue;
+                    if (!addedNames.Add(handler.Name))
+                    {
+                        continue;
+                    }
 
                     var item = new MenuFlyoutItem { Text = handler.Name };
                     if (!string.IsNullOrEmpty(handler.ExePath))
@@ -288,9 +300,11 @@ namespace Japlayer.Views
                     var logoStream = await handler.DisplayInfo.GetLogo(new Windows.Foundation.Size(256, 256)).OpenReadAsync();
                     DispatcherQueue.TryEnqueue(async () =>
                     {
-                        var bitmap = new BitmapImage();
-                        // High-res decode to avoid soft edges and aliasing
-                        bitmap.DecodePixelHeight = 72;
+                        var bitmap = new BitmapImage
+                        {
+                            // High-res decode to avoid soft edges and aliasing
+                            DecodePixelHeight = 72
+                        };
                         await bitmap.SetSourceAsync(logoStream);
 
                         // Use 48x48 with -14 margin to "zoom in" natively by effectively 2.4x.
@@ -312,8 +326,10 @@ namespace Japlayer.Views
                         var logoStream = await handler.DisplayInfo.GetLogo(new Windows.Foundation.Size(64, 64)).OpenReadAsync();
                         DispatcherQueue.TryEnqueue(async () =>
                         {
-                            var bitmap = new BitmapImage();
-                            bitmap.DecodePixelHeight = 20;
+                            var bitmap = new BitmapImage
+                            {
+                                DecodePixelHeight = 20
+                            };
                             await bitmap.SetSourceAsync(logoStream);
                             item.Icon = new ImageIcon { Source = bitmap, Width = 20, Height = 20 };
                         });
@@ -336,9 +352,11 @@ namespace Japlayer.Views
                     {
                         DispatcherQueue.TryEnqueue(async () =>
                         {
-                            var bitmap = new BitmapImage();
-                            // Decode specifically to 20px for maximum sharpness
-                            bitmap.DecodePixelHeight = 20;
+                            var bitmap = new BitmapImage
+                            {
+                                // Decode specifically to 20px for maximum sharpness
+                                DecodePixelHeight = 20
+                            };
                             await bitmap.SetSourceAsync(thumbnail);
                             item.Icon = new ImageIcon
                             {

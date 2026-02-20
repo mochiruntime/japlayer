@@ -92,15 +92,24 @@ namespace Japlayer.Services
         {
             // 1. Check for local dev config in parent directories
             var localDevConfig = FindLocalConfig(AppContext.BaseDirectory);
-            if (localDevConfig != null) return localDevConfig;
+            if (localDevConfig != null)
+            {
+                return localDevConfig;
+            }
 
             // 2. Check in AppData (User specific)
             var appDataPath = Path.Combine(BaseAppDataPath, ConfigFileName);
-            if (File.Exists(appDataPath)) return appDataPath;
+            if (File.Exists(appDataPath))
+            {
+                return appDataPath;
+            }
 
             // 3. Check in BaseDirectory
             var baseConfig = Path.Combine(AppContext.BaseDirectory, ConfigFileName);
-            if (File.Exists(baseConfig)) return baseConfig;
+            if (File.Exists(baseConfig))
+            {
+                return baseConfig;
+            }
 
             return null;
         }

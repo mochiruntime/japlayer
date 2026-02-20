@@ -4,12 +4,12 @@ namespace Japlayer.Data.Contracts
 {
     public interface IMediaProvider
     {
-        Task<IEnumerable<LibraryItem>> GetLibraryItemsAsync();
+        public Task<IEnumerable<LibraryItem>> GetLibraryItemsAsync();
 
-        Task<MediaItem> GetMediaItemAsync(string mediaId);
+        public Task<MediaItem> GetMediaItemAsync(string mediaId);
 
-        Task<IEnumerable<string>> GetUserTagsAsync();
+        public Task<IEnumerable<string>> GetUserTagsAsync();
 
-        Task<IEnumerable<string>> GetGenresAsync();
+        public Task<IEnumerable<string>> GetGenresAsync();
     }
 }

@@ -24,9 +24,6 @@ namespace Japlayer.Controls
             set => SetValue(StretchProperty, value);
         }
 
-        public MediaCoverView()
-        {
-            this.InitializeComponent();
-        }
+        public MediaCoverView() => this.InitializeComponent();
     }
 }

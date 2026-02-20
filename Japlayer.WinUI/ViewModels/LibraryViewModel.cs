@@ -65,7 +65,10 @@ namespace Japlayer.ViewModels
                 .ThenByDescending(t => t.IsSelected == true)
                 .ThenBy(t => t.Name);
 
-            foreach (var tag in filteredTags) TagFilterItems.Add(tag);
+            foreach (var tag in filteredTags)
+            {
+                TagFilterItems.Add(tag);
+            }
         }
 
         private void UpdateGenreFilterItems()
@@ -77,7 +80,10 @@ namespace Japlayer.ViewModels
                 .ThenByDescending(g => g.IsSelected == true)
                 .ThenBy(g => g.Name);
 
-            foreach (var genre in filteredGenres) GenreFilterItems.Add(genre);
+            foreach (var genre in filteredGenres)
+            {
+                GenreFilterItems.Add(genre);
+            }
         }
 
         private void ApplyFilter()
@@ -91,18 +97,29 @@ namespace Japlayer.ViewModels
             var filteredItems = _allMediaItems.AsEnumerable();
 
             if (requiredTags.Count > 0)
+            {
                 filteredItems = filteredItems.Where(item => requiredTags.All(tag => item.LibraryItem.UserTags.Contains(tag)));
+            }
 
             if (excludedTags.Count > 0)
+            {
                 filteredItems = filteredItems.Where(item => excludedTags.All(tag => !item.LibraryItem.UserTags.Contains(tag)));
+            }
 
             if (requiredGenres.Count > 0)
+            {
                 filteredItems = filteredItems.Where(item => requiredGenres.All(genre => item.LibraryItem.Genres.Contains(genre)));
+            }
 
             if (excludedGenres.Count > 0)
+            {
                 filteredItems = filteredItems.Where(item => excludedGenres.All(genre => !item.LibraryItem.Genres.Contains(genre)));
+            }
 
-            foreach (var item in filteredItems) MediaItems.Add(item);
+            foreach (var item in filteredItems)
+            {
+                MediaItems.Add(item);
+            }
 
             UpdateTagFilterItems();
             UpdateGenreFilterItems();

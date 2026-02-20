@@ -43,7 +43,11 @@ namespace Japlayer.ViewModels
         {
             get
             {
-                if (string.IsNullOrEmpty(_libraryItem.CoverImagePath)) return "ms-appx:///Assets/NoCover.png";
+                if (string.IsNullOrEmpty(_libraryItem.CoverImagePath))
+                {
+                    return "ms-appx:///Assets/NoCover.png";
+                }
+
                 return Path.Combine(_settingsService.ImagePath, _libraryItem.CoverImagePath);
             }
         }
@@ -62,7 +66,10 @@ namespace Japlayer.ViewModels
 
         public async Task LoadDetailsAsync()
         {
-            if (IsDetailsLoaded) return;
+            if (IsDetailsLoaded)
+            {
+                return;
+            }
 
             MediaItemData = await _mediaProvider.GetMediaItemAsync(Id);
 

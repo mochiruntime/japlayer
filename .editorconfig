@@ -26,6 +26,9 @@ csharp_style_var_when_type_is_apparent = true:suggestion
 dotnet_style_predefined_type_for_locals_parameters_extract_method = true:suggestion
 dotnet_style_predefined_type_for_member_access = true:suggestion
 
+# Enforce braces for all control statements
+csharp_prefer_braces = true:suggestion
+
 # Parentheses preferences
 dotnet_style_parentheses_in_arithmetic_binary_operators = always_for_clarity:silent
 dotnet_style_parentheses_in_relational_binary_operators = always_for_clarity:silent

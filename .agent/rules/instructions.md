@@ -17,7 +17,7 @@ After making changes to the codebase:
 
 2.  After a successful build, run `dotnet format` to ensure that the code adheres to the project's style guidelines as defined in `.editorconfig`.
     ```powershell
-    dotnet format
+    dotnet format && dotnet format style --severity info
     ```
 
 Always perform these steps before submitting or concluding a task.

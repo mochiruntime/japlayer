@@ -62,7 +62,10 @@ namespace Japlayer.Data.Services
                 .Include(m => m.Genres)
                 .FirstOrDefaultAsync(m => m.MediaId == mediaId);
 
-            if (media == null) return null!;
+            if (media == null)
+            {
+                return null!;
+            }
 
             var metadata = media.MediaMetadata.FirstOrDefault();
 

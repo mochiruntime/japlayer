@@ -4,11 +4,11 @@ namespace Japlayer.Contracts
 {
     public interface ISettingsService
     {
-        string ImagePath { get; set; }
-        string SqliteDatabasePath { get; set; }
+        public string ImagePath { get; set; }
+        public string SqliteDatabasePath { get; set; }
 
-        Task LoadAsync();
-        Task SaveAsync();
+        public Task LoadAsync();
+        public Task SaveAsync();
     }
 }
 
