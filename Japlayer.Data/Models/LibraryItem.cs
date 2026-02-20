@@ -6,5 +6,6 @@ namespace Japlayer.Data.Models
         public string? Title { get; init; }
         public string? CoverImagePath { get; init; }
         public IReadOnlyList<string> UserTags { get; init; } = [];
+        public IReadOnlyList<string> Genres { get; init; } = [];
     }
 }

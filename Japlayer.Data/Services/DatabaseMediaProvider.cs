@@ -22,7 +22,8 @@ namespace Japlayer.Data.Services
                     // We take the title and cover from the first metadata entry
                     Title = m.MediaMetadata.Select(md => md.Title).FirstOrDefault(),
                     CoverImagePath = m.MediaMetadata.Select(md => md.Cover).FirstOrDefault(),
-                    UserTags = m.UserTags.Select(ut => ut.Name).ToList()
+                    UserTags = m.UserTags.Select(ut => ut.Name).ToList(),
+                    Genres = m.Genres.Select(g => g.Name).ToList()
                 })
                 .OrderBy(m => m.MediaId)
                 .ToListAsync();
@@ -33,6 +34,16 @@ namespace Japlayer.Data.Services
             return await _context.UserTags
                 .AsNoTracking()
                 .Select(ut => ut.Name)
+                .Distinct()
+                .OrderBy(name => name)
+                .ToListAsync();
+        }
+
+        public async Task<IEnumerable<string>> GetGenresAsync()
+        {
+            return await _context.MediaGenres
+                .AsNoTracking()
+                .Select(g => g.Name)
                 .Distinct()
                 .OrderBy(name => name)
                 .ToListAsync();

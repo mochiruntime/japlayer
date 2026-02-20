@@ -28,7 +28,7 @@
             <!-- Sidebar Container -->
             <Grid Grid.Column="0" Padding="24,0,12,0">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" VerticalScrollMode="Auto">
-                    <StackPanel Spacing="16" Margin="0,0,0,24">
+                    <StackPanel Spacing="16" Padding="0,0,12,24">
                         <!-- UserTag Filter Card -->
                         <Grid Padding="16" 
                               Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" 
@@ -53,7 +53,42 @@
                             <ItemsControl Grid.Row="2" 
                                          ItemsSource="{x:Bind ViewModel.TagFilterItems, Mode=OneWay}">
                                 <ItemsControl.ItemTemplate>
-                                    <DataTemplate x:DataType="vm:UserTagFilterItem">
+                                    <DataTemplate x:DataType="vm:FilterItem">
+                                        <CheckBox Content="{x:Bind Name}" 
+                                                  IsChecked="{x:Bind IsSelected, Mode=TwoWay}" 
+                                                  IsThreeState="True"
+                                                  Margin="0,0,0,4"
+                                                  HorizontalAlignment="Stretch"/>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </Grid>
+
+                        <!-- Genres Filter Card -->
+                        <Grid Padding="16" 
+                              Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" 
+                              CornerRadius="8" 
+                              BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" 
+                              BorderThickness="1">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            
+                            <TextBlock Text="Genres" 
+                                       Style="{StaticResource BodyStrongTextBlockStyle}" 
+                                       Margin="0,0,0,12"/>
+                            
+                            <TextBox Grid.Row="1" 
+                                     Text="{x:Bind ViewModel.GenreSearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" 
+                                     PlaceholderText="Filter genres..." 
+                                     Margin="0,0,0,12"/>
+                            
+                            <ItemsControl Grid.Row="2" 
+                                         ItemsSource="{x:Bind ViewModel.GenreFilterItems, Mode=OneWay}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:FilterItem">
                                         <CheckBox Content="{x:Bind Name}" 
                                                   IsChecked="{x:Bind IsSelected, Mode=TwoWay}" 
                                                   IsThreeState="True"

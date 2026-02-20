@@ -9,5 +9,7 @@ namespace Japlayer.Data.Contracts
         Task<MediaItem> GetMediaItemAsync(string mediaId);
 
         Task<IEnumerable<string>> GetUserTagsAsync();
+
+        Task<IEnumerable<string>> GetGenresAsync();
     }
 }
