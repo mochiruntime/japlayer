@@ -6,6 +6,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Japlayer.Data.Contracts;
+using Japlayer.Models;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Japlayer.ViewModels
@@ -21,6 +22,7 @@ namespace Japlayer.ViewModels
         public ObservableCollection<LibraryItemViewModel> MediaItems { get; } = [];
         public ObservableCollection<FilterItem> TagFilterItems { get; } = [];
         public ObservableCollection<FilterItem> GenreFilterItems { get; } = [];
+        public IReadOnlyList<LibrarySortOption> SortOptions { get; } = LibrarySortOption.All;
 
         [ObservableProperty]
         public partial bool IsDataLoaded { get; set; }
@@ -31,8 +33,12 @@ namespace Japlayer.ViewModels
         [ObservableProperty]
         public partial string GenreSearchText { get; set; } = string.Empty;
 
+        [ObservableProperty]
+        public partial LibrarySortOption SortOrder { get; set; } = LibrarySortOption.AlphabeticalAscending;
+
         partial void OnTagSearchTextChanged(string value) => UpdateTagFilterItems();
         partial void OnGenreSearchTextChanged(string value) => UpdateGenreFilterItems();
+        partial void OnSortOrderChanged(LibrarySortOption value) => ApplyFilter();
 
         public async Task LoadDataAsync()
         {
@@ -115,6 +121,15 @@ namespace Japlayer.ViewModels
             {
                 filteredItems = filteredItems.Where(item => excludedGenres.All(genre => !item.LibraryItem.Genres.Contains(genre)));
             }
+
+            filteredItems = SortOrder switch
+            {
+                _ when SortOrder == LibrarySortOption.AlphabeticalAscending => filteredItems.OrderBy(item => item.Title),
+                _ when SortOrder == LibrarySortOption.AlphabeticalDescending => filteredItems.OrderByDescending(item => item.Title),
+                _ when SortOrder == LibrarySortOption.ReleaseDateAscending => filteredItems.OrderBy(item => item.ReleaseDate ?? DateOnly.MinValue),
+                _ when SortOrder == LibrarySortOption.ReleaseDateDescending => filteredItems.OrderByDescending(item => item.ReleaseDate ?? DateOnly.MinValue),
+                _ => filteredItems.OrderBy(item => item.Title)
+            };
 
             foreach (var item in filteredItems)
             {

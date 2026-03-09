@@ -1,4 +1,5 @@
 #nullable enable
+using System;
 using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Japlayer.Contracts;
@@ -14,6 +15,7 @@ namespace Japlayer.ViewModels
         public string Id => _libraryItem.MediaId;
         public string Title => _libraryItem.MediaId + " " + (_libraryItem.Title ?? string.Empty);
         public string? OriginalTitle => _libraryItem.Title;
+        public DateOnly? ReleaseDate => _libraryItem.ReleaseDate;
 
         public string? CoverPath
         {

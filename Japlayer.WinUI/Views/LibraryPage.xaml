@@ -29,6 +29,22 @@
             <Grid Grid.Column="0" Padding="24,0,12,0">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" VerticalScrollMode="Auto">
                     <StackPanel Spacing="16" Padding="0,0,12,24">
+                        <!-- Sort By Card -->
+                        <Grid Padding="16" 
+                              Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" 
+                              CornerRadius="8" 
+                              BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" 
+                              BorderThickness="1">
+                            <StackPanel Spacing="8">
+                                <TextBlock Text="Sort by" Style="{StaticResource BodyStrongTextBlockStyle}"/>
+                                <ComboBox HorizontalAlignment="Stretch"
+                                          ItemsSource="{x:Bind ViewModel.SortOptions}"
+                                          SelectedItem="{x:Bind ViewModel.SortOrder, Mode=TwoWay}"
+                                          DisplayMemberPath="DisplayName">
+                                </ComboBox>
+                            </StackPanel>
+                        </Grid>
+
                         <!-- UserTag Filter Card -->
                         <Grid Padding="16" 
                               Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" 

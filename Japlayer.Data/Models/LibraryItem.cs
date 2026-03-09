@@ -4,6 +4,7 @@ namespace Japlayer.Data.Models
     {
         public required string MediaId { get; init; }
         public string? Title { get; init; }
+        public DateOnly? ReleaseDate { get; init; }
         public string? CoverImagePath { get; init; }
         public IReadOnlyList<string> UserTags { get; init; } = [];
         public IReadOnlyList<string> Genres { get; init; } = [];

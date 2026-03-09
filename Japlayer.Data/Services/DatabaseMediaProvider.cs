@@ -21,6 +21,7 @@ namespace Japlayer.Data.Services
                     MediaId = m.MediaId,
                     // We take the title and cover from the first metadata entry
                     Title = m.MediaMetadata.Select(md => md.Title).FirstOrDefault(),
+                    ReleaseDate = m.MediaMetadata.Select(md => md.ReleaseDate).FirstOrDefault(),
                     CoverImagePath = m.MediaMetadata.Select(md => md.Cover).FirstOrDefault(),
                     UserTags = m.UserTags.Select(ut => ut.Name).ToList(),
                     Genres = m.Genres.Select(g => g.Name).ToList()
