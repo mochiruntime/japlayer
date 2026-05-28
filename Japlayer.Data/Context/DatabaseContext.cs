@@ -1,4 +1,4 @@
-﻿using Japlayer.Data.Entities;
+using Japlayer.Data.Entities;
 using Microsoft.EntityFrameworkCore;
 
 namespace Japlayer.Data.Context;
@@ -71,6 +71,9 @@ public partial class DatabaseContext : DbContext
                 .HasColumnName("scene");
             entity.Property(e => e.Hostname).HasColumnName("hostname");
             entity.Property(e => e.Path).HasColumnName("path");
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnName("createdAt");
 
             entity.HasOne(d => d.Media).WithMany(p => p.MediaLocations)
                 .HasForeignKey(d => d.MediaId)

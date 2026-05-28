@@ -1,4 +1,4 @@
-﻿namespace Japlayer.Data.Entities;
+namespace Japlayer.Data.Entities;
 
 public partial class MediaLocation
 {
@@ -9,6 +9,8 @@ public partial class MediaLocation
     public string Hostname { get; set; } = null!;
 
     public string Path { get; set; } = null!;
+
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public virtual Media Media { get; set; } = null!;
 }

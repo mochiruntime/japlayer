@@ -34,7 +34,7 @@ namespace Japlayer.ViewModels
         public partial string GenreSearchText { get; set; } = string.Empty;
 
         [ObservableProperty]
-        public partial LibrarySortOption SortOrder { get; set; } = LibrarySortOption.AlphabeticalAscending;
+        public partial LibrarySortOption SortOrder { get; set; } = LibrarySortOption.AddedDateDescending;
 
         partial void OnTagSearchTextChanged(string value) => UpdateTagFilterItems();
         partial void OnGenreSearchTextChanged(string value) => UpdateGenreFilterItems();
@@ -128,6 +128,8 @@ namespace Japlayer.ViewModels
                 _ when SortOrder == LibrarySortOption.AlphabeticalDescending => filteredItems.OrderByDescending(item => item.Title),
                 _ when SortOrder == LibrarySortOption.ReleaseDateAscending => filteredItems.OrderBy(item => item.ReleaseDate ?? DateOnly.MinValue),
                 _ when SortOrder == LibrarySortOption.ReleaseDateDescending => filteredItems.OrderByDescending(item => item.ReleaseDate ?? DateOnly.MinValue),
+                _ when SortOrder == LibrarySortOption.AddedDateAscending => filteredItems.OrderBy(item => item.LibraryItem.CreatedAt ?? DateTime.MinValue),
+                _ when SortOrder == LibrarySortOption.AddedDateDescending => filteredItems.OrderByDescending(item => item.LibraryItem.CreatedAt ?? DateTime.MinValue),
                 _ => filteredItems.OrderBy(item => item.Title)
             };
 

@@ -8,5 +8,6 @@ namespace Japlayer.Data.Models
         public string? CoverImagePath { get; init; }
         public IReadOnlyList<string> UserTags { get; init; } = [];
         public IReadOnlyList<string> Genres { get; init; } = [];
+        public DateTime? CreatedAt { get; init; }
     }
 }
