@@ -1,4 +1,4 @@
-﻿namespace Japlayer.Data.Entities;
+namespace Japlayer.Data.Entities;
 
 public partial class Media
 {
@@ -21,4 +21,6 @@ public partial class Media
     public virtual ICollection<UserTag> UserTags { get; set; } = [];
 
     public virtual ICollection<MediaLocation> MediaLocations { get; set; } = [];
+
+    public virtual ICollection<MediaThumbnail> MediaThumbnails { get; set; } = [];
 }

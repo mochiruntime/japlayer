@@ -134,6 +134,7 @@
                           CornerRadius="8" 
                           ToolTipService.ToolTip="{x:Bind Title}"
                           PointerEntered="MediaItem_PointerEntered"
+                          PointerMoved="MediaItem_PointerMoved"
                           PointerExited="MediaItem_PointerExited"
                           RightTapped="MediaItem_RightTapped">
 
@@ -144,7 +145,7 @@
                         
                         <!-- Cover Image -->
                         <controls:MediaCoverView Grid.Row="0" 
-                                                 Source="{x:Bind DisplayCover, Mode=OneWay}" 
+                                                 Source="{x:Bind DisplayImageSource, Mode=OneWay}" 
                                                  Stretch="UniformToFill"
                                                  CornerRadius="8" />
 

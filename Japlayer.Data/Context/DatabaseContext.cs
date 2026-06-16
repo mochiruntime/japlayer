@@ -32,6 +32,8 @@ public partial class DatabaseContext : DbContext
 
     public virtual DbSet<UserTag> UserTags { get; set; }
 
+    public virtual DbSet<MediaThumbnail> MediaThumbnails { get; set; }
+
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -78,6 +80,28 @@ public partial class DatabaseContext : DbContext
             entity.HasOne(d => d.Media).WithMany(p => p.MediaLocations)
                 .HasForeignKey(d => d.MediaId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<MediaThumbnail>(entity =>
+        {
+            entity.HasKey(e => new { e.MediaId, e.Scene, e.Timestamp });
+
+            entity.Property(e => e.MediaId)
+                .UseCollation("NOCASE")
+                .HasColumnName("mediaId");
+            entity.Property(e => e.Scene)
+                .HasColumnType("INT")
+                .HasColumnName("scene");
+            entity.Property(e => e.Timestamp)
+                .HasColumnType("INT")
+                .HasColumnName("timestamp");
+            entity.Property(e => e.Path).HasColumnName("path");
+            entity.Property(e => e.OriginalHostname).HasColumnName("originalHostname");
+            entity.Property(e => e.OriginalPath).HasColumnName("originalPath");
+
+            entity.HasOne(d => d.Media).WithMany(p => p.MediaThumbnails)
+                .HasForeignKey(d => d.MediaId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<MediaMetadata>(entity =>

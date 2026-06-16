@@ -39,9 +39,33 @@ namespace Japlayer.Views
             }
         }
 
-        private void MediaItem_PointerEntered(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e) => ProtectedCursor = Microsoft.UI.Input.InputSystemCursor.Create(Microsoft.UI.Input.InputSystemCursorShape.Hand);
+        private async void MediaItem_PointerEntered(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+        {
+            ProtectedCursor = Microsoft.UI.Input.InputSystemCursor.Create(Microsoft.UI.Input.InputSystemCursorShape.Hand);
+            if (sender is FrameworkElement element && element.DataContext is LibraryItemViewModel vm)
+            {
+                await vm.LoadThumbnailsAsync();
+            }
+        }
 
-        private void MediaItem_PointerExited(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e) => ProtectedCursor = null; // Revert to default
+        private void MediaItem_PointerMoved(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+        {
+            if (sender is FrameworkElement element && element.DataContext is LibraryItemViewModel vm)
+            {
+                var point = e.GetCurrentPoint(element);
+                var percent = point.Position.X / element.ActualWidth;
+                vm.ScrubPreview(percent);
+            }
+        }
+
+        private void MediaItem_PointerExited(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+        {
+            ProtectedCursor = null; // Revert to default
+            if (sender is FrameworkElement element && element.DataContext is LibraryItemViewModel vm)
+            {
+                vm.ResetPreview();
+            }
+        }
 
         private async void MediaItem_RightTapped(object sender, Microsoft.UI.Xaml.Input.RightTappedRoutedEventArgs e)
         {
