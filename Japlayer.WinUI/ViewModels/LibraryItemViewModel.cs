@@ -11,14 +11,53 @@ using Japlayer.Data.Models;
 
 namespace Japlayer.ViewModels
 {
-    public partial class LibraryItemViewModel(LibraryItem libraryItem, ISettingsService settingsService, IMediaThumbnailProvider thumbnailProvider) : ObservableObject
+    public partial class LibraryItemViewModel : ObservableObject
     {
-        private readonly LibraryItem _libraryItem = libraryItem;
-        private readonly ISettingsService _settingsService = settingsService;
-        private readonly IMediaThumbnailProvider _thumbnailProvider = thumbnailProvider;
+        private readonly LibraryItem _libraryItem;
+        private readonly ISettingsService _settingsService;
+        private readonly IMediaThumbnailProvider _thumbnailProvider;
 
         private List<string> _thumbnails = [];
         private bool _areThumbnailsLoaded;
+        private string? _fallbackThumbnailPath;
+
+        public LibraryItemViewModel(LibraryItem libraryItem, ISettingsService settingsService, IMediaThumbnailProvider thumbnailProvider)
+        {
+            _libraryItem = libraryItem;
+            _settingsService = settingsService;
+            _thumbnailProvider = thumbnailProvider;
+
+            if (string.IsNullOrEmpty(_libraryItem.CoverImagePath))
+            {
+                _ = LoadFallbackThumbnailAsync();
+            }
+        }
+
+        private async Task LoadFallbackThumbnailAsync()
+        {
+            try
+            {
+                var thumbnails = await _thumbnailProvider.GetThumbnailsAsync(Id);
+                var sortedThumbnails = thumbnails.OrderBy(thumbnail => thumbnail.Scene).ThenBy(thumbnail => thumbnail.Timestamp).ToList();
+                if (sortedThumbnails.Count > 0)
+                {
+                    // Cache the loaded thumbnails so we don't reload them on hover
+                    _thumbnails = [.. sortedThumbnails.Select(thumbnail => Path.Combine(_settingsService.ImagePath, thumbnail.Path))];
+                    _areThumbnailsLoaded = true;
+
+                    var index = Math.Clamp((int)Math.Round((sortedThumbnails.Count - 1) * 0.75), 0, sortedThumbnails.Count - 1);
+                    var fallbackThumbnail = sortedThumbnails[index];
+                    _fallbackThumbnailPath = Path.Combine(_settingsService.ImagePath, fallbackThumbnail.Path);
+
+                    OnPropertyChanged(nameof(DisplayCover));
+                    OnPropertyChanged(nameof(DisplayImageSource));
+                }
+            }
+            catch (Exception exception)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to load fallback cover for {Id}: {exception.Message}");
+            }
+        }
 
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(DisplayImageSource))]
@@ -44,7 +83,7 @@ namespace Japlayer.ViewModels
             }
         }
 
-        public string DisplayCover => CoverPath ?? "ms-appx:///Assets/NoCover.png";
+        public string DisplayCover => CoverPath ?? _fallbackThumbnailPath ?? "ms-appx:///Assets/NoCover.png";
 
         public async Task LoadThumbnailsAsync()
         {

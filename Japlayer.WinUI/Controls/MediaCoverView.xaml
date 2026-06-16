@@ -20,11 +20,20 @@
                 <FontIcon Glyph="&#xEA69;" 
                           Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
             </Viewbox>
-            <Image Source="{Binding Source, ElementName=Root}" 
+            <!-- Image 1 -->
+            <Image x:Name="CoverImage1" 
                    Stretch="{Binding Stretch, ElementName=Root}" 
                    VerticalAlignment="Center" 
                    HorizontalAlignment="Center"
-                   Margin="-20"/> <!-- Negative margin to counteract Grid padding for the actual image -->
+                   Margin="-20"
+                   Opacity="1"/>
+            <!-- Image 2 -->
+            <Image x:Name="CoverImage2" 
+                   Stretch="{Binding Stretch, ElementName=Root}" 
+                   VerticalAlignment="Center" 
+                   HorizontalAlignment="Center"
+                   Margin="-20"
+                   Opacity="0"/>
         </Grid>
     </Border>
 </UserControl>

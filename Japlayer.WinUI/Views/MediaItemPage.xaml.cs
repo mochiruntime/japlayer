@@ -66,8 +66,6 @@ namespace Japlayer.Views
 
                 var elementWidth = ((FrameworkElement)element).ActualWidth;
                 var spacing = (panel.Spacing);
-
-                var elementStart = cumulative;
                 var elementEnd = cumulative + elementWidth;
 
                 if (scrollOffset < elementEnd)
