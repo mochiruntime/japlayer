@@ -130,6 +130,7 @@ namespace Japlayer.ViewModels
                 _ when SortOrder == LibrarySortOption.ReleaseDateDescending => filteredItems.OrderByDescending(item => item.ReleaseDate ?? DateOnly.MinValue),
                 _ when SortOrder == LibrarySortOption.AddedDateAscending => filteredItems.OrderBy(item => item.LibraryItem.CreatedAt ?? DateTime.MinValue),
                 _ when SortOrder == LibrarySortOption.AddedDateDescending => filteredItems.OrderByDescending(item => item.LibraryItem.CreatedAt ?? DateTime.MinValue),
+                _ when SortOrder == LibrarySortOption.Random => filteredItems.OrderBy(item => Random.Shared.Next()),
                 _ => filteredItems.OrderBy(item => item.Title)
             };
 

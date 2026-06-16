@@ -10,6 +10,7 @@ namespace Japlayer.Models
         public static readonly LibrarySortOption ReleaseDateDescending = new("Release Date (Newest)");
         public static readonly LibrarySortOption AddedDateAscending = new("Added Date (Oldest)");
         public static readonly LibrarySortOption AddedDateDescending = new("Added Date (Newest)");
+        public static readonly LibrarySortOption Random = new("Random");
 
         public string DisplayName { get; }
 
@@ -22,7 +23,8 @@ namespace Japlayer.Models
             ReleaseDateAscending,
             ReleaseDateDescending,
             AddedDateAscending,
-            AddedDateDescending
+            AddedDateDescending,
+            Random
         ];
 
         public override string ToString() => DisplayName;
