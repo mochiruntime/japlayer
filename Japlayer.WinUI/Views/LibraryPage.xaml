@@ -134,7 +134,8 @@
                           CornerRadius="8" 
                           ToolTipService.ToolTip="{x:Bind Title}"
                           PointerEntered="MediaItem_PointerEntered"
-                          PointerExited="MediaItem_PointerExited">
+                          PointerExited="MediaItem_PointerExited"
+                          RightTapped="MediaItem_RightTapped">
 
                         <Grid.RowDefinitions>
                             <RowDefinition Height="*"/>

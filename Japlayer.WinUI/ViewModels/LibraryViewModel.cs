@@ -6,14 +6,16 @@ using System.Linq;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Japlayer.Data.Contracts;
+using Japlayer.Data.Models;
 using Japlayer.Models;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Japlayer.ViewModels
 {
-    public partial class LibraryViewModel(IMediaProvider mediaProvider, IServiceProvider serviceProvider) : ObservableObject
+    public partial class LibraryViewModel(IMediaProvider mediaProvider, IMediaSceneProvider sceneProvider, IServiceProvider serviceProvider) : ObservableObject
     {
         private readonly IMediaProvider _mediaProvider = mediaProvider;
+        private readonly IMediaSceneProvider _sceneProvider = sceneProvider;
         private readonly IServiceProvider _serviceProvider = serviceProvider;
         private List<LibraryItemViewModel> _allMediaItems = [];
         private List<FilterItem> _allTagFilters = [];
@@ -23,6 +25,8 @@ namespace Japlayer.ViewModels
         public ObservableCollection<FilterItem> TagFilterItems { get; } = [];
         public ObservableCollection<FilterItem> GenreFilterItems { get; } = [];
         public IReadOnlyList<LibrarySortOption> SortOptions { get; } = LibrarySortOption.All;
+
+        public Task<IEnumerable<MediaScene>> GetMediaScenesAsync(string mediaId) => _sceneProvider.GetMediaScenesAsync(mediaId);
 
         [ObservableProperty]
         public partial bool IsDataLoaded { get; set; }
