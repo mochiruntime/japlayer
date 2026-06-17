@@ -22,6 +22,9 @@ namespace Japlayer.ViewModels
         private List<FilterItem> _allTagFilters = [];
         private List<FilterItem> _allGenreFilters = [];
         private DispatcherTimer? _filterDebounceTimer;
+        // Flag to track if the sort order dropdown was changed. Used to choose between
+        // fast collection replacement (for sorting) and smooth collection reconciliation (for filtering).
+        private bool _isSortOrderChanging = true;
 
         [ObservableProperty]
         public partial ObservableCollection<LibraryItemViewModel> MediaItems { get; set; } = [];
@@ -49,7 +52,12 @@ namespace Japlayer.ViewModels
         partial void OnSearchTextChanged(string value) => QueueApplyFilter();
         partial void OnTagSearchTextChanged(string value) => UpdateTagFilterItems();
         partial void OnGenreSearchTextChanged(string value) => UpdateGenreFilterItems();
-        partial void OnSortOrderChanged(LibrarySortOption value) => QueueApplyFilter();
+        partial void OnSortOrderChanged(LibrarySortOption value)
+        {
+            // Set flag to bypass slow in-place moves and replace the collection instead
+            _isSortOrderChanging = true;
+            QueueApplyFilter();
+        }
 
         public async Task LoadDataAsync()
         {
@@ -179,7 +187,54 @@ namespace Japlayer.ViewModels
             };
 
             var targetList = filteredItems.ToList();
-            MediaItems = new ObservableCollection<LibraryItemViewModel>(targetList);
+
+            // Hybrid strategy:
+            // If the sort order changed, re-instantiate the collection. This is extremely fast
+            // for sorting because it avoids triggering O(N) Move notifications on the UI layout panel.
+            if (_isSortOrderChanging)
+            {
+                _isSortOrderChanging = false;
+                MediaItems = new ObservableCollection<LibraryItemViewModel>(targetList);
+            }
+            // If the sort order is constant, reconcile the existing collection.
+            // Since the sort order didn't change, the relative order is identical, which results
+            // in zero Move operations (only standard RemoveAt/Insert). This keeps existing UI containers
+            // and cover images intact, removing all typing and checkbox toggling lag.
+            else
+            {
+                var targetSet = new HashSet<LibraryItemViewModel>(targetList);
+
+                // 1. Remove items that are not in targetList
+                for (var index = MediaItems.Count - 1; index >= 0; index--)
+                {
+                    if (!targetSet.Contains(MediaItems[index]))
+                    {
+                        MediaItems.RemoveAt(index);
+                    }
+                }
+
+                // 2. Add, move, or position items to match targetList
+                for (var index = 0; index < targetList.Count; index++)
+                {
+                    var targetItem = targetList[index];
+                    if (index >= MediaItems.Count)
+                    {
+                        MediaItems.Add(targetItem);
+                    }
+                    else if (MediaItems[index] != targetItem)
+                    {
+                        var oldIndex = MediaItems.IndexOf(targetItem);
+                        if (oldIndex >= 0)
+                        {
+                            MediaItems.Move(oldIndex, index);
+                        }
+                        else
+                        {
+                            MediaItems.Insert(index, targetItem);
+                        }
+                    }
+                }
+            }
 
             UpdateTagFilterItems();
             UpdateGenreFilterItems();
