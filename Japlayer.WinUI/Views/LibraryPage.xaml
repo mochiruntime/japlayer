@@ -17,7 +17,19 @@
         </Grid.RowDefinitions>
 
         <!-- Header -->
-        <TextBlock Text="Library" Style="{StaticResource TitleTextBlockStyle}" Margin="24,24,0,12"/>
+        <Grid Margin="24,24,24,12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="Library" Style="{StaticResource TitleTextBlockStyle}" VerticalAlignment="Center" Margin="0"/>
+            <AutoSuggestBox Grid.Column="1" 
+                            Width="300"
+                            PlaceholderText="Search by ID, title, tags..."
+                            QueryIcon="Find"
+                            VerticalAlignment="Center"
+                            Text="{x:Bind ViewModel.SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+        </Grid>
 
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
