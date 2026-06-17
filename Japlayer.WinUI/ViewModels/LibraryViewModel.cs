@@ -21,7 +21,8 @@ namespace Japlayer.ViewModels
         private List<FilterItem> _allTagFilters = [];
         private List<FilterItem> _allGenreFilters = [];
 
-        public ObservableCollection<LibraryItemViewModel> MediaItems { get; } = [];
+        [ObservableProperty]
+        public partial ObservableCollection<LibraryItemViewModel> MediaItems { get; set; } = [];
         public ObservableCollection<FilterItem> TagFilterItems { get; } = [];
         public ObservableCollection<FilterItem> GenreFilterItems { get; } = [];
         public IReadOnlyList<LibrarySortOption> SortOptions { get; } = LibrarySortOption.All;
@@ -107,7 +108,6 @@ namespace Japlayer.ViewModels
             var requiredGenres = _allGenreFilters.Where(g => g.IsSelected == true).Select(g => g.Name).ToList();
             var excludedGenres = _allGenreFilters.Where(g => g.IsSelected == null).Select(g => g.Name).ToList();
 
-            MediaItems.Clear();
             var filteredItems = _allMediaItems.AsEnumerable();
 
             if (!string.IsNullOrWhiteSpace(SearchText))
@@ -157,10 +157,8 @@ namespace Japlayer.ViewModels
                 _ => filteredItems.OrderBy(item => item.Title)
             };
 
-            foreach (var item in filteredItems)
-            {
-                MediaItems.Add(item);
-            }
+            var filteredList = filteredItems.ToList();
+            MediaItems = new ObservableCollection<LibraryItemViewModel>(filteredList);
 
             UpdateTagFilterItems();
             UpdateGenreFilterItems();
