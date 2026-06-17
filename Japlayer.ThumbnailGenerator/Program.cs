@@ -84,56 +84,147 @@ namespace Japlayer.ThumbnailGenerator
                 return;
             }
 
+            // Self-healing: Check if any committed thumbnails are missing their files on disk
+            try
+            {
+                LogInfo("Verifying thumbnail files on disk consistency...");
+                var databaseThumbnails = await context.MediaThumbnails
+                    .AsNoTracking()
+                    .Select(thumbnail => new { thumbnail.MediaId, thumbnail.Scene, thumbnail.Path })
+                    .ToListAsync();
+
+                var groupedThumbnails = databaseThumbnails
+                    .GroupBy(thumbnail => new { thumbnail.MediaId, thumbnail.Scene })
+                    .ToList();
+
+                var missingGroups = new List<(string MediaId, int Scene)>();
+                foreach (var group in groupedThumbnails)
+                {
+                    // Check if the first file in the group exists on disk
+                    var firstThumbnail = group.First();
+                    var absolutePath = Path.Combine(settings.ImagePath, firstThumbnail.Path);
+                    if (!File.Exists(absolutePath))
+                    {
+                        missingGroups.Add((group.Key.MediaId, group.Key.Scene));
+                    }
+                }
+
+                if (missingGroups.Count > 0)
+                {
+                    LogInfo($"Found {missingGroups.Count} processed scenes with missing files on disk. Cleaning up database records for reprocessing...");
+
+                    // Delete the database records in batches to avoid SQLite parameter limits
+                    const int BatchSize = 100;
+                    for (var index = 0; index < missingGroups.Count; index += BatchSize)
+                    {
+                        var batch = missingGroups.Skip(index).Take(BatchSize).ToList();
+
+                        using var deleteContext = new DatabaseContext(optionsBuilder.Options);
+                        using var transaction = await deleteContext.Database.BeginTransactionAsync();
+                        try
+                        {
+                            foreach (var (MediaId, Scene) in batch)
+                            {
+                                var recordsToDelete = await deleteContext.MediaThumbnails
+                                    .Where(thumbnail => thumbnail.MediaId == MediaId && thumbnail.Scene == Scene)
+                                    .ToListAsync();
+                                deleteContext.MediaThumbnails.RemoveRange(recordsToDelete);
+                            }
+                            await deleteContext.SaveChangesAsync();
+                            await transaction.CommitAsync();
+                        }
+                        catch (Exception exception)
+                        {
+                            await transaction.RollbackAsync();
+                            LogError($"Failed to delete orphan database records: {exception.Message}");
+                        }
+                    }
+                    LogInfo("Database consistency cleanup complete.");
+                }
+                else
+                {
+                    LogInfo("All database preview records have corresponding files on disk.");
+                }
+            }
+            catch (Exception exception)
+            {
+                LogError($"Failed to perform consistency check: {exception.Message}");
+            }
+
             // Scan missing items
-            List<MediaLocation> targets;
+            List<MediaLocation> targetLocations;
             try
             {
                 LogInfo("Scanning database for media files...");
-                var locations = await context.MediaLocations.AsNoTracking().ToListAsync();
-                var existingThumbs = await context.MediaThumbnails
+                var mediaLocations = await context.MediaLocations.AsNoTracking().ToListAsync();
+                var existingThumbnails = await context.MediaThumbnails
                     .AsNoTracking()
-                    .Select(t => new { t.MediaId, t.Scene })
+                    .Select(thumbnail => new { thumbnail.MediaId, thumbnail.Scene })
                     .Distinct()
                     .ToListAsync();
 
-                var processed = existingThumbs.Select(t => (t.MediaId, t.Scene)).ToHashSet();
-                targets = [.. locations.Where(l => !processed.Contains((l.MediaId, l.Scene)))];
+                var processedScenes = existingThumbnails.Select(thumbnail => (thumbnail.MediaId, thumbnail.Scene)).ToHashSet();
+                var rawTargetLocations = mediaLocations.Where(location => !processedScenes.Contains((location.MediaId, location.Scene))).ToList();
 
-                LogInfo($"Found {locations.Count} total media locations. {processed.Count} already have previews. {targets.Count} need processing.");
+                // Group by MediaId and Scene to pick a single representative file location per scene
+                targetLocations = [.. rawTargetLocations
+                    .GroupBy(location => new { location.MediaId, location.Scene })
+                    .Select(group =>
+                    {
+                        var candidates = group.ToList();
+                        var existingCandidates = candidates.Where(candidate => File.Exists(candidate.Path)).ToList();
+
+                        if (existingCandidates.Count > 0)
+                        {
+                            // Prefer files that have "8k", "4k", or "UC" in their filename to capture higher quality or uncensored versions.
+                            // Otherwise, fallback to alphabetical sorting.
+                            return existingCandidates
+                                .OrderByDescending(candidate => Path.GetFileNameWithoutExtension(candidate.Path).Contains("8k", StringComparison.OrdinalIgnoreCase))
+                                .ThenByDescending(candidate => Path.GetFileNameWithoutExtension(candidate.Path).Contains("4k", StringComparison.OrdinalIgnoreCase))
+                                .ThenByDescending(candidate => Path.GetFileNameWithoutExtension(candidate.Path).Contains("UC", StringComparison.OrdinalIgnoreCase))
+                                .ThenBy(candidate => candidate.Path, StringComparer.OrdinalIgnoreCase)
+                                .First();
+                        }
+
+                        // If none of the files physically exist on disk, return the first one so that it will be logged as missing during processing.
+                        return candidates.First();
+                    })];
+
+                LogInfo($"Found {mediaLocations.Count} total media locations. {processedScenes.Count} already have previews. {targetLocations.Count} scenes need processing.");
             }
-            catch (Exception ex)
+            catch (Exception exception)
             {
-                LogError($"Failed to query database: {ex.Message}");
+                LogError($"Failed to query database: {exception.Message}");
                 return;
             }
 
-            if (targets.Count == 0)
+            if (targetLocations.Count == 0)
             {
                 LogInfo("All media locations are already processed. Exiting.");
                 return;
             }
 
             // Interleave targets by drive root to maximize parallelism across physical drives
-            var driveGroups = targets
-                .GroupBy(t => Path.GetPathRoot(t.Path) ?? "", StringComparer.OrdinalIgnoreCase)
-                .Select(g => g.ToList())
+            var driveGroups = targetLocations
+                .GroupBy(location => Path.GetPathRoot(location.Path) ?? "", StringComparer.OrdinalIgnoreCase)
+                .Select(group => group.ToList())
                 .ToList();
 
-            var interleavedTargets = new List<MediaLocation>();
+            var interleavedTargetLocations = new List<MediaLocation>();
             if (driveGroups.Count > 0)
             {
-                var maxGroupSize = driveGroups.Max(g => g.Count);
-                for (var i = 0; i < maxGroupSize; i++)
+                var maxGroupSize = driveGroups.Max(group => group.Count);
+                for (var index = 0; index < maxGroupSize; index++)
                 {
                     foreach (var group in driveGroups)
                     {
-                        if (i < group.Count)
+                        if (index < group.Count)
                         {
-                            interleavedTargets.Add(group[i]);
+                            interleavedTargetLocations.Add(group[index]);
                         }
                     }
                 }
-                targets = interleavedTargets;
+                targetLocations = interleavedTargetLocations;
             }
 
             // Max global parallelism is equal to CPU core count.
@@ -154,7 +245,7 @@ namespace Japlayer.ThumbnailGenerator
 
             var stopwatch = Stopwatch.StartNew();
 
-            await Parallel.ForEachAsync(targets, parallelOptions, async (location, cancellationToken) =>
+            await Parallel.ForEachAsync(targetLocations, parallelOptions, async (location, cancellationToken) =>
             {
                 var logPrefix = $"[{location.MediaId} - Scene {location.Scene}]";
 
