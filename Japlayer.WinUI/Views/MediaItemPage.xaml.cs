@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using Japlayer.Helpers;
 using Japlayer.ViewModels;
@@ -9,7 +10,7 @@ namespace Japlayer.Views
 {
     public sealed partial class MediaItemPage : Page
     {
-        public MediaItemViewModel ViewModel { get; private set; }
+        public MediaItemViewModel ViewModel { get; private set; } = null!;
         private int _targetGalleryIndex = 0;
 
         public MediaItemPage()
@@ -140,12 +141,41 @@ namespace Japlayer.Views
         private void Button_PointerEntered(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e) => ProtectedCursor = Microsoft.UI.Input.InputSystemCursor.Create(Microsoft.UI.Input.InputSystemCursorShape.Hand);
         private void Button_PointerExited(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e) => ProtectedCursor = null; // Revert to default cursor
 
+        private void PlayOverlay_Tapped(object sender, Microsoft.UI.Xaml.Input.TappedRoutedEventArgs e)
+        {
+            if (sender is FrameworkElement element && element.DataContext is MediaSceneViewModel sceneVm)
+            {
+                sceneVm.PlayerSource = sceneVm.File;
+                sceneVm.IsPlayerLoaded = true;
+            }
+        }
+
         private void MediaPlayerElement_Loaded(object sender, RoutedEventArgs e)
         {
             if (sender is MediaPlayerElement mpe)
             {
-                mpe.SizeChanged += MediaPlayerElement_SizeChanged;
-                UpdateMediaPlayerHeight(mpe);
+                if (mpe.DataContext is MediaSceneViewModel sceneVm)
+                {
+                    sceneVm.PropertyChanged += SceneVm_PropertyChanged;
+                }
+
+                try
+                {
+                    var player = mpe.MediaPlayer;
+                    if (player != null)
+                    {
+                        player.MediaOpened += MediaPlayer_MediaOpened;
+                    }
+                }
+                catch (Exception)
+                {
+                }
+
+                var container = FindParentGrid(mpe);
+                if (container != null)
+                {
+                    UpdatePlayerContainerHeight(container);
+                }
             }
         }
 
@@ -153,7 +183,22 @@ namespace Japlayer.Views
         {
             if (sender is MediaPlayerElement mpe)
             {
-                mpe.SizeChanged -= MediaPlayerElement_SizeChanged;
+                if (mpe.DataContext is MediaSceneViewModel sceneVm)
+                {
+                    sceneVm.PropertyChanged -= SceneVm_PropertyChanged;
+                }
+
+                try
+                {
+                    var player = mpe.MediaPlayer;
+                    if (player != null)
+                    {
+                        player.MediaOpened -= MediaPlayer_MediaOpened;
+                    }
+                }
+                catch (Exception)
+                {
+                }
 
                 // IMPORTANT: Setting Source to null is enough to release the file handle.
                 // Do NOT call mpe.MediaPlayer.Dispose() as it can cause COMException 
@@ -162,32 +207,190 @@ namespace Japlayer.Views
             }
         }
 
-        private void MediaPlayerElement_SizeChanged(object sender, SizeChangedEventArgs e)
+        private void PlayerContainer_SizeChanged(object sender, SizeChangedEventArgs e)
         {
-            if (sender is MediaPlayerElement mpe)
+            if (sender is Grid container)
             {
-                UpdateMediaPlayerHeight(mpe);
+                UpdatePlayerContainerHeight(container);
             }
         }
 
-        private void UpdateMediaPlayerHeight(MediaPlayerElement mpe)
+        private void MediaPlayer_MediaOpened(Windows.Media.Playback.MediaPlayer sender, object args)
         {
-            if (mpe == null)
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                var container = FindPlayerContainer(RootScrollViewer, sender);
+                if (container != null)
+                {
+                    UpdatePlayerContainerHeight(container);
+                }
+            });
+        }
+
+        private void SceneVm_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(MediaSceneViewModel.AspectRatio))
+            {
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    if (sender is MediaSceneViewModel sceneVm)
+                    {
+                        var container = FindPlayerContainerByDataContext(RootScrollViewer, sceneVm);
+                        if (container != null)
+                        {
+                            UpdatePlayerContainerHeight(container);
+                        }
+                    }
+                });
+            }
+        }
+
+        private Grid? FindParentGrid(DependencyObject child)
+        {
+            var parent = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetParent(child);
+            while (parent != null)
+            {
+                if (parent is Grid grid && grid.Name == "PlayerContainer")
+                {
+                    return grid;
+                }
+                parent = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetParent(parent);
+            }
+            return null;
+        }
+
+        private MediaPlayerElement? FindMediaPlayerElement(DependencyObject parent, Windows.Media.Playback.MediaPlayer player)
+        {
+            if (parent == null)
+            {
+                return null;
+            }
+
+            if (parent is MediaPlayerElement mpe)
+            {
+                try
+                {
+                    if (mpe.MediaPlayer == player)
+                    {
+                        return mpe;
+                    }
+                }
+                catch { }
+            }
+
+            var childrenCount = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChildrenCount(parent);
+            for (var i = 0; i < childrenCount; i++)
+            {
+                var child = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChild(parent, i);
+                var result = FindMediaPlayerElement(child, player);
+                if (result != null)
+                {
+                    return result;
+                }
+            }
+
+            return null;
+        }
+
+        private Grid? FindPlayerContainer(DependencyObject parent, Windows.Media.Playback.MediaPlayer player)
+        {
+            var mpe = FindMediaPlayerElement(parent, player);
+            if (mpe != null)
+            {
+                return FindParentGrid(mpe);
+            }
+            return null;
+        }
+
+        private Grid? FindPlayerContainerByDataContext(DependencyObject parent, MediaSceneViewModel dataContext)
+        {
+            if (parent == null)
+            {
+                return null;
+            }
+
+            if (parent is Grid grid && grid.Name == "PlayerContainer" && grid.DataContext == dataContext)
+            {
+                return grid;
+            }
+
+            var childrenCount = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChildrenCount(parent);
+            for (var i = 0; i < childrenCount; i++)
+            {
+                var child = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChild(parent, i);
+                var result = FindPlayerContainerByDataContext(child, dataContext);
+                if (result != null)
+                {
+                    return result;
+                }
+            }
+
+            return null;
+        }
+
+        private T? FindVisualChild<T>(DependencyObject parent) where T : DependencyObject
+        {
+            if (parent == null)
+            {
+                return null;
+            }
+
+            if (parent is T typedChild)
+            {
+                return typedChild;
+            }
+
+            var childrenCount = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChildrenCount(parent);
+            for (var i = 0; i < childrenCount; i++)
+            {
+                var child = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChild(parent, i);
+                var result = FindVisualChild<T>(child);
+                if (result != null)
+                {
+                    return result;
+                }
+            }
+
+            return null;
+        }
+
+        private void UpdatePlayerContainerHeight(Grid container)
+        {
+            if (container == null || container.DataContext is not MediaSceneViewModel sceneVm)
             {
                 return;
             }
 
-            try
+            if (container.ActualWidth <= 0)
             {
-                if (mpe.MediaPlayer != null && mpe.MediaPlayer.PlaybackSession != null && mpe.MediaPlayer.PlaybackSession.NaturalVideoWidth > 0)
-                {
-                    var ratio = (double)mpe.MediaPlayer.PlaybackSession.NaturalVideoHeight / mpe.MediaPlayer.PlaybackSession.NaturalVideoWidth;
-                    mpe.Height = mpe.ActualWidth * ratio;
-                }
+                return;
             }
-            catch (Exception)
+
+            // Use the cached aspect ratio if available to avoid calling COM properties on the UI thread
+            if (sceneVm.AspectRatio.HasValue)
             {
-                // Prevent crashes if player is disposed or in an invalid state
+                container.Height = container.ActualWidth * sceneVm.AspectRatio.Value;
+                return;
+            }
+
+            // Only retrieve dimensions if player is active and we are in or after the MediaOpened event
+            if (sceneVm.IsPlayerLoaded)
+            {
+                try
+                {
+                    var mpe = FindVisualChild<MediaPlayerElement>(container);
+                    var player = mpe?.MediaPlayer;
+                    if (player != null && player.PlaybackSession != null && player.PlaybackSession.NaturalVideoWidth > 0)
+                    {
+                        var ratio = (double)player.PlaybackSession.NaturalVideoHeight / player.PlaybackSession.NaturalVideoWidth;
+                        sceneVm.AspectRatio = ratio;
+                        container.Height = container.ActualWidth * ratio;
+                    }
+                }
+                catch (Exception)
+                {
+                    // Prevent crashes if player is disposed or in an invalid state
+                }
             }
         }
         private async void OpenIn_Click(object sender, RoutedEventArgs e)

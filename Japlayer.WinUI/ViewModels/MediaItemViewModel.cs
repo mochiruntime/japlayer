@@ -11,13 +11,14 @@ using Japlayer.Data.Models;
 
 namespace Japlayer.ViewModels
 {
-    public partial class MediaItemViewModel(LibraryItem libraryItem, IImageProvider imageProvider, IMediaSceneProvider sceneProvider, IMediaProvider mediaProvider, ISettingsService settingsService) : ObservableObject
+    public partial class MediaItemViewModel(LibraryItem libraryItem, IImageProvider imageProvider, IMediaSceneProvider sceneProvider, IMediaProvider mediaProvider, ISettingsService settingsService, IMediaThumbnailProvider thumbnailProvider) : ObservableObject
     {
         private readonly LibraryItem _libraryItem = libraryItem;
         private readonly IImageProvider _imageProvider = imageProvider;
         private readonly IMediaSceneProvider _sceneProvider = sceneProvider;
         private readonly IMediaProvider _mediaProvider = mediaProvider;
         private readonly ISettingsService _settingsService = settingsService;
+        private readonly IMediaThumbnailProvider _thumbnailProvider = thumbnailProvider;
 
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(ContentId))]
@@ -74,7 +75,42 @@ namespace Japlayer.ViewModels
             MediaItemData = await _mediaProvider.GetMediaItemAsync(Id);
 
             var scenes = await _sceneProvider.GetMediaScenesAsync(Id);
-            var viewModels = scenes.Select(s => new MediaSceneViewModel(s));
+            var thumbnails = await _thumbnailProvider.GetThumbnailsAsync(Id);
+            var scenePosterDict = System.Linq.Enumerable.Any(thumbnails)
+                ? thumbnails
+                    .GroupBy(t => t.Scene)
+                    .ToDictionary(
+                        g => g.Key,
+                        g =>
+                        {
+                            var list = g.OrderBy(t => t.Timestamp).ToList();
+                            if (list.Count == 0)
+                            {
+                                return null;
+                            }
+
+                            var min = list[0].Timestamp;
+                            var max = list[^1].Timestamp;
+                            var target = min + 0.75 * (max - min);
+                            var best = list.OrderBy(t => System.Math.Abs(t.Timestamp - target)).First();
+                            return Path.Combine(_settingsService.ImagePath, best.Path);
+                        }
+                    )
+                    .Where(kvp => kvp.Value != null)
+                    .ToDictionary(kvp => kvp.Key, kvp => kvp.Value!)
+                : [];
+
+            var viewModels = scenes.Select(s =>
+            {
+                string? posterPath = null;
+                if (s.SceneNumber.HasValue && scenePosterDict.TryGetValue(s.SceneNumber.Value, out var path))
+                {
+                    posterPath = path;
+                }
+                var vm = new MediaSceneViewModel(s, posterPath);
+                vm.InitializeDimensions();
+                return vm;
+            });
             Scenes = new ObservableCollection<MediaSceneViewModel>(viewModels);
 
             var gallery = await _imageProvider.GetGalleryPathsAsync(Id);
