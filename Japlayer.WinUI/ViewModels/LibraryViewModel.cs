@@ -32,6 +32,9 @@ namespace Japlayer.ViewModels
         public partial bool IsDataLoaded { get; set; }
 
         [ObservableProperty]
+        public partial string SearchText { get; set; } = string.Empty;
+
+        [ObservableProperty]
         public partial string TagSearchText { get; set; } = string.Empty;
 
         [ObservableProperty]
@@ -40,6 +43,7 @@ namespace Japlayer.ViewModels
         [ObservableProperty]
         public partial LibrarySortOption SortOrder { get; set; } = LibrarySortOption.AddedDateDescending;
 
+        partial void OnSearchTextChanged(string value) => ApplyFilter();
         partial void OnTagSearchTextChanged(string value) => UpdateTagFilterItems();
         partial void OnGenreSearchTextChanged(string value) => UpdateGenreFilterItems();
         partial void OnSortOrderChanged(LibrarySortOption value) => ApplyFilter();
@@ -106,6 +110,21 @@ namespace Japlayer.ViewModels
             MediaItems.Clear();
             var filteredItems = _allMediaItems.AsEnumerable();
 
+            if (!string.IsNullOrWhiteSpace(SearchText))
+            {
+                var searchTerms = SearchText.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                foreach (var term in searchTerms)
+                {
+                    var normalizedTerm = NormalizeForSearch(term);
+                    filteredItems = filteredItems.Where(item =>
+                        NormalizeForSearch(item.Id).Contains(normalizedTerm) ||
+                        (item.OriginalTitle != null && item.OriginalTitle.Contains(term, StringComparison.OrdinalIgnoreCase)) ||
+                        item.LibraryItem.UserTags.Any(tag => tag.Contains(term, StringComparison.OrdinalIgnoreCase)) ||
+                        item.LibraryItem.Genres.Any(genre => genre.Contains(term, StringComparison.OrdinalIgnoreCase))
+                    );
+                }
+            }
+
             if (requiredTags.Count > 0)
             {
                 filteredItems = filteredItems.Where(item => requiredTags.All(tag => item.LibraryItem.UserTags.Contains(tag)));
@@ -145,6 +164,16 @@ namespace Japlayer.ViewModels
 
             UpdateTagFilterItems();
             UpdateGenreFilterItems();
+        }
+
+        private static string NormalizeForSearch(string input)
+        {
+            if (string.IsNullOrEmpty(input))
+            {
+                return string.Empty;
+            }
+
+            return new string([.. input.Where(char.IsLetterOrDigit)]).ToLowerInvariant();
         }
     }
 
