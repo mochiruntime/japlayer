@@ -9,6 +9,7 @@ using Japlayer.Data.Contracts;
 using Japlayer.Data.Models;
 using Japlayer.Models;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.UI.Xaml;
 
 namespace Japlayer.ViewModels
 {
@@ -20,6 +21,7 @@ namespace Japlayer.ViewModels
         private List<LibraryItemViewModel> _allMediaItems = [];
         private List<FilterItem> _allTagFilters = [];
         private List<FilterItem> _allGenreFilters = [];
+        private DispatcherTimer? _filterDebounceTimer;
 
         [ObservableProperty]
         public partial ObservableCollection<LibraryItemViewModel> MediaItems { get; set; } = [];
@@ -44,10 +46,10 @@ namespace Japlayer.ViewModels
         [ObservableProperty]
         public partial LibrarySortOption SortOrder { get; set; } = LibrarySortOption.AddedDateDescending;
 
-        partial void OnSearchTextChanged(string value) => ApplyFilter();
+        partial void OnSearchTextChanged(string value) => QueueApplyFilter();
         partial void OnTagSearchTextChanged(string value) => UpdateTagFilterItems();
         partial void OnGenreSearchTextChanged(string value) => UpdateGenreFilterItems();
-        partial void OnSortOrderChanged(LibrarySortOption value) => ApplyFilter();
+        partial void OnSortOrderChanged(LibrarySortOption value) => QueueApplyFilter();
 
         public async Task LoadDataAsync()
         {
@@ -62,8 +64,8 @@ namespace Japlayer.ViewModels
             var genres = await genresTask;
 
             _allMediaItems = [.. items.Select(item => ActivatorUtilities.CreateInstance<LibraryItemViewModel>(_serviceProvider, item))];
-            _allTagFilters = [.. tags.Select(tag => new FilterItem(tag, ApplyFilter))];
-            _allGenreFilters = [.. genres.Select(genre => new FilterItem(genre, ApplyFilter))];
+            _allTagFilters = [.. tags.Select(tag => new FilterItem(tag, QueueApplyFilter))];
+            _allGenreFilters = [.. genres.Select(genre => new FilterItem(genre, QueueApplyFilter))];
 
             UpdateTagFilterItems();
             UpdateGenreFilterItems();
@@ -99,6 +101,25 @@ namespace Japlayer.ViewModels
             {
                 GenreFilterItems.Add(genre);
             }
+        }
+
+        private void QueueApplyFilter()
+        {
+            if (_filterDebounceTimer == null)
+            {
+                _filterDebounceTimer = new DispatcherTimer
+                {
+                    Interval = TimeSpan.FromMilliseconds(150)
+                };
+                _filterDebounceTimer.Tick += (sender, e) =>
+                {
+                    _filterDebounceTimer.Stop();
+                    ApplyFilter();
+                };
+            }
+
+            _filterDebounceTimer.Stop();
+            _filterDebounceTimer.Start();
         }
 
         private void ApplyFilter()
@@ -157,8 +178,8 @@ namespace Japlayer.ViewModels
                 _ => filteredItems.OrderBy(item => item.Title)
             };
 
-            var filteredList = filteredItems.ToList();
-            MediaItems = new ObservableCollection<LibraryItemViewModel>(filteredList);
+            var targetList = filteredItems.ToList();
+            MediaItems = new ObservableCollection<LibraryItemViewModel>(targetList);
 
             UpdateTagFilterItems();
             UpdateGenreFilterItems();
