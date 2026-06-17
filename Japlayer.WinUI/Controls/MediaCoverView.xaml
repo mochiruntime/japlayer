@@ -8,11 +8,11 @@
     x:Name="Root">
 
     <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
-            CornerRadius="{Binding CornerRadius, ElementName=Root}"
+            CornerRadius="{x:Bind CornerRadius, Mode=OneWay}"
             BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
             BorderThickness="1"
             MinHeight="250">
-        <Grid CornerRadius="{Binding CornerRadius, ElementName=Root}"
+        <Grid CornerRadius="{x:Bind CornerRadius, Mode=OneWay}"
               Padding="20">
             <Viewbox MaxHeight="40" MaxWidth="40" 
                      VerticalAlignment="Center" 
@@ -22,14 +22,14 @@
             </Viewbox>
             <!-- Image 1 -->
             <Image x:Name="CoverImage1" 
-                   Stretch="{Binding Stretch, ElementName=Root}" 
+                   Stretch="{x:Bind Stretch, Mode=OneWay}" 
                    VerticalAlignment="Center" 
                    HorizontalAlignment="Center"
                    Margin="-20"
                    Opacity="1"/>
             <!-- Image 2 -->
             <Image x:Name="CoverImage2" 
-                   Stretch="{Binding Stretch, ElementName=Root}" 
+                   Stretch="{x:Bind Stretch, Mode=OneWay}" 
                    VerticalAlignment="Center" 
                    HorizontalAlignment="Center"
                    Margin="-20"

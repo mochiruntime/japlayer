@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.ComponentModel;
 using System.Linq;
 using Japlayer.Helpers;
 using Japlayer.ViewModels;
@@ -28,6 +29,25 @@ namespace Japlayer.Views
             if (e.NavigationMode == NavigationMode.New || !ViewModel.IsDataLoaded)
             {
                 await ViewModel.LoadDataAsync();
+            }
+
+            ViewModel.PropertyChanged += ViewModel_PropertyChanged;
+        }
+
+        protected override void OnNavigatedFrom(NavigationEventArgs e)
+        {
+            base.OnNavigatedFrom(e);
+            ViewModel.PropertyChanged -= ViewModel_PropertyChanged;
+        }
+
+        private void ViewModel_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(ViewModel.MediaItems))
+            {
+                if (MediaGrid.Items.Count > 0)
+                {
+                    MediaGrid.ScrollIntoView(MediaGrid.Items[0]);
+                }
             }
         }
 
