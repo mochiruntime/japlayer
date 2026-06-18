@@ -179,25 +179,36 @@
                                                               VerticalAlignment="Stretch"
                                                               Stretch="Uniform"
                                                               Loaded="MediaPlayerElement_Loaded"
-                                                              Unloaded="MediaPlayerElement_Unloaded"/>
+                                                              Unloaded="MediaPlayerElement_Unloaded">
+                                                <MediaPlayerElement.TransportControls>
+                                                     <controls:CustomMediaTransportControls x:Name="TransportControls" />
+                                                </MediaPlayerElement.TransportControls>
+                                            </MediaPlayerElement>
 
-                                            <Grid x:Name="PlayOverlay"
-                                                  Visibility="{x:Bind PlayOverlayVisibility, Mode=OneWay}"
-                                                  Background="Black"
-                                                  Tapped="PlayOverlay_Tapped"
-                                                  PointerEntered="Button_PointerEntered"
-                                                  PointerExited="Button_PointerExited"
-                                                  HorizontalAlignment="Stretch"
-                                                  VerticalAlignment="Stretch">
-                                                <Image Source="{x:Bind PosterPath, Mode=OneWay}"
-                                                       Stretch="UniformToFill"
-                                                       HorizontalAlignment="Center"
-                                                       VerticalAlignment="Center"
-                                                       Opacity="0.75"/>
-                                                <Viewbox Width="64" Height="64" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                                    <SymbolIcon Symbol="Play" Foreground="White"/>
-                                                </Viewbox>
-                                            </Grid>
+                                            <Button x:Name="PlayOverlay"
+                                                   Visibility="{x:Bind PlayOverlayVisibility, Mode=OneWay}"
+                                                   Background="Black"
+                                                   Click="PlayOverlay_Click"
+                                                   PointerEntered="Button_PointerEntered"
+                                                   PointerExited="Button_PointerExited"
+                                                   HorizontalAlignment="Stretch"
+                                                   VerticalAlignment="Stretch"
+                                                   HorizontalContentAlignment="Stretch"
+                                                   VerticalContentAlignment="Stretch"
+                                                   Padding="0"
+                                                   BorderThickness="0"
+                                                   CornerRadius="0">
+                                                 <Grid>
+                                                     <Image Source="{x:Bind PosterPath, Mode=OneWay}"
+                                                            Stretch="UniformToFill"
+                                                            HorizontalAlignment="Center"
+                                                            VerticalAlignment="Center"
+                                                            Opacity="0.75"/>
+                                                     <Viewbox Width="64" Height="64" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                         <SymbolIcon Symbol="Play" Foreground="White"/>
+                                                     </Viewbox>
+                                                 </Grid>
+                                             </Button>
                                         </Grid>
                                     </Grid>
                                 </Border>

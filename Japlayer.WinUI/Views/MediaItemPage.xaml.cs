@@ -141,7 +141,7 @@ namespace Japlayer.Views
         private void Button_PointerEntered(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e) => ProtectedCursor = Microsoft.UI.Input.InputSystemCursor.Create(Microsoft.UI.Input.InputSystemCursorShape.Hand);
         private void Button_PointerExited(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e) => ProtectedCursor = null; // Revert to default cursor
 
-        private void PlayOverlay_Tapped(object sender, Microsoft.UI.Xaml.Input.TappedRoutedEventArgs e)
+        private void PlayOverlay_Click(object sender, RoutedEventArgs e)
         {
             if (sender is FrameworkElement element && element.DataContext is MediaSceneViewModel sceneVm)
             {
