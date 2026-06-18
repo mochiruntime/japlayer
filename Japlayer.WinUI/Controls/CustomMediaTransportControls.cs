@@ -95,10 +95,6 @@ namespace Japlayer.Controls
                 _fastSeekForwardButton.Click -= FastSeekForward_Click;
             }
 
-            if (_progressSlider != null)
-            {
-                _progressSlider.RemoveHandler(UIElement.PointerPressedEvent, new PointerEventHandler(OnProgressSliderPointerPressed));
-            }
 
             // Find elements
             _slowSeekBackwardButton = GetTemplateChild("SlowSeekBackwardButton") as Button;
@@ -140,32 +136,8 @@ namespace Japlayer.Controls
                 _fastSeekForwardButton.Click += FastSeekForward_Click;
             }
 
-            if (_progressSlider != null)
-            {
-                _progressSlider.AddHandler(UIElement.PointerPressedEvent, new PointerEventHandler(OnProgressSliderPointerPressed), true);
-            }
         }
 
-        private void OnProgressSliderPointerPressed(object sender, PointerRoutedEventArgs e)
-        {
-            if (sender is Slider slider && _parentMpe?.MediaPlayer != null)
-            {
-                var point = e.GetCurrentPoint(slider);
-                var positionX = point.Position.X;
-                var width = slider.ActualWidth;
-                if (width > 0)
-                {
-                    var percent = Math.Clamp(positionX / width, 0, 1);
-                    var duration = _parentMpe.MediaPlayer.PlaybackSession.NaturalDuration;
-                    if (duration.TotalSeconds > 0)
-                    {
-                        var targetSeconds = percent * duration.TotalSeconds;
-                        _parentMpe.MediaPlayer.Position = TimeSpan.FromSeconds(targetSeconds);
-                        slider.Value = targetSeconds;
-                    }
-                }
-            }
-        }
 
         private void CustomMediaTransportControls_Loaded(object sender, RoutedEventArgs e)
         {
