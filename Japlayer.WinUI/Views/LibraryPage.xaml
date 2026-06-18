@@ -134,6 +134,7 @@
 
             <!-- Media Grid -->
             <GridView x:Name="MediaGrid"
+                      AutomationProperties.AutomationId="MediaGrid"
                       Grid.Column="1" 
                       ItemsSource="{x:Bind ViewModel.MediaItems, Mode=OneWay}"
                       SelectionMode="Single"

@@ -62,6 +62,19 @@
                             <Style TargetType="FontIcon">
                                 <Setter Property="FontFamily" Value="{ThemeResource SymbolThemeFontFamily}" />
                             </Style>
+                            <Style x:Key="MediaControlButtonStyle" TargetType="Button">
+                                <Setter Property="Height" Value="40" />
+                                <Setter Property="Width" Value="40" />
+                                <Setter Property="Padding" Value="0" />
+                                <Setter Property="Background" Value="Transparent" />
+                                <Setter Property="BorderBrush" Value="Transparent" />
+                                <Setter Property="BorderThickness" Value="0" />
+                                <Setter Property="Foreground" Value="White" />
+                                <Setter Property="AllowFocusOnInteraction" Value="True" />
+                                <Setter Property="CornerRadius" Value="4" />
+                                <Setter Property="VerticalAlignment" Value="Center" />
+                                <Setter Property="HorizontalAlignment" Value="Center" />
+                            </Style>
                             <SolidColorBrush x:Key="SystemControlFocusVisualWhiteBrush" Color="White" />
                             <SolidColorBrush x:Key="SystemControlFocusVisualBlackBrush" Color="Black" />
                         </Grid.Resources>
@@ -252,120 +265,62 @@
                                         </AppBarButton.Icon>
                                     </AppBarButton>
                                 </Border>
-                                <Border x:Name="MediaTransportControls_Command_Border" Grid.Column="1" Grid.Row="2">
-                                    <CommandBar x:Name="MediaControlsCommandBar" Margin="0,3" Style="{StaticResource CommandBarStyle}" IsDynamicOverflowEnabled="False">
-                                        <CommandBar.Resources>
-                                            <Thickness x:Key="AppBarButtonInnerBorderMargin">5</Thickness>
-                                            <Thickness x:Key="AppBarButtonContentViewboxCollapsedMargin">0,12</Thickness>
-                                            <x:Double x:Key="AppBarThemeCompactHeight">40</x:Double>
-                                            <x:Double x:Key="AppBarMoreButtonColumnMinWidth">0</x:Double>
-                                        </CommandBar.Resources>
-                                        <CommandBar.PrimaryCommands>
-                                            <!-- Left side: Mute Button & Volume Slider -->
-                                            <AppBarButton x:Name="AudioMuteButton" AutomationProperties.AutomationId="AudioMuteButton" Style="{StaticResource AppBarButtonStyle}" MediaTransportControlsHelper.DropoutOrder="19">
-                                                <AppBarButton.Icon>
-                                                    <SymbolIcon x:Name="AudioMuteSymbol" Symbol="Volume" />
-                                                </AppBarButton.Icon>
-                                            </AppBarButton>
-                                            <AppBarElementContainer MediaTransportControlsHelper.DropoutOrder="18">
-                                                <Slider x:Name="VolumeSlider" AutomationProperties.AutomationId="VolumeSlider" Value="50" IsThumbToolTipEnabled="False" Width="80" VerticalAlignment="Center" Margin="8,0" />
-                                            </AppBarElementContainer>
+                                 <Border x:Name="MediaTransportControls_Command_Border" Grid.Column="1" Grid.Row="2">
+                                     <Grid x:Name="MediaControlsCommandBar" Margin="0,3">
+                                         <Grid.ColumnDefinitions>
+                                             <ColumnDefinition Width="*" />
+                                             <ColumnDefinition Width="Auto" />
+                                             <ColumnDefinition Width="*" />
+                                         </Grid.ColumnDefinitions>
 
-                                            <!-- Collapsed Standard Buttons to keep MediaTransportControls happy -->
-                                            <AppBarButton x:Name="CCSelectionButton" Style="{StaticResource AppBarButtonStyle}" MediaTransportControlsHelper.DropoutOrder="15" Visibility="Collapsed">
-                                                <AppBarButton.Icon>
-                                                    <FontIcon Glyph="&#xED1E;" />
-                                                </AppBarButton.Icon>
-                                            </AppBarButton>
-                                            <AppBarButton x:Name="AudioTracksSelectionButton" Style="{StaticResource AppBarButtonStyle}" MediaTransportControlsHelper.DropoutOrder="13" Visibility="Collapsed">
-                                                <AppBarButton.Icon>
-                                                    <FontIcon Glyph="&#xED1F;" />
-                                                </AppBarButton.Icon>
-                                            </AppBarButton>
-                                            <AppBarSeparator x:Name="LeftSeparator" Height="0" Width="0" Margin="0,0" />
-                                            <AppBarButton x:Name="StopButton" Icon="Stop" Style="{StaticResource AppBarButtonStyle}" MediaTransportControlsHelper.DropoutOrder="7" Visibility="Collapsed"/>
-                                            <AppBarButton x:Name="SkipBackwardButton" Style="{StaticResource AppBarButtonStyle}" MediaTransportControlsHelper.DropoutOrder="5" Visibility="Collapsed">
-                                                <AppBarButton.Icon>
-                                                    <FontIcon Glyph="&#xED3C;" />
-                                                </AppBarButton.Icon>
-                                            </AppBarButton>
-                                            <AppBarButton x:Name="PreviousTrackButton" Style="{StaticResource AppBarButtonStyle}" MediaTransportControlsHelper.DropoutOrder="3" Visibility="Collapsed">
-                                                <AppBarButton.Icon>
-                                                    <FontIcon Glyph="&#xF8AC;" />
-                                                </AppBarButton.Icon>
-                                            </AppBarButton>
-                                            <AppBarButton x:Name="RewindButton" Style="{StaticResource AppBarButtonStyle}" MediaTransportControlsHelper.DropoutOrder="1" Visibility="Collapsed">
-                                                <AppBarButton.Icon>
-                                                    <FontIcon Glyph="&#xE627;" />
-                                                </AppBarButton.Icon>
-                                            </AppBarButton>
+                                         <!-- Left side: Mute Button & Volume Slider -->
+                                         <StackPanel Grid.Column="0" Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
+                                             <Button x:Name="AudioMuteButton" AutomationProperties.AutomationId="AudioMuteButton" Style="{StaticResource MediaControlButtonStyle}">
+                                                 <SymbolIcon x:Name="AudioMuteSymbol" Symbol="Volume" />
+                                             </Button>
+                                             <Slider x:Name="VolumeSlider" AutomationProperties.AutomationId="VolumeSlider" Value="50" IsThumbToolTipEnabled="False" Width="80" VerticalAlignment="Center" Margin="8,0" />
+                                         </StackPanel>
 
-                                            <!-- Middle: Custom Seek Buttons around PlayPauseButton -->
-                                            <AppBarButton x:Name="FastSeekBackwardButton" AutomationProperties.AutomationId="FastSeekBackwardButton" Style="{StaticResource AppBarButtonStyle}">
-                                                <AppBarButton.Icon>
-                                                    <FontIcon Glyph="&#xED3C;" />
-                                                </AppBarButton.Icon>
-                                            </AppBarButton>
-                                            <AppBarButton x:Name="SlowSeekBackwardButton" AutomationProperties.AutomationId="SlowSeekBackwardButton" Style="{StaticResource AppBarButtonStyle}">
-                                                <AppBarButton.Icon>
-                                                    <FontIcon Glyph="&#xE112;" />
-                                                </AppBarButton.Icon>
-                                            </AppBarButton>
- 
-                                            <AppBarButton x:Name="PlayPauseButton" AutomationProperties.AutomationId="PlayPauseButton" Style="{StaticResource AppBarButtonStyle}" MediaTransportControlsHelper.DropoutOrder="23">
-                                                <AppBarButton.Icon>
-                                                    <FontIcon x:Name="PlayPauseSymbol" Glyph="&#xF5B0;" />
-                                                </AppBarButton.Icon>
-                                            </AppBarButton>
- 
-                                            <AppBarButton x:Name="SlowSeekForwardButton" AutomationProperties.AutomationId="SlowSeekForwardButton" Style="{StaticResource AppBarButtonStyle}">
-                                                <AppBarButton.Icon>
-                                                    <FontIcon Glyph="&#xE111;" />
-                                                </AppBarButton.Icon>
-                                            </AppBarButton>
-                                            <AppBarButton x:Name="FastSeekForwardButton" AutomationProperties.AutomationId="FastSeekForwardButton" Style="{StaticResource AppBarButtonStyle}">
-                                                <AppBarButton.Icon>
-                                                    <FontIcon Glyph="&#xED3D;" />
-                                                </AppBarButton.Icon>
-                                            </AppBarButton>
+                                         <!-- Middle: Custom Seek Buttons around PlayPauseButton -->
+                                         <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8">
+                                             <Button x:Name="FastSeekBackwardButton" AutomationProperties.AutomationId="FastSeekBackwardButton" Style="{StaticResource MediaControlButtonStyle}">
+                                                 <FontIcon Glyph="&#xED3C;" />
+                                             </Button>
+                                             <Button x:Name="SlowSeekBackwardButton" AutomationProperties.AutomationId="SlowSeekBackwardButton" Style="{StaticResource MediaControlButtonStyle}">
+                                                 <FontIcon Glyph="&#xE112;" />
+                                             </Button>
+                                             <Button x:Name="PlayPauseButton" AutomationProperties.AutomationId="PlayPauseButton" Style="{StaticResource MediaControlButtonStyle}">
+                                                 <FontIcon x:Name="PlayPauseSymbol" Glyph="&#xF5B0;" />
+                                             </Button>
+                                             <Button x:Name="SlowSeekForwardButton" AutomationProperties.AutomationId="SlowSeekForwardButton" Style="{StaticResource MediaControlButtonStyle}">
+                                                 <FontIcon Glyph="&#xE111;" />
+                                             </Button>
+                                             <Button x:Name="FastSeekForwardButton" AutomationProperties.AutomationId="FastSeekForwardButton" Style="{StaticResource MediaControlButtonStyle}">
+                                                 <FontIcon Glyph="&#xED3D;" />
+                                             </Button>
+                                         </StackPanel>
 
-                                            <!-- Collapsed Standard Buttons continued -->
-                                            <AppBarButton x:Name="FastForwardButton" Style="{StaticResource AppBarButtonStyle}" MediaTransportControlsHelper.DropoutOrder="1" Visibility="Collapsed">
-                                                <AppBarButton.Icon>
-                                                    <FontIcon Glyph="&#xE628;" />
-                                                </AppBarButton.Icon>
-                                            </AppBarButton>
-                                            <AppBarButton x:Name="NextTrackButton" Style="{StaticResource AppBarButtonStyle}" MediaTransportControlsHelper.DropoutOrder="3" Visibility="Collapsed">
-                                                <AppBarButton.Icon>
-                                                    <FontIcon Glyph="&#xF8AD;" />
-                                                </AppBarButton.Icon>
-                                            </AppBarButton>
-                                            <AppBarButton x:Name="SkipForwardButton" Style="{StaticResource AppBarButtonStyle}" MediaTransportControlsHelper.DropoutOrder="5" Visibility="Collapsed">
-                                                <AppBarButton.Icon>
-                                                    <FontIcon Glyph="&#xED3D;" />
-                                                </AppBarButton.Icon>
-                                            </AppBarButton>
-                                            <AppBarButton x:Name="PlaybackRateButton" Style="{StaticResource AppBarButtonStyle}" MediaTransportControlsHelper.DropoutOrder="10" Visibility="Collapsed">
-                                                <AppBarButton.Icon>
-                                                    <FontIcon Glyph="&#xEC57;" />
-                                                </AppBarButton.Icon>
-                                            </AppBarButton>
-                                            <AppBarSeparator x:Name="RightSeparator" Height="0" Width="0" Margin="0,0" />
-                                            <AppBarToggleButton x:Name="RepeatButton" Style="{StaticResource AppBarToggleButtonStyle}" MediaTransportControlsHelper.DropoutOrder="1" Visibility="Collapsed">
-                                                <AppBarToggleButton.Icon>
-                                                    <SymbolIcon x:Name="RepeatSymbol" Symbol="RepeatAll" />
-                                                </AppBarToggleButton.Icon>
-                                            </AppBarToggleButton>
+                                         <!-- Right side: Fullscreen Toggle only -->
+                                         <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                             <Button x:Name="FullWindowButton" AutomationProperties.AutomationId="FullWindowButton" Style="{StaticResource MediaControlButtonStyle}">
+                                                 <SymbolIcon x:Name="FullWindowSymbol" Symbol="FullScreen" />
+                                             </Button>
+                                         </StackPanel>
 
-                                            <!-- Right side: Fullscreen Toggle only -->
-                                            <AppBarButton x:Name="FullWindowButton" AutomationProperties.AutomationId="FullWindowButton" Style="{StaticResource AppBarButtonStyle}" MediaTransportControlsHelper.DropoutOrder="17">
-                                                <AppBarButton.Icon>
-                                                    <SymbolIcon x:Name="FullWindowSymbol" Symbol="FullScreen" />
-                                                </AppBarButton.Icon>
-                                            </AppBarButton>
-                                        </CommandBar.PrimaryCommands>
-                                    </CommandBar>
-                                </Border>
+                                         <!-- Collapsed Standard Buttons to keep MediaTransportControls class happy -->
+                                         <Button x:Name="CCSelectionButton" Visibility="Collapsed" />
+                                         <Button x:Name="AudioTracksSelectionButton" Visibility="Collapsed" />
+                                         <Button x:Name="StopButton" Visibility="Collapsed"/>
+                                         <Button x:Name="SkipBackwardButton" Visibility="Collapsed" />
+                                         <Button x:Name="PreviousTrackButton" Visibility="Collapsed" />
+                                         <Button x:Name="RewindButton" Visibility="Collapsed" />
+                                         <Button x:Name="FastForwardButton" Visibility="Collapsed" />
+                                         <Button x:Name="NextTrackButton" Visibility="Collapsed" />
+                                         <Button x:Name="SkipForwardButton" Visibility="Collapsed" />
+                                         <Button x:Name="PlaybackRateButton" Visibility="Collapsed" />
+                                         <ToggleButton x:Name="RepeatButton" Visibility="Collapsed" />
+                                     </Grid>
+                                 </Border>
                             </Grid>
                         </Border>
 

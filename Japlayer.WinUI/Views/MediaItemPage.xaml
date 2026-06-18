@@ -172,6 +172,7 @@
 
                                         <Grid Grid.Row="1" x:Name="PlayerContainer" Margin="1,0,1,1" SizeChanged="PlayerContainer_SizeChanged">
                                             <MediaPlayerElement x:Name="Player"
+                                                              AutomationProperties.AutomationId="Player"
                                                               Source="{x:Bind PlayerSource, Converter={StaticResource PathToMediaSourceConverter}, Mode=OneWay}" 
                                                               AreTransportControlsEnabled="True" 
                                                               AutoPlay="True"
@@ -186,6 +187,7 @@
                                             </MediaPlayerElement>
 
                                             <Button x:Name="PlayOverlay"
+                                                   AutomationProperties.AutomationId="PlayOverlay"
                                                    Visibility="{x:Bind PlayOverlayVisibility, Mode=OneWay}"
                                                    Background="Black"
                                                    Click="PlayOverlay_Click"

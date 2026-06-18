@@ -68,6 +68,12 @@ namespace Japlayer.Controls
         {
             base.OnApplyTemplate();
 
+            try
+            {
+                System.IO.File.AppendAllText(@"c:\Users\alex\Documents\Code\japlayer\debug_log.txt", $"[{DateTime.Now}] OnApplyTemplate started\n");
+            }
+            catch {}
+
             // Unsubscribe from previous events if template is reapplied
             if (_slowSeekBackwardButton != null)
             {
@@ -89,7 +95,10 @@ namespace Japlayer.Controls
                 _fastSeekForwardButton.Click -= FastSeekForward_Click;
             }
 
-
+            if (_progressSlider != null)
+            {
+                _progressSlider.RemoveHandler(UIElement.PointerPressedEvent, new PointerEventHandler(OnProgressSliderPointerPressed));
+            }
 
             // Find elements
             _slowSeekBackwardButton = GetTemplateChild("SlowSeekBackwardButton") as Button;
@@ -97,6 +106,18 @@ namespace Japlayer.Controls
             _fastSeekBackwardButton = GetTemplateChild("FastSeekBackwardButton") as Button;
             _fastSeekForwardButton = GetTemplateChild("FastSeekForwardButton") as Button;
             _progressSlider = GetTemplateChild("ProgressSlider") as Slider;
+
+            try
+            {
+                System.IO.File.AppendAllText(@"c:\Users\alex\Documents\Code\japlayer\debug_log.txt", 
+                    $"[{DateTime.Now}] Buttons found: " +
+                    $"slowBack={(_slowSeekBackwardButton != null)}, " +
+                    $"slowForward={(_slowSeekForwardButton != null)}, " +
+                    $"fastBack={(_fastSeekBackwardButton != null)}, " +
+                    $"fastForward={(_fastSeekForwardButton != null)}, " +
+                    $"slider={(_progressSlider != null)}\n");
+            }
+            catch {}
 
             // Subscribe to events
             if (_slowSeekBackwardButton != null)
@@ -119,7 +140,31 @@ namespace Japlayer.Controls
                 _fastSeekForwardButton.Click += FastSeekForward_Click;
             }
 
+            if (_progressSlider != null)
+            {
+                _progressSlider.AddHandler(UIElement.PointerPressedEvent, new PointerEventHandler(OnProgressSliderPointerPressed), true);
+            }
+        }
 
+        private void OnProgressSliderPointerPressed(object sender, PointerRoutedEventArgs e)
+        {
+            if (sender is Slider slider && _parentMpe?.MediaPlayer != null)
+            {
+                var point = e.GetCurrentPoint(slider);
+                var positionX = point.Position.X;
+                var width = slider.ActualWidth;
+                if (width > 0)
+                {
+                    var percent = Math.Clamp(positionX / width, 0, 1);
+                    var duration = _parentMpe.MediaPlayer.PlaybackSession.NaturalDuration;
+                    if (duration.TotalSeconds > 0)
+                    {
+                        var targetSeconds = percent * duration.TotalSeconds;
+                        _parentMpe.MediaPlayer.Position = TimeSpan.FromSeconds(targetSeconds);
+                        slider.Value = targetSeconds;
+                    }
+                }
+            }
         }
 
         private void CustomMediaTransportControls_Loaded(object sender, RoutedEventArgs e)
@@ -186,6 +231,13 @@ namespace Japlayer.Controls
 
         private void Seek(double seconds)
         {
+            try
+            {
+                System.IO.File.AppendAllText(@"c:\Users\alex\Documents\Code\japlayer\debug_log.txt", 
+                    $"[{DateTime.Now}] Seek called: seconds={seconds}, _parentMpe={(_parentMpe != null)}, player={(_parentMpe?.MediaPlayer != null)}\n");
+            }
+            catch {}
+
             if (_parentMpe?.MediaPlayer == null)
             {
                 return;
@@ -194,6 +246,13 @@ namespace Japlayer.Controls
             var player = _parentMpe.MediaPlayer;
             var position = player.Position;
             var duration = player.PlaybackSession.NaturalDuration;
+
+            try
+            {
+                System.IO.File.AppendAllText(@"c:\Users\alex\Documents\Code\japlayer\debug_log.txt", 
+                    $"[{DateTime.Now}] Seek values: pos={position.TotalSeconds}, dur={duration.TotalSeconds}\n");
+            }
+            catch {}
 
             player.Position = TimeSpan.FromSeconds(Math.Clamp(position.TotalSeconds + seconds, 0, duration.TotalSeconds));
         }
