@@ -69,7 +69,7 @@
                                 <Setter Property="Background" Value="Transparent" />
                                 <Setter Property="BorderBrush" Value="Transparent" />
                                 <Setter Property="BorderThickness" Value="0" />
-                                <Setter Property="Foreground" Value="White" />
+                                <Setter Property="Foreground" Value="{ThemeResource ButtonForeground}" />
                                 <Setter Property="AllowFocusOnInteraction" Value="True" />
                                 <Setter Property="CornerRadius" Value="4" />
                                 <Setter Property="VerticalAlignment" Value="Center" />
@@ -266,12 +266,50 @@
                                     </AppBarButton>
                                 </Border>
                                  <Border x:Name="MediaTransportControls_Command_Border" Grid.Column="1" Grid.Row="2">
-                                     <Grid x:Name="MediaControlsCommandBar" Margin="0,3">
-                                         <Grid.ColumnDefinitions>
-                                             <ColumnDefinition Width="*" />
-                                             <ColumnDefinition Width="Auto" />
-                                             <ColumnDefinition Width="*" />
-                                         </Grid.ColumnDefinitions>
+                                      <Grid x:Name="MediaControlsCommandBar" Margin="0,3">
+                                           <Grid.Resources>
+                                               <ResourceDictionary>
+                                                   <ResourceDictionary.ThemeDictionaries>
+                                                       <ResourceDictionary x:Key="Default">
+                                                           <SolidColorBrush x:Key="ButtonBackground" Color="Transparent" />
+                                                           <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="#20FFFFFF" />
+                                                           <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="#40FFFFFF" />
+                                                           <SolidColorBrush x:Key="ButtonBackgroundDisabled" Color="Transparent" />
+                                                           
+                                                           <SolidColorBrush x:Key="ButtonForeground" Color="White" />
+                                                           <SolidColorBrush x:Key="ButtonForegroundPointerOver" Color="White" />
+                                                           <SolidColorBrush x:Key="ButtonForegroundPressed" Color="White" />
+                                                           <SolidColorBrush x:Key="ButtonForegroundDisabled" Color="#80FFFFFF" />
+                                                           
+                                                           <SolidColorBrush x:Key="ButtonBorderBrush" Color="Transparent" />
+                                                           <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="Transparent" />
+                                                           <SolidColorBrush x:Key="ButtonBorderBrushPressed" Color="Transparent" />
+                                                           <SolidColorBrush x:Key="ButtonBorderBrushDisabled" Color="Transparent" />
+                                                       </ResourceDictionary>
+                                                       <ResourceDictionary x:Key="Light">
+                                                           <SolidColorBrush x:Key="ButtonBackground" Color="Transparent" />
+                                                           <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="#20000000" />
+                                                           <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="#40000000" />
+                                                           <SolidColorBrush x:Key="ButtonBackgroundDisabled" Color="Transparent" />
+                                                           
+                                                           <SolidColorBrush x:Key="ButtonForeground" Color="Black" />
+                                                           <SolidColorBrush x:Key="ButtonForegroundPointerOver" Color="Black" />
+                                                           <SolidColorBrush x:Key="ButtonForegroundPressed" Color="Black" />
+                                                           <SolidColorBrush x:Key="ButtonForegroundDisabled" Color="#80000000" />
+                                                           
+                                                           <SolidColorBrush x:Key="ButtonBorderBrush" Color="Transparent" />
+                                                           <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="Transparent" />
+                                                           <SolidColorBrush x:Key="ButtonBorderBrushPressed" Color="Transparent" />
+                                                           <SolidColorBrush x:Key="ButtonBorderBrushDisabled" Color="Transparent" />
+                                                       </ResourceDictionary>
+                                                   </ResourceDictionary.ThemeDictionaries>
+                                               </ResourceDictionary>
+                                           </Grid.Resources>
+                                          <Grid.ColumnDefinitions>
+                                              <ColumnDefinition Width="*" />
+                                              <ColumnDefinition Width="Auto" />
+                                              <ColumnDefinition Width="*" />
+                                          </Grid.ColumnDefinitions>
 
                                          <!-- Left side: Mute Button & Volume Slider -->
                                          <StackPanel Grid.Column="0" Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
