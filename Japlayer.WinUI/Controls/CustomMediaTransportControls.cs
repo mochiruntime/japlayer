@@ -18,6 +18,7 @@ namespace Japlayer.Controls
         private Button? _slowSeekForwardButton;
         private Button? _fastSeekBackwardButton;
         private Button? _fastSeekForwardButton;
+        private Button? _fullWindowButton;
 
         public static readonly DependencyProperty SlowSeekIntervalProperty =
             DependencyProperty.Register(nameof(SlowSeekInterval), typeof(double), typeof(CustomMediaTransportControls), new PropertyMetadata(10.0));
@@ -62,6 +63,9 @@ namespace Japlayer.Controls
             Unloaded += CustomMediaTransportControls_Unloaded;
 
             IsVolumeButtonVisible = true;
+
+            // Register PointerPressed with handledEventsToo = true to track this as active player on click
+            this.AddHandler(UIElement.PointerPressedEvent, new PointerEventHandler(CustomMediaTransportControls_PointerPressed), true);
         }
 
         protected override void OnApplyTemplate()
@@ -94,6 +98,10 @@ namespace Japlayer.Controls
             {
                 _fastSeekForwardButton.Click -= FastSeekForward_Click;
             }
+            if (_fullWindowButton != null)
+            {
+                _fullWindowButton.Click -= FullWindowButton_Click;
+            }
 
 
             // Find elements
@@ -102,6 +110,7 @@ namespace Japlayer.Controls
             _fastSeekBackwardButton = GetTemplateChild("FastSeekBackwardButton") as Button;
             _fastSeekForwardButton = GetTemplateChild("FastSeekForwardButton") as Button;
             _progressSlider = GetTemplateChild("ProgressSlider") as Slider;
+            _fullWindowButton = GetTemplateChild("FullWindowButton") as Button;
 
             try
             {
@@ -135,29 +144,48 @@ namespace Japlayer.Controls
             {
                 _fastSeekForwardButton.Click += FastSeekForward_Click;
             }
+            if (_fullWindowButton != null)
+            {
+                _fullWindowButton.Click += FullWindowButton_Click;
+            }
 
         }
 
 
         private void CustomMediaTransportControls_Loaded(object sender, RoutedEventArgs e)
         {
-            // Bind keyboard handlers at the MediaPlayerElement level when control is loaded in visual tree
             _parentMpe = GetMediaPlayerElement();
-            _parentMpe?.AddHandler(UIElement.PreviewKeyDownEvent, new KeyEventHandler(OnPlayerPreviewKeyDown), true);
+            UpdateActivePlayer();
         }
 
-        private void CustomMediaTransportControls_Unloaded(object sender, RoutedEventArgs e)
+        private void CustomMediaTransportControls_Unloaded(object sender, RoutedEventArgs e) => _parentMpe = null;
+
+        private void UpdateActivePlayer()
         {
-            _parentMpe?.RemoveHandler(UIElement.PreviewKeyDownEvent, new KeyEventHandler(OnPlayerPreviewKeyDown));
-            _parentMpe = null;
+            var page = GetMediaItemPage();
+            var mediaPlayerElement = GetParentMediaPlayerElement();
+            if (page != null && mediaPlayerElement != null)
+            {
+                page.ActivePlayer = mediaPlayerElement;
+            }
         }
+
+        private void CustomMediaTransportControls_PointerPressed(object sender, PointerRoutedEventArgs e) => UpdateActivePlayer();
 
         private void SlowSeekBackward_Click(object sender, RoutedEventArgs e) => Seek(-SlowSeekInterval);
         private void SlowSeekForward_Click(object sender, RoutedEventArgs e) => Seek(SlowSeekInterval);
+
+        private void FullWindowButton_Click(object sender, RoutedEventArgs e)
+        {
+            var page = GetMediaItemPage();
+            var mediaPlayerElement = GetParentMediaPlayerElement();
+            if (page != null && mediaPlayerElement != null)
+            {
+                page.ToggleFullScreen(mediaPlayerElement);
+            }
+        }
         private void FastSeekBackward_Click(object sender, RoutedEventArgs e) => Seek(-FastSeekInterval);
         private void FastSeekForward_Click(object sender, RoutedEventArgs e) => Seek(FastSeekInterval);
-
-
 
         private bool IsCtrlPressed()
         {
@@ -171,11 +199,10 @@ namespace Japlayer.Controls
             }
         }
 
-
-
         private void OnPlayerPreviewKeyDown(object sender, KeyRoutedEventArgs e)
         {
-            if (_parentMpe?.MediaPlayer == null)
+            var mediaPlayerElement = GetParentMediaPlayerElement();
+            if (mediaPlayerElement?.MediaPlayer == null)
             {
                 return;
             }
@@ -184,7 +211,7 @@ namespace Japlayer.Controls
             {
                 var seekAmount = IsCtrlPressed() ? ModifierSeekResolution : NormalSeekResolution;
 
-                var player = _parentMpe.MediaPlayer;
+                var player = mediaPlayerElement.MediaPlayer;
                 var position = player.Position;
                 var duration = player.PlaybackSession.NaturalDuration;
 
@@ -203,19 +230,20 @@ namespace Japlayer.Controls
 
         private void Seek(double seconds)
         {
+            var mediaPlayerElement = GetParentMediaPlayerElement();
             try
             {
                 System.IO.File.AppendAllText(@"c:\Users\alex\Documents\Code\japlayer\debug_log.txt",
-                    $"[{DateTime.Now}] Seek called: seconds={seconds}, _parentMpe={(_parentMpe != null)}, player={(_parentMpe?.MediaPlayer != null)}\n");
+                    $"[{DateTime.Now}] Seek called: seconds={seconds}, _parentMpe={(mediaPlayerElement != null)}, player={(mediaPlayerElement?.MediaPlayer != null)}\n");
             }
             catch { }
 
-            if (_parentMpe?.MediaPlayer == null)
+            if (mediaPlayerElement?.MediaPlayer == null)
             {
                 return;
             }
 
-            var player = _parentMpe.MediaPlayer;
+            var player = mediaPlayerElement.MediaPlayer;
             var position = player.Position;
             var duration = player.PlaybackSession.NaturalDuration;
 
@@ -229,14 +257,37 @@ namespace Japlayer.Controls
             player.Position = TimeSpan.FromSeconds(Math.Clamp(position.TotalSeconds + seconds, 0, duration.TotalSeconds));
         }
 
+        private MediaPlayerElement? GetParentMediaPlayerElement()
+        {
+            if (_parentMpe == null)
+            {
+                _parentMpe = GetMediaPlayerElement();
+            }
+            return _parentMpe;
+        }
+
         private MediaPlayerElement? GetMediaPlayerElement()
         {
             DependencyObject parent = VisualTreeHelper.GetParent(this);
             while (parent != null)
             {
-                if (parent is MediaPlayerElement mpe)
+                if (parent is MediaPlayerElement mediaPlayerElement)
                 {
-                    return mpe;
+                    return mediaPlayerElement;
+                }
+                parent = VisualTreeHelper.GetParent(parent);
+            }
+            return null;
+        }
+
+        private Views.MediaItemPage? GetMediaItemPage()
+        {
+            DependencyObject parent = VisualTreeHelper.GetParent(this);
+            while (parent != null)
+            {
+                if (parent is Views.MediaItemPage page)
+                {
+                    return page;
                 }
                 parent = VisualTreeHelper.GetParent(parent);
             }

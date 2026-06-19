@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using Japlayer.Controls;
 using Japlayer.Helpers;
 using Japlayer.ViewModels;
 using Microsoft.UI.Xaml;
@@ -12,11 +13,17 @@ namespace Japlayer.Views
     {
         public MediaItemViewModel ViewModel { get; private set; } = null!;
         private int _targetGalleryIndex = 0;
+        private MediaPlayerElement? _fullScreenPlayer;
+        private Grid? _originalPlayerParent;
+        private double _originalParentHeight;
+        private MediaPlayerElement? _activePlayer;
 
         public MediaItemPage()
         {
             this.InitializeComponent();
             GalleryScrollViewer.AddHandler(UIElement.PointerWheelChangedEvent, new Microsoft.UI.Xaml.Input.PointerEventHandler(GalleryScrollViewer_PointerWheelChanged), true);
+            this.Unloaded += MediaItemPage_Unloaded;
+            this.PreviewKeyDown += MediaItemPage_PreviewKeyDown;
         }
 
         protected override async void OnNavigatedTo(NavigationEventArgs e)
@@ -152,16 +159,18 @@ namespace Japlayer.Views
 
         private void MediaPlayerElement_Loaded(object sender, RoutedEventArgs e)
         {
-            if (sender is MediaPlayerElement mpe)
+            if (sender is MediaPlayerElement mediaPlayerElement)
             {
-                if (mpe.DataContext is MediaSceneViewModel sceneVm)
+                _activePlayer = mediaPlayerElement;
+
+                if (mediaPlayerElement.DataContext is MediaSceneViewModel sceneViewModel)
                 {
-                    sceneVm.PropertyChanged += SceneVm_PropertyChanged;
+                    sceneViewModel.PropertyChanged += SceneVm_PropertyChanged;
                 }
 
                 try
                 {
-                    var player = mpe.MediaPlayer;
+                    var player = mediaPlayerElement.MediaPlayer;
                     if (player != null)
                     {
                         player.MediaOpened += MediaPlayer_MediaOpened;
@@ -171,26 +180,29 @@ namespace Japlayer.Views
                 {
                 }
 
-                var container = FindParentGrid(mpe);
+                var container = FindParentGrid(mediaPlayerElement);
                 if (container != null)
                 {
                     UpdatePlayerContainerHeight(container);
                 }
+
+                mediaPlayerElement.Focus(FocusState.Programmatic);
+                mediaPlayerElement.AddHandler(UIElement.PointerPressedEvent, new Microsoft.UI.Xaml.Input.PointerEventHandler(MediaPlayerElement_PointerPressed), true);
             }
         }
 
         private void MediaPlayerElement_Unloaded(object sender, RoutedEventArgs e)
         {
-            if (sender is MediaPlayerElement mpe)
+            if (sender is MediaPlayerElement mediaPlayerElement)
             {
-                if (mpe.DataContext is MediaSceneViewModel sceneVm)
+                if (mediaPlayerElement.DataContext is MediaSceneViewModel sceneViewModel)
                 {
-                    sceneVm.PropertyChanged -= SceneVm_PropertyChanged;
+                    sceneViewModel.PropertyChanged -= SceneVm_PropertyChanged;
                 }
 
                 try
                 {
-                    var player = mpe.MediaPlayer;
+                    var player = mediaPlayerElement.MediaPlayer;
                     if (player != null)
                     {
                         player.MediaOpened -= MediaPlayer_MediaOpened;
@@ -200,10 +212,17 @@ namespace Japlayer.Views
                 {
                 }
 
+                mediaPlayerElement.RemoveHandler(UIElement.PointerPressedEvent, new Microsoft.UI.Xaml.Input.PointerEventHandler(MediaPlayerElement_PointerPressed));
+
+                if (_activePlayer == mediaPlayerElement)
+                {
+                    _activePlayer = null;
+                }
+
                 // IMPORTANT: Setting Source to null is enough to release the file handle.
-                // Do NOT call mpe.MediaPlayer.Dispose() as it can cause COMException 
+                // Do NOT call mediaPlayerElement.MediaPlayer.Dispose() as it can cause COMException 
                 // if the framework tries to access the player during/after unload.
-                mpe.Source = null;
+                mediaPlayerElement.Source = null;
             }
         }
 
@@ -424,6 +443,213 @@ namespace Japlayer.Views
             catch (Exception ex)
             {
                 await AppLauncherHelper.ShowErrorDialogAsync($"Could not open file handlers: {ex.Message}", XamlRoot);
+            }
+        }
+
+        private void MediaItemPage_Unloaded(object sender, RoutedEventArgs e)
+        {
+            this.PreviewKeyDown -= MediaItemPage_PreviewKeyDown;
+            if (_fullScreenPlayer != null)
+            {
+                ToggleFullScreen(_fullScreenPlayer);
+            }
+        }
+
+        public void ToggleFullScreen(MediaPlayerElement player)
+        {
+            var mainWindow = App.GetService<MainWindow>();
+            if (mainWindow == null)
+            {
+                return;
+            }
+
+            var hWnd = WinRT.Interop.WindowNative.GetWindowHandle(mainWindow);
+            var windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(hWnd);
+            var appWindow = Microsoft.UI.Windowing.AppWindow.GetFromWindowId(windowId);
+            if (appWindow == null)
+            {
+                return;
+            }
+
+            if (_fullScreenPlayer != null)
+            {
+                // Exit Fullscreen
+                appWindow.SetPresenter(Microsoft.UI.Windowing.AppWindowPresenterKind.Default);
+
+                // Save playing state
+                var wasPlaying = false;
+                try
+                {
+                    if (_fullScreenPlayer.MediaPlayer != null)
+                    {
+                        wasPlaying = _fullScreenPlayer.MediaPlayer.PlaybackSession.PlaybackState == Windows.Media.Playback.MediaPlaybackState.Playing;
+                    }
+                }
+                catch { }
+
+                // Temporarily unsubscribe Unloaded to prevent clearing Source
+                _fullScreenPlayer.Unloaded -= MediaPlayerElement_Unloaded;
+
+                // Restore visual tree
+                FullScreenOverlayGrid.Children.Remove(_fullScreenPlayer);
+                FullScreenOverlayGrid.Visibility = Visibility.Collapsed;
+
+                if (_originalPlayerParent != null)
+                {
+                    _originalPlayerParent.Children.Add(_fullScreenPlayer);
+                    _originalPlayerParent.Height = _originalParentHeight;
+                    _fullScreenPlayer.Focus(FocusState.Programmatic);
+
+                    // Scroll back to the player on the next layout pass
+                    var targetParent = _originalPlayerParent;
+                    DispatcherQueue.TryEnqueue(() =>
+                    {
+                        targetParent.StartBringIntoView();
+                    });
+                }
+
+                // Resubscribe Unloaded
+                _fullScreenPlayer.Unloaded += MediaPlayerElement_Unloaded;
+
+                // Resume playback if it was playing
+                if (wasPlaying)
+                {
+                    try
+                    {
+                        _fullScreenPlayer.MediaPlayer?.Play();
+                    }
+                    catch { }
+                }
+
+                // Restore MainWindow TitleBar and ContentFrame layout
+                mainWindow.SetTitleBarAndFrameFullscreen(false);
+
+                // Notify controls
+                var controls = _fullScreenPlayer.TransportControls as CustomMediaTransportControls;
+                if (controls != null)
+                {
+                    VisualStateManager.GoToState(controls, "NonFullWindowState", true);
+                }
+
+                _fullScreenPlayer = null;
+                _originalPlayerParent = null;
+            }
+            else
+            {
+                // Enter Fullscreen
+                _originalPlayerParent = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetParent(player) as Grid;
+
+                // Save playing state
+                var wasPlaying = false;
+                try
+                {
+                    if (player.MediaPlayer != null)
+                    {
+                        wasPlaying = player.MediaPlayer.PlaybackSession.PlaybackState == Windows.Media.Playback.MediaPlaybackState.Playing;
+                    }
+                }
+                catch { }
+
+                if (_originalPlayerParent != null)
+                {
+                    _originalParentHeight = _originalPlayerParent.Height;
+
+                    // Temporarily unsubscribe Unloaded to prevent clearing Source
+                    player.Unloaded -= MediaPlayerElement_Unloaded;
+
+                    _originalPlayerParent.Children.Remove(player);
+                    _originalPlayerParent.Height = 0; // Collapse container
+                }
+
+                _fullScreenPlayer = player;
+                FullScreenOverlayGrid.Children.Add(_fullScreenPlayer);
+                FullScreenOverlayGrid.Visibility = Visibility.Visible;
+                _fullScreenPlayer.Focus(FocusState.Programmatic);
+
+                // Resubscribe Unloaded
+                _fullScreenPlayer.Unloaded += MediaPlayerElement_Unloaded;
+
+                // Resume playback if it was playing
+                if (wasPlaying)
+                {
+                    try
+                    {
+                        _fullScreenPlayer.MediaPlayer?.Play();
+                    }
+                    catch { }
+                }
+
+                // Hide MainWindow TitleBar and expand ContentFrame layout
+                mainWindow.SetTitleBarAndFrameFullscreen(true);
+
+                appWindow.SetPresenter(Microsoft.UI.Windowing.AppWindowPresenterKind.FullScreen);
+
+                // Notify controls
+                var controls = _fullScreenPlayer.TransportControls as CustomMediaTransportControls;
+                if (controls != null)
+                {
+                    VisualStateManager.GoToState(controls, "FullWindowState", true);
+                }
+            }
+        }
+
+        public MediaPlayerElement? ActivePlayer
+        {
+            get => _activePlayer;
+            set => _activePlayer = value;
+        }
+
+        private void MediaPlayerElement_PointerPressed(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+        {
+            if (sender is MediaPlayerElement mediaPlayerElement)
+            {
+                ActivePlayer = mediaPlayerElement;
+            }
+        }
+
+        private void MediaItemPage_PreviewKeyDown(object sender, Microsoft.UI.Xaml.Input.KeyRoutedEventArgs e)
+        {
+            if (_activePlayer?.MediaPlayer == null)
+            {
+                return;
+            }
+
+            if (e.Key == Windows.System.VirtualKey.Left || e.Key == Windows.System.VirtualKey.Right)
+            {
+                // Retrieve seek interval preferences from custom controls if available, otherwise use defaults
+                var normalSeek = 10.0;
+                var modifierSeek = 60.0;
+
+                var controls = _activePlayer.TransportControls as CustomMediaTransportControls;
+                if (controls != null)
+                {
+                    normalSeek = controls.NormalSeekResolution;
+                    modifierSeek = controls.ModifierSeekResolution;
+                }
+
+                // Check modifier key
+                var isCtrlPressed = false;
+                try
+                {
+                    isCtrlPressed = Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(Windows.System.VirtualKey.Control).HasFlag(Windows.UI.Core.CoreVirtualKeyStates.Down);
+                }
+                catch { }
+
+                var seekAmount = isCtrlPressed ? modifierSeek : normalSeek;
+                var player = _activePlayer.MediaPlayer;
+                var position = player.Position;
+                var duration = player.PlaybackSession.NaturalDuration;
+
+                if (e.Key == Windows.System.VirtualKey.Left)
+                {
+                    player.Position = TimeSpan.FromSeconds(Math.Max(0, position.TotalSeconds - seekAmount));
+                }
+                else
+                {
+                    player.Position = TimeSpan.FromSeconds(Math.Min(duration.TotalSeconds, position.TotalSeconds + seekAmount));
+                }
+
+                e.Handled = true;
             }
         }
     }

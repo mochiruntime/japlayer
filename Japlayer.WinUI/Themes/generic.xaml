@@ -321,21 +321,33 @@
 
                                          <!-- Middle: Custom Seek Buttons around PlayPauseButton -->
                                          <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8">
-                                             <Button x:Name="FastSeekBackwardButton" AutomationProperties.AutomationId="FastSeekBackwardButton" Style="{StaticResource MediaControlButtonStyle}">
-                                                 <FontIcon Glyph="&#xED3C;" />
-                                             </Button>
-                                             <Button x:Name="SlowSeekBackwardButton" AutomationProperties.AutomationId="SlowSeekBackwardButton" Style="{StaticResource MediaControlButtonStyle}">
-                                                 <FontIcon Glyph="&#xE112;" />
-                                             </Button>
-                                             <Button x:Name="PlayPauseButton" AutomationProperties.AutomationId="PlayPauseButton" Style="{StaticResource MediaControlButtonStyle}">
-                                                 <FontIcon x:Name="PlayPauseSymbol" Glyph="&#xF5B0;" />
-                                             </Button>
-                                             <Button x:Name="SlowSeekForwardButton" AutomationProperties.AutomationId="SlowSeekForwardButton" Style="{StaticResource MediaControlButtonStyle}">
-                                                 <FontIcon Glyph="&#xE111;" />
-                                             </Button>
-                                             <Button x:Name="FastSeekForwardButton" AutomationProperties.AutomationId="FastSeekForwardButton" Style="{StaticResource MediaControlButtonStyle}">
-                                                 <FontIcon Glyph="&#xED3D;" />
-                                             </Button>
+                                              <Button x:Name="FastSeekBackwardButton" AutomationProperties.AutomationId="FastSeekBackwardButton" Style="{StaticResource MediaControlButtonStyle}" Width="60" Height="50">
+                                                  <StackPanel HorizontalAlignment="Center">
+                                                      <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xEB9E;" FontSize="18"/>
+                                                      <TextBlock Text="60s" FontSize="10" HorizontalAlignment="Center" Margin="0,2,0,0" Opacity="0.7"/>
+                                                  </StackPanel>
+                                              </Button>
+                                              <Button x:Name="SlowSeekBackwardButton" AutomationProperties.AutomationId="SlowSeekBackwardButton" Style="{StaticResource MediaControlButtonStyle}" Width="60" Height="50">
+                                                  <StackPanel HorizontalAlignment="Center">
+                                                      <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE72B;" FontSize="18"/>
+                                                      <TextBlock Text="10s" FontSize="10" HorizontalAlignment="Center" Margin="0,2,0,0" Opacity="0.7"/>
+                                                  </StackPanel>
+                                              </Button>
+                                              <Button x:Name="PlayPauseButton" AutomationProperties.AutomationId="PlayPauseButton" Style="{StaticResource MediaControlButtonStyle}">
+                                                  <FontIcon x:Name="PlayPauseSymbol" Glyph="&#xF5B0;" />
+                                              </Button>
+                                              <Button x:Name="SlowSeekForwardButton" AutomationProperties.AutomationId="SlowSeekForwardButton" Style="{StaticResource MediaControlButtonStyle}" Width="60" Height="50">
+                                                  <StackPanel HorizontalAlignment="Center">
+                                                      <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE72A;" FontSize="18"/>
+                                                      <TextBlock Text="10s" FontSize="10" HorizontalAlignment="Center" Margin="0,2,0,0" Opacity="0.7"/>
+                                                  </StackPanel>
+                                              </Button>
+                                              <Button x:Name="FastSeekForwardButton" AutomationProperties.AutomationId="FastSeekForwardButton" Style="{StaticResource MediaControlButtonStyle}" Width="60" Height="50">
+                                                  <StackPanel HorizontalAlignment="Center">
+                                                      <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xEB9D;" FontSize="18"/>
+                                                      <TextBlock Text="60s" FontSize="10" HorizontalAlignment="Center" Margin="0,2,0,0" Opacity="0.7"/>
+                                                  </StackPanel>
+                                              </Button>
                                          </StackPanel>
 
                                          <!-- Right side: Fullscreen Toggle only -->
