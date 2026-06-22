@@ -1,6 +1,5 @@
 using Microsoft.UI.Xaml;
-
-
+using Microsoft.UI.Xaml.Controls;
 
 namespace Japlayer
 {
@@ -23,5 +22,20 @@ namespace Japlayer
             ContentFrame.Navigate(typeof(Views.LibraryPage));
         }
 
+        public void SetTitleBarAndFrameFullscreen(bool isFullscreen)
+        {
+            if (isFullscreen)
+            {
+                AppTitleBar.Visibility = Visibility.Collapsed;
+                Grid.SetRow(ContentFrame, 0);
+                Grid.SetRowSpan(ContentFrame, 2);
+            }
+            else
+            {
+                AppTitleBar.Visibility = Visibility.Visible;
+                Grid.SetRow(ContentFrame, 1);
+                Grid.SetRowSpan(ContentFrame, 1);
+            }
+        }
     }
 }
