@@ -1,11 +1,14 @@
 using System;
+using System.IO;
 using Japlayer.Contracts;
 using Japlayer.Data.Context;
 using Japlayer.Data.Services;
+using Japlayer.Logging;
 using Japlayer.Services;
 using Japlayer.ViewModels;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml;
 
 namespace Japlayer
@@ -27,6 +30,16 @@ namespace Japlayer
         private static IServiceProvider ConfigureServices()
         {
             var services = new ServiceCollection();
+
+            // Logging
+            services.AddLogging(loggingBuilder =>
+            {
+                loggingBuilder.AddDebug();
+
+                var logDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Japlayer", "Logs");
+                var logPath = Path.Combine(logDirectory, "app.log");
+                loggingBuilder.AddFile(logPath);
+            });
 
             // Services
             var settingsService = new SettingsService();
