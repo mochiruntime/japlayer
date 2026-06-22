@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using Microsoft.Extensions.Logging;
 using Microsoft.UI.Input;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -12,6 +13,7 @@ namespace Japlayer.Controls
 {
     public class CustomMediaTransportControls : MediaTransportControls
     {
+        private readonly ILogger<CustomMediaTransportControls> _logger;
         private MediaPlayerElement? _parentMpe;
         private Slider? _progressSlider;
         private Button? _slowSeekBackwardButton;
@@ -58,6 +60,7 @@ namespace Japlayer.Controls
 
         public CustomMediaTransportControls()
         {
+            _logger = App.GetService<ILogger<CustomMediaTransportControls>>();
             DefaultStyleKey = typeof(CustomMediaTransportControls);
             Loaded += CustomMediaTransportControls_Loaded;
             Unloaded += CustomMediaTransportControls_Unloaded;
@@ -72,11 +75,7 @@ namespace Japlayer.Controls
         {
             base.OnApplyTemplate();
 
-            try
-            {
-                System.IO.File.AppendAllText(@"c:\Users\alex\Documents\Code\japlayer\debug_log.txt", $"[{DateTime.Now}] OnApplyTemplate started\n");
-            }
-            catch { }
+            _logger.LogInformation("OnApplyTemplate started");
 
             // Unsubscribe from previous events if template is reapplied
             if (_slowSeekBackwardButton != null)
@@ -112,17 +111,12 @@ namespace Japlayer.Controls
             _progressSlider = GetTemplateChild("ProgressSlider") as Slider;
             _fullWindowButton = GetTemplateChild("FullWindowButton") as Button;
 
-            try
-            {
-                System.IO.File.AppendAllText(@"c:\Users\alex\Documents\Code\japlayer\debug_log.txt",
-                    $"[{DateTime.Now}] Buttons found: " +
-                    $"slowBack={(_slowSeekBackwardButton != null)}, " +
-                    $"slowForward={(_slowSeekForwardButton != null)}, " +
-                    $"fastBack={(_fastSeekBackwardButton != null)}, " +
-                    $"fastForward={(_fastSeekForwardButton != null)}, " +
-                    $"slider={(_progressSlider != null)}\n");
-            }
-            catch { }
+            _logger.LogInformation("Buttons found: slowBack={SlowBack}, slowForward={SlowForward}, fastBack={FastBack}, fastForward={FastForward}, slider={Slider}",
+                _slowSeekBackwardButton != null,
+                _slowSeekForwardButton != null,
+                _fastSeekBackwardButton != null,
+                _fastSeekForwardButton != null,
+                _progressSlider != null);
 
             // Subscribe to events
             if (_slowSeekBackwardButton != null)
@@ -231,12 +225,10 @@ namespace Japlayer.Controls
         private void Seek(double seconds)
         {
             var mediaPlayerElement = GetParentMediaPlayerElement();
-            try
-            {
-                System.IO.File.AppendAllText(@"c:\Users\alex\Documents\Code\japlayer\debug_log.txt",
-                    $"[{DateTime.Now}] Seek called: seconds={seconds}, _parentMpe={(mediaPlayerElement != null)}, player={(mediaPlayerElement?.MediaPlayer != null)}\n");
-            }
-            catch { }
+            _logger.LogInformation("Seek called: seconds={Seconds}, parentMpeExists={ParentMpeExists}, playerExists={PlayerExists}",
+                seconds,
+                mediaPlayerElement != null,
+                mediaPlayerElement?.MediaPlayer != null);
 
             if (mediaPlayerElement?.MediaPlayer == null)
             {
@@ -247,12 +239,9 @@ namespace Japlayer.Controls
             var position = player.Position;
             var duration = player.PlaybackSession.NaturalDuration;
 
-            try
-            {
-                System.IO.File.AppendAllText(@"c:\Users\alex\Documents\Code\japlayer\debug_log.txt",
-                    $"[{DateTime.Now}] Seek values: pos={position.TotalSeconds}, dur={duration.TotalSeconds}\n");
-            }
-            catch { }
+            _logger.LogInformation("Seek values: position={PositionSeconds}, duration={DurationSeconds}",
+                position.TotalSeconds,
+                duration.TotalSeconds);
 
             player.Position = TimeSpan.FromSeconds(Math.Clamp(position.TotalSeconds + seconds, 0, duration.TotalSeconds));
         }
