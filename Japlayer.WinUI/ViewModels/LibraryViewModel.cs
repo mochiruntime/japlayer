@@ -182,6 +182,8 @@ namespace Japlayer.ViewModels
                 _ when SortOrder == LibrarySortOption.ReleaseDateDescending => filteredItems.OrderByDescending(item => item.ReleaseDate ?? DateOnly.MinValue),
                 _ when SortOrder == LibrarySortOption.AddedDateAscending => filteredItems.OrderBy(item => item.LibraryItem.CreatedAt ?? DateTime.MinValue),
                 _ when SortOrder == LibrarySortOption.AddedDateDescending => filteredItems.OrderByDescending(item => item.LibraryItem.CreatedAt ?? DateTime.MinValue),
+                _ when SortOrder == LibrarySortOption.HighlightsAscending => filteredItems.OrderBy(item => item.HighlightCount),
+                _ when SortOrder == LibrarySortOption.HighlightsDescending => filteredItems.OrderByDescending(item => item.HighlightCount),
                 _ when SortOrder == LibrarySortOption.Random => filteredItems.OrderBy(item => Random.Shared.Next()),
                 _ => filteredItems.OrderBy(item => item.Title)
             };

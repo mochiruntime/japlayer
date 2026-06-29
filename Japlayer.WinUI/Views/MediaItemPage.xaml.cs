@@ -32,6 +32,7 @@ namespace Japlayer.Views
             if (e.Parameter is LibraryItemViewModel libraryItem)
             {
                 ViewModel = Microsoft.Extensions.DependencyInjection.ActivatorUtilities.CreateInstance<MediaItemViewModel>(App.Current.Services, libraryItem.LibraryItem);
+                ViewModel.LibraryItemViewModel = libraryItem;
                 await ViewModel.LoadDetailsAsync();
             }
         }

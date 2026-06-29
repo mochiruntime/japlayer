@@ -26,6 +26,7 @@ namespace Japlayer.ViewModels
             _libraryItem = libraryItem;
             _settingsService = settingsService;
             _thumbnailProvider = thumbnailProvider;
+            HighlightCount = libraryItem.HighlightCount;
 
             if (string.IsNullOrEmpty(_libraryItem.CoverImagePath))
             {
@@ -58,6 +59,9 @@ namespace Japlayer.ViewModels
                 System.Diagnostics.Debug.WriteLine($"Failed to load fallback cover for {Id}: {exception.Message}");
             }
         }
+
+        [ObservableProperty]
+        public partial int HighlightCount { get; set; }
 
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(DisplayImageSource))]
