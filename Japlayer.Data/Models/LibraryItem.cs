@@ -9,5 +9,6 @@ namespace Japlayer.Data.Models
         public IReadOnlyList<string> UserTags { get; init; } = [];
         public IReadOnlyList<string> Genres { get; init; } = [];
         public DateTime? CreatedAt { get; init; }
+        public int HighlightCount { get; init; }
     }
 }

@@ -25,7 +25,8 @@ namespace Japlayer.Data.Services
                     CoverImagePath = m.MediaMetadata.Select(md => md.Cover).FirstOrDefault(),
                     UserTags = m.UserTags.Select(ut => ut.Name).ToList(),
                     Genres = m.Genres.Select(g => g.Name).ToList(),
-                    CreatedAt = m.MediaLocations.Select(ml => (DateTime?)ml.CreatedAt).Min()
+                    CreatedAt = m.MediaLocations.Select(ml => (DateTime?)ml.CreatedAt).Min(),
+                    HighlightCount = m.MediaHighlights.Count
                 })
                 .OrderBy(m => m.MediaId)
                 .ToListAsync();
