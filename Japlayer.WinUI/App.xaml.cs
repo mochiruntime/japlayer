@@ -55,6 +55,7 @@ namespace Japlayer
             services.AddSingleton<Data.Contracts.IImageProvider, DatabaseImageProvider>();
             services.AddSingleton<Data.Contracts.IMediaSceneProvider, DatabaseMediaSceneProvider>();
             services.AddSingleton<Data.Contracts.IMediaThumbnailProvider, DatabaseMediaThumbnailProvider>();
+            services.AddSingleton<Data.Contracts.IMediaHighlightProvider, DatabaseMediaHighlightProvider>();
 
             // ViewModels
             services.AddTransient<LibraryViewModel>();

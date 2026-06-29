@@ -34,6 +34,8 @@ public partial class DatabaseContext : DbContext
 
     public virtual DbSet<MediaThumbnail> MediaThumbnails { get; set; }
 
+    public virtual DbSet<MediaHighlight> MediaHighlights { get; set; }
+
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -100,6 +102,25 @@ public partial class DatabaseContext : DbContext
             entity.Property(e => e.OriginalPath).HasColumnName("originalPath");
 
             entity.HasOne(d => d.Media).WithMany(p => p.MediaThumbnails)
+                .HasForeignKey(d => d.MediaId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<MediaHighlight>(entity =>
+        {
+            entity.HasKey(e => new { e.MediaId, e.Scene, e.Timestamp });
+
+            entity.Property(e => e.MediaId)
+                .UseCollation("NOCASE")
+                .HasColumnName("mediaId");
+            entity.Property(e => e.Scene)
+                .HasColumnType("INT")
+                .HasColumnName("scene");
+            entity.Property(e => e.Timestamp)
+                .HasColumnType("INT")
+                .HasColumnName("timestamp");
+
+            entity.HasOne(d => d.Media).WithMany(p => p.MediaHighlights)
                 .HasForeignKey(d => d.MediaId)
                 .OnDelete(DeleteBehavior.Cascade);
         });

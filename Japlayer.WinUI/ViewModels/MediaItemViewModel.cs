@@ -11,7 +11,7 @@ using Japlayer.Data.Models;
 
 namespace Japlayer.ViewModels
 {
-    public partial class MediaItemViewModel(LibraryItem libraryItem, IImageProvider imageProvider, IMediaSceneProvider sceneProvider, IMediaProvider mediaProvider, ISettingsService settingsService, IMediaThumbnailProvider thumbnailProvider) : ObservableObject
+    public partial class MediaItemViewModel(LibraryItem libraryItem, IImageProvider imageProvider, IMediaSceneProvider sceneProvider, IMediaProvider mediaProvider, ISettingsService settingsService, IMediaThumbnailProvider thumbnailProvider, IMediaHighlightProvider highlightProvider) : ObservableObject
     {
         private readonly LibraryItem _libraryItem = libraryItem;
         private readonly IImageProvider _imageProvider = imageProvider;
@@ -19,6 +19,7 @@ namespace Japlayer.ViewModels
         private readonly IMediaProvider _mediaProvider = mediaProvider;
         private readonly ISettingsService _settingsService = settingsService;
         private readonly IMediaThumbnailProvider _thumbnailProvider = thumbnailProvider;
+        private readonly IMediaHighlightProvider _highlightProvider = highlightProvider;
 
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(ContentId))]
@@ -100,14 +101,31 @@ namespace Japlayer.ViewModels
                     .ToDictionary(kvp => kvp.Key, kvp => kvp.Value!)
                 : [];
 
+            IEnumerable<Data.Entities.MediaHighlight> highlights = [];
+            try
+            {
+                highlights = await _highlightProvider.GetHighlightsAsync(Id);
+            }
+            catch (System.Exception exception)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to load highlights from database (table might not exist yet): {exception.Message}");
+            }
+            var highlightsGrouped = highlights.GroupBy(h => h.Scene).ToDictionary(g => g.Key, g => g.Select(h => h.Timestamp).ToList());
+            var thumbnailsGrouped = thumbnails.GroupBy(t => t.Scene).ToDictionary(g => g.Key, g => g.ToList());
+
             var viewModels = scenes.Select(s =>
             {
                 string? posterPath = null;
-                if (s.SceneNumber.HasValue && scenePosterDict.TryGetValue(s.SceneNumber.Value, out var path))
+                var sceneNumber = s.SceneNumber ?? 1;
+                if (s.SceneNumber.HasValue && scenePosterDict.TryGetValue(sceneNumber, out var path))
                 {
                     posterPath = path;
                 }
-                var vm = new MediaSceneViewModel(s, posterPath);
+
+                highlightsGrouped.TryGetValue(sceneNumber, out var sceneHighlights);
+                thumbnailsGrouped.TryGetValue(sceneNumber, out var sceneThumbnails);
+
+                var vm = new MediaSceneViewModel(s, posterPath, sceneHighlights ?? [], sceneThumbnails ?? [], _highlightProvider);
                 vm.InitializeDimensions();
                 return vm;
             });

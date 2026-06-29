@@ -10,9 +10,7 @@
     <Style TargetType="controls:CustomMediaTransportControls">
         <Setter Property="IsTabStop" Value="False" />
         <Setter Property="Background" Value="Transparent" />
-        <Setter Property="FlowDirection" Value="LeftToRight" />
         <Setter Property="Margin" Value="{ThemeResource MediaTransportControlsMargin}" />
-        <Setter Property="MaxWidth" Value="{ThemeResource MediaTransportControlsMaxWidth}" />
         <Setter Property="MinWidth" Value="{ThemeResource MediaTransportControlsMinWidth}" />
         <Setter Property="UseSystemFocusVisuals" Value="True" />
         <Setter Property="IsTextScaleFactorEnabled" Value="False" />
@@ -88,6 +86,13 @@
                                             <EasingDoubleKeyFrame KeyTime="0" Value="0" />
                                             <EasingDoubleKeyFrame KeyTime="0:0:0.3" Value="1" />
                                         </DoubleAnimationUsingKeyFrames>
+                                        <DoubleAnimationUsingKeyFrames Storyboard.TargetProperty="Opacity" Storyboard.TargetName="HighlightsCanvas">
+                                            <EasingDoubleKeyFrame KeyTime="0" Value="0" />
+                                            <EasingDoubleKeyFrame KeyTime="0:0:0.3" Value="1" />
+                                        </DoubleAnimationUsingKeyFrames>
+                                        <ObjectAnimationUsingKeyFrames Storyboard.TargetProperty="IsHitTestVisible" Storyboard.TargetName="HighlightsCanvas">
+                                            <DiscreteObjectKeyFrame KeyTime="0" Value="True" />
+                                        </ObjectAnimationUsingKeyFrames>
                                         <DoubleAnimation Storyboard.TargetProperty="Y" Storyboard.TargetName="TranslateVertical" From="50" To="0.5" Duration="0:0:0.3" />
                                     </Storyboard>
                                 </VisualState>
@@ -97,7 +102,14 @@
                                             <EasingDoubleKeyFrame KeyTime="0" Value="1" />
                                             <EasingDoubleKeyFrame KeyTime="0:0:0.7" Value="0" />
                                         </DoubleAnimationUsingKeyFrames>
+                                        <DoubleAnimationUsingKeyFrames Storyboard.TargetProperty="Opacity" Storyboard.TargetName="HighlightsCanvas">
+                                            <EasingDoubleKeyFrame KeyTime="0" Value="1" />
+                                            <EasingDoubleKeyFrame KeyTime="0:0:0.7" Value="0" />
+                                        </DoubleAnimationUsingKeyFrames>
                                         <ObjectAnimationUsingKeyFrames Storyboard.TargetProperty="IsHitTestVisible" Storyboard.TargetName="ControlPanel_ControlPanelVisibilityStates_Border">
+                                            <DiscreteObjectKeyFrame KeyTime="0" Value="False" />
+                                        </ObjectAnimationUsingKeyFrames>
+                                        <ObjectAnimationUsingKeyFrames Storyboard.TargetProperty="IsHitTestVisible" Storyboard.TargetName="HighlightsCanvas">
                                             <DiscreteObjectKeyFrame KeyTime="0" Value="False" />
                                         </ObjectAnimationUsingKeyFrames>
                                         <DoubleAnimation Storyboard.TargetProperty="Y" Storyboard.TargetName="TranslateVertical" From="0.5" To="50" Duration="0:0:0.7" />
@@ -221,8 +233,8 @@
                             </VisualStateGroup>
                         </VisualStateManager.VisualStateGroups>
 
-                        <Border x:Name="ControlPanel_ControlPanelVisibilityStates_Border">
-                            <Grid x:Name="ControlPanelGrid" Background="{ThemeResource MediaTransportControlsPanelBackground}" VerticalAlignment="Bottom" RenderTransformOrigin="0.5,0.5" BorderBrush="{ThemeResource MediaTransportControlsBorderBrush}" BorderThickness="{ThemeResource MediaTransportControlsBorderThickness}" CornerRadius="{TemplateBinding CornerRadius}">
+                        <Border x:Name="ControlPanel_ControlPanelVisibilityStates_Border" MaxWidth="{ThemeResource MediaTransportControlsMaxWidth}" HorizontalAlignment="Stretch">
+                            <Grid x:Name="ControlPanelGrid" Background="Transparent" VerticalAlignment="Bottom" RenderTransformOrigin="0.5,0.5">
                                 <Grid.RenderTransform>
                                     <TranslateTransform x:Name="TranslateVertical" />
                                 </Grid.RenderTransform>
@@ -238,6 +250,12 @@
                                     <RowDefinition Height="*" />
                                     <RowDefinition Height="Auto" />
                                 </Grid.RowDefinitions>
+
+                                <Border Grid.Row="1" Grid.RowSpan="2" Grid.ColumnSpan="3"
+                                        Background="{ThemeResource MediaTransportControlsPanelBackground}"
+                                        BorderBrush="{ThemeResource MediaTransportControlsBorderBrush}"
+                                        BorderThickness="{ThemeResource MediaTransportControlsBorderThickness}"
+                                        CornerRadius="{TemplateBinding CornerRadius}" />
                                 <Border x:Name="ErrorBorder" Width="320" Height="96" Grid.ColumnSpan="3" HorizontalAlignment="Center" Background="{ThemeResource MediaTransportControlsPanelBackground}" Visibility="Collapsed">
                                     <TextBlock x:Name="ErrorTextBlock" Style="{StaticResource CaptionTextBlockStyle}" TextWrapping="WrapWholeWords" Margin="12" />
                                 </Border>
@@ -246,16 +264,16 @@
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition />
                                         </Grid.ColumnDefinitions>
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition />
-                                            <RowDefinition Height="Auto" />
-                                        </Grid.RowDefinitions>
-                                        <Slider x:Name="ProgressSlider" AutomationProperties.AutomationId="ProgressSlider" Margin="7,2,7,1" MinWidth="80" Height="{ThemeResource MediaTransportControlsSliderHeight}" VerticalAlignment="Center" IsThumbToolTipEnabled="False" />
-                                        <ProgressBar x:Name="BufferingProgressBar" Height="4" IsIndeterminate="True" ShowPaused="True" IsHitTestVisible="False" VerticalAlignment="Top" Margin="0,2,0,0" Visibility="Collapsed" />
-                                        <Grid x:Name="TimeTextGrid" Margin="7,0,7,2" Grid.Row="1" Height="16">
-                                            <TextBlock x:Name="TimeElapsedElement" Style="{StaticResource CaptionTextBlockStyle}" Margin="0" Text="00:00" HorizontalAlignment="Left" VerticalAlignment="Bottom" />
-                                            <TextBlock x:Name="TimeRemainingElement" Style="{StaticResource CaptionTextBlockStyle}" Text="00:00" HorizontalAlignment="Right" VerticalAlignment="Bottom" />
-                                        </Grid>
+                                         <Grid.RowDefinitions>
+                                             <RowDefinition />
+                                             <RowDefinition Height="Auto" />
+                                         </Grid.RowDefinitions>
+                                         <Slider x:Name="ProgressSlider" Grid.Row="0" AutomationProperties.AutomationId="ProgressSlider" Margin="7,2,7,1" MinWidth="80" Height="{ThemeResource MediaTransportControlsSliderHeight}" VerticalAlignment="Center" IsThumbToolTipEnabled="False" />
+                                         <ProgressBar x:Name="BufferingProgressBar" Grid.Row="0" Height="4" IsIndeterminate="True" ShowPaused="True" IsHitTestVisible="False" VerticalAlignment="Top" Margin="0,2,0,0" Visibility="Collapsed" />
+                                         <Grid x:Name="TimeTextGrid" Margin="7,0,7,2" Grid.Row="1" Height="16">
+                                             <TextBlock x:Name="TimeElapsedElement" Style="{StaticResource CaptionTextBlockStyle}" Margin="0" Text="00:00" HorizontalAlignment="Left" VerticalAlignment="Bottom" />
+                                             <TextBlock x:Name="TimeRemainingElement" Style="{StaticResource CaptionTextBlockStyle}" Text="00:00" HorizontalAlignment="Right" VerticalAlignment="Bottom" />
+                                         </Grid>
                                     </Grid>
                                 </Border>
                                 <Border x:Name="LeftSidePlayBorder" Grid.Column="0" Grid.Row="1" Visibility="Collapsed">
@@ -320,35 +338,47 @@
                                          </StackPanel>
 
                                          <!-- Middle: Custom Seek Buttons around PlayPauseButton -->
-                                         <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8">
-                                              <Button x:Name="FastSeekBackwardButton" AutomationProperties.AutomationId="FastSeekBackwardButton" Style="{StaticResource MediaControlButtonStyle}" Width="60" Height="50">
-                                                  <StackPanel HorizontalAlignment="Center">
-                                                      <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xEB9E;" FontSize="18"/>
-                                                      <TextBlock Text="60s" FontSize="10" HorizontalAlignment="Center" Margin="0,2,0,0" Opacity="0.7"/>
-                                                  </StackPanel>
-                                              </Button>
-                                              <Button x:Name="SlowSeekBackwardButton" AutomationProperties.AutomationId="SlowSeekBackwardButton" Style="{StaticResource MediaControlButtonStyle}" Width="60" Height="50">
-                                                  <StackPanel HorizontalAlignment="Center">
-                                                      <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE72B;" FontSize="18"/>
-                                                      <TextBlock Text="10s" FontSize="10" HorizontalAlignment="Center" Margin="0,2,0,0" Opacity="0.7"/>
-                                                  </StackPanel>
-                                              </Button>
-                                              <Button x:Name="PlayPauseButton" AutomationProperties.AutomationId="PlayPauseButton" Style="{StaticResource MediaControlButtonStyle}">
-                                                  <FontIcon x:Name="PlayPauseSymbol" Glyph="&#xF5B0;" />
-                                              </Button>
-                                              <Button x:Name="SlowSeekForwardButton" AutomationProperties.AutomationId="SlowSeekForwardButton" Style="{StaticResource MediaControlButtonStyle}" Width="60" Height="50">
-                                                  <StackPanel HorizontalAlignment="Center">
-                                                      <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE72A;" FontSize="18"/>
-                                                      <TextBlock Text="10s" FontSize="10" HorizontalAlignment="Center" Margin="0,2,0,0" Opacity="0.7"/>
-                                                  </StackPanel>
-                                              </Button>
-                                              <Button x:Name="FastSeekForwardButton" AutomationProperties.AutomationId="FastSeekForwardButton" Style="{StaticResource MediaControlButtonStyle}" Width="60" Height="50">
-                                                  <StackPanel HorizontalAlignment="Center">
-                                                      <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xEB9D;" FontSize="18"/>
-                                                      <TextBlock Text="60s" FontSize="10" HorizontalAlignment="Center" Margin="0,2,0,0" Opacity="0.7"/>
-                                                  </StackPanel>
-                                              </Button>
-                                         </StackPanel>
+                                          <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8">
+                                               <Button x:Name="SaveHighlightButton" AutomationProperties.AutomationId="SaveHighlightButton" Style="{StaticResource MediaControlButtonStyle}" Width="60" Height="50">
+                                                   <StackPanel HorizontalAlignment="Center">
+                                                       <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE718;" FontSize="18"/>
+                                                       <TextBlock Text="Save Hlt" FontSize="10" HorizontalAlignment="Center" Margin="0,2,0,0" Opacity="0.7"/>
+                                                   </StackPanel>
+                                               </Button>
+                                               <Button x:Name="FastSeekBackwardButton" AutomationProperties.AutomationId="FastSeekBackwardButton" Style="{StaticResource MediaControlButtonStyle}" Width="60" Height="50">
+                                                   <StackPanel HorizontalAlignment="Center">
+                                                       <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xEB9E;" FontSize="18"/>
+                                                       <TextBlock Text="60s" FontSize="10" HorizontalAlignment="Center" Margin="0,2,0,0" Opacity="0.7"/>
+                                                   </StackPanel>
+                                               </Button>
+                                               <Button x:Name="SlowSeekBackwardButton" AutomationProperties.AutomationId="SlowSeekBackwardButton" Style="{StaticResource MediaControlButtonStyle}" Width="60" Height="50">
+                                                   <StackPanel HorizontalAlignment="Center">
+                                                       <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE72B;" FontSize="18"/>
+                                                       <TextBlock Text="10s" FontSize="10" HorizontalAlignment="Center" Margin="0,2,0,0" Opacity="0.7"/>
+                                                   </StackPanel>
+                                               </Button>
+                                               <Button x:Name="PlayPauseButton" AutomationProperties.AutomationId="PlayPauseButton" Style="{StaticResource MediaControlButtonStyle}">
+                                                   <FontIcon x:Name="PlayPauseSymbol" Glyph="&#xF5B0;" />
+                                               </Button>
+                                               <Button x:Name="SlowSeekForwardButton" AutomationProperties.AutomationId="SlowSeekForwardButton" Style="{StaticResource MediaControlButtonStyle}" Width="60" Height="50">
+                                                   <StackPanel HorizontalAlignment="Center">
+                                                       <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE72A;" FontSize="18"/>
+                                                       <TextBlock Text="10s" FontSize="10" HorizontalAlignment="Center" Margin="0,2,0,0" Opacity="0.7"/>
+                                                   </StackPanel>
+                                               </Button>
+                                               <Button x:Name="FastSeekForwardButton" AutomationProperties.AutomationId="FastSeekForwardButton" Style="{StaticResource MediaControlButtonStyle}" Width="60" Height="50">
+                                                   <StackPanel HorizontalAlignment="Center">
+                                                       <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xEB9D;" FontSize="18"/>
+                                                       <TextBlock Text="60s" FontSize="10" HorizontalAlignment="Center" Margin="0,2,0,0" Opacity="0.7"/>
+                                                   </StackPanel>
+                                               </Button>
+                                               <Button x:Name="SkipToNextHighlightButton" AutomationProperties.AutomationId="SkipToNextHighlightButton" Style="{StaticResource MediaControlButtonStyle}" Width="60" Height="50" Visibility="Collapsed">
+                                                   <StackPanel HorizontalAlignment="Center">
+                                                       <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE893;" FontSize="18"/>
+                                                       <TextBlock Text="Next Hlt" FontSize="10" HorizontalAlignment="Center" Margin="0,2,0,0" Opacity="0.7"/>
+                                                   </StackPanel>
+                                               </Button>
+                                          </StackPanel>
 
                                          <!-- Right side: Fullscreen Toggle only -->
                                          <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
@@ -373,6 +403,7 @@
                                  </Border>
                             </Grid>
                         </Border>
+                        <Canvas x:Name="HighlightsCanvas" IsHitTestVisible="True" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" />
 
                         <Border x:Name="FocusVisualWhite" IsHitTestVisible="False" Opacity="0" BorderBrush="{ThemeResource SystemControlFocusVisualWhiteBrush}" BorderThickness="2" />
                         <Border x:Name="FocusVisualBlack" IsHitTestVisible="False" Opacity="0" BorderBrush="{ThemeResource SystemControlFocusVisualBlackBrush}" BorderThickness="1" />
