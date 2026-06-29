@@ -2,6 +2,7 @@
 using System;
 using System.Linq;
 using Japlayer.Contracts;
+using Japlayer.Helpers;
 using Microsoft.Extensions.Logging;
 using Microsoft.UI.Input;
 using Microsoft.UI.Xaml;
@@ -61,6 +62,15 @@ namespace Japlayer.Controls
         {
             get => (double)GetValue(ModifierSeekResolutionProperty);
             set => SetValue(ModifierSeekResolutionProperty, value);
+        }
+
+        public static readonly DependencyProperty IsFullWindowButtonVisibleProperty =
+            DependencyProperty.Register(nameof(IsFullWindowButtonVisible), typeof(bool), typeof(CustomMediaTransportControls), new PropertyMetadata(true));
+
+        public bool IsFullWindowButtonVisible
+        {
+            get => (bool)GetValue(IsFullWindowButtonVisibleProperty);
+            set => SetValue(IsFullWindowButtonVisibleProperty, value);
         }
 
         public CustomMediaTransportControls()
@@ -181,6 +191,10 @@ namespace Japlayer.Controls
         private void CustomMediaTransportControls_Loaded(object sender, RoutedEventArgs e)
         {
             _parentMpe = GetMediaPlayerElement();
+            if (_parentMpe != null)
+            {
+                _parentMpe.PreviewKeyDown += OnPlayerPreviewKeyDown;
+            }
             UpdateActivePlayer();
 
             var player = _parentMpe?.MediaPlayer;
@@ -192,6 +206,10 @@ namespace Japlayer.Controls
 
         private void CustomMediaTransportControls_Unloaded(object sender, RoutedEventArgs e)
         {
+            if (_parentMpe != null)
+            {
+                _parentMpe.PreviewKeyDown -= OnPlayerPreviewKeyDown;
+            }
             var player = _parentMpe?.MediaPlayer;
             if (player != null)
             {
@@ -249,21 +267,7 @@ namespace Japlayer.Controls
 
             if (e.Key == VirtualKey.Left || e.Key == VirtualKey.Right)
             {
-                var seekAmount = IsCtrlPressed() ? ModifierSeekResolution : NormalSeekResolution;
-
-                var player = mediaPlayerElement.MediaPlayer;
-                var position = player.Position;
-                var duration = player.PlaybackSession.NaturalDuration;
-
-                if (e.Key == VirtualKey.Left)
-                {
-                    player.Position = TimeSpan.FromSeconds(Math.Max(0, position.TotalSeconds - seekAmount));
-                }
-                else
-                {
-                    player.Position = TimeSpan.FromSeconds(Math.Min(duration.TotalSeconds, position.TotalSeconds + seekAmount));
-                }
-
+                MediaPlaybackHelper.HandleArrowSeek(mediaPlayerElement.MediaPlayer, e.Key, IsCtrlPressed(), NormalSeekResolution, ModifierSeekResolution);
                 e.Handled = true;
             }
         }
@@ -565,16 +569,11 @@ namespace Japlayer.Controls
             }
 
             var currentSeconds = mediaPlayerElement.MediaPlayer.Position.TotalSeconds;
-
-            // Find the first highlight strictly greater than the current playback position
-            var nextHighlight = sceneViewModel.Highlights
-                .Cast<int?>()
-                .FirstOrDefault(timestamp => timestamp > currentSeconds + 0.5);
-
-            // Loop back to the first highlight
-            nextHighlight ??= sceneViewModel.Highlights.First();
-
-            mediaPlayerElement.MediaPlayer.Position = TimeSpan.FromSeconds(nextHighlight.Value);
+            var nextHighlight = MediaPlaybackHelper.GetNextHighlightTime(currentSeconds, sceneViewModel.Highlights);
+            if (nextHighlight.HasValue)
+            {
+                mediaPlayerElement.MediaPlayer.Position = TimeSpan.FromSeconds(nextHighlight.Value);
+            }
         }
 
         private MediaPlayerElement? GetParentMediaPlayerElement()
@@ -611,6 +610,13 @@ namespace Japlayer.Controls
                 }
                 parent = VisualTreeHelper.GetParent(parent);
             }
+
+            var mainWindow = App.GetService<MainWindow>();
+            if (mainWindow?.NavigationFrame?.Content is Views.MediaItemPage mediaItemPage)
+            {
+                return mediaItemPage;
+            }
+
             return null;
         }
     }
