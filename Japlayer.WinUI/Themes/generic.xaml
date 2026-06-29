@@ -342,7 +342,7 @@
                                                <Button x:Name="SaveHighlightButton" AutomationProperties.AutomationId="SaveHighlightButton" Style="{StaticResource MediaControlButtonStyle}" Width="60" Height="50">
                                                    <StackPanel HorizontalAlignment="Center">
                                                        <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE718;" FontSize="18"/>
-                                                       <TextBlock Text="Save Hlt" FontSize="10" HorizontalAlignment="Center" Margin="0,2,0,0" Opacity="0.7"/>
+                                                       <TextBlock Text="Save" FontSize="10" HorizontalAlignment="Center" Margin="0,2,0,0" Opacity="0.7"/>
                                                    </StackPanel>
                                                </Button>
                                                <Button x:Name="FastSeekBackwardButton" AutomationProperties.AutomationId="FastSeekBackwardButton" Style="{StaticResource MediaControlButtonStyle}" Width="60" Height="50">
@@ -375,7 +375,7 @@
                                                <Button x:Name="SkipToNextHighlightButton" AutomationProperties.AutomationId="SkipToNextHighlightButton" Style="{StaticResource MediaControlButtonStyle}" Width="60" Height="50" Visibility="Collapsed">
                                                    <StackPanel HorizontalAlignment="Center">
                                                        <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE893;" FontSize="18"/>
-                                                       <TextBlock Text="Next Hlt" FontSize="10" HorizontalAlignment="Center" Margin="0,2,0,0" Opacity="0.7"/>
+                                                       <TextBlock Text="Next ★" FontSize="10" HorizontalAlignment="Center" Margin="0,2,0,0" Opacity="0.7"/>
                                                    </StackPanel>
                                                </Button>
                                           </StackPanel>
