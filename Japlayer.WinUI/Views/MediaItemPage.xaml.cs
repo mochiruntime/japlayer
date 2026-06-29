@@ -496,6 +496,7 @@ namespace Japlayer.Views
 
                 if (_originalPlayerParent != null)
                 {
+                    _fullScreenPlayer.ClearValue(FrameworkElement.DataContextProperty);
                     _originalPlayerParent.Children.Add(_fullScreenPlayer);
                     _originalPlayerParent.Height = _originalParentHeight;
                     _fullScreenPlayer.Focus(FocusState.Programmatic);
@@ -537,6 +538,7 @@ namespace Japlayer.Views
             else
             {
                 // Enter Fullscreen
+                var sceneDataContext = player.DataContext;
                 _originalPlayerParent = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetParent(player) as Grid;
 
                 // Save playing state
@@ -563,6 +565,7 @@ namespace Japlayer.Views
 
                 _fullScreenPlayer = player;
                 FullScreenOverlayGrid.Children.Add(_fullScreenPlayer);
+                _fullScreenPlayer.DataContext = sceneDataContext;
                 FullScreenOverlayGrid.Visibility = Visibility.Visible;
                 _fullScreenPlayer.Focus(FocusState.Programmatic);
 
