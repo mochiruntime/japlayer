@@ -220,8 +220,5 @@
                 </StackPanel>
             </Grid>
         </ScrollViewer>
-
-        <!-- Fullscreen Player Overlay Grid -->
-        <Grid x:Name="FullScreenOverlayGrid" Background="Black" Visibility="Collapsed" Canvas.ZIndex="999"/>
     </Grid>
 </Page>

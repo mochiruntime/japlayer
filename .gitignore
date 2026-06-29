@@ -44,3 +44,7 @@ japlayer.settings.json*
 
 # Log files
 *.log
+
+# Plans folder
+plans/
+

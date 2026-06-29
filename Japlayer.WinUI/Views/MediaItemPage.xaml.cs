@@ -463,19 +463,8 @@ namespace Japlayer.Views
                 return;
             }
 
-            var hWnd = WinRT.Interop.WindowNative.GetWindowHandle(mainWindow);
-            var windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(hWnd);
-            var appWindow = Microsoft.UI.Windowing.AppWindow.GetFromWindowId(windowId);
-            if (appWindow == null)
-            {
-                return;
-            }
-
             if (_fullScreenPlayer != null)
             {
-                // Exit Fullscreen
-                appWindow.SetPresenter(Microsoft.UI.Windowing.AppWindowPresenterKind.Default);
-
                 // Save playing state
                 var wasPlaying = false;
                 try
@@ -490,16 +479,9 @@ namespace Japlayer.Views
                 // Temporarily unsubscribe Unloaded to prevent clearing Source
                 _fullScreenPlayer.Unloaded -= MediaPlayerElement_Unloaded;
 
-                // Restore visual tree
-                FullScreenOverlayGrid.Children.Remove(_fullScreenPlayer);
-                FullScreenOverlayGrid.Visibility = Visibility.Collapsed;
-
                 if (_originalPlayerParent != null)
                 {
-                    _fullScreenPlayer.ClearValue(FrameworkElement.DataContextProperty);
-                    _originalPlayerParent.Children.Add(_fullScreenPlayer);
-                    _originalPlayerParent.Height = _originalParentHeight;
-                    _fullScreenPlayer.Focus(FocusState.Programmatic);
+                    mainWindow.ExitFullScreen(_fullScreenPlayer, _originalPlayerParent, _originalParentHeight);
 
                     // Scroll back to the player on the next layout pass
                     var targetParent = _originalPlayerParent;
@@ -521,9 +503,6 @@ namespace Japlayer.Views
                     }
                     catch { }
                 }
-
-                // Restore MainWindow TitleBar and ContentFrame layout
-                mainWindow.SetTitleBarAndFrameFullscreen(false);
 
                 // Notify controls
                 var controls = _fullScreenPlayer.TransportControls as CustomMediaTransportControls;
@@ -564,10 +543,8 @@ namespace Japlayer.Views
                 }
 
                 _fullScreenPlayer = player;
-                FullScreenOverlayGrid.Children.Add(_fullScreenPlayer);
+                mainWindow.EnterFullScreen(_fullScreenPlayer, _originalPlayerParent!);
                 _fullScreenPlayer.DataContext = sceneDataContext;
-                FullScreenOverlayGrid.Visibility = Visibility.Visible;
-                _fullScreenPlayer.Focus(FocusState.Programmatic);
 
                 // Resubscribe Unloaded
                 _fullScreenPlayer.Unloaded += MediaPlayerElement_Unloaded;
@@ -581,11 +558,6 @@ namespace Japlayer.Views
                     }
                     catch { }
                 }
-
-                // Hide MainWindow TitleBar and expand ContentFrame layout
-                mainWindow.SetTitleBarAndFrameFullscreen(true);
-
-                appWindow.SetPresenter(Microsoft.UI.Windowing.AppWindowPresenterKind.FullScreen);
 
                 // Notify controls
                 var controls = _fullScreenPlayer.TransportControls as CustomMediaTransportControls;
@@ -638,20 +610,7 @@ namespace Japlayer.Views
                 }
                 catch { }
 
-                var seekAmount = isCtrlPressed ? modifierSeek : normalSeek;
-                var player = _activePlayer.MediaPlayer;
-                var position = player.Position;
-                var duration = player.PlaybackSession.NaturalDuration;
-
-                if (e.Key == Windows.System.VirtualKey.Left)
-                {
-                    player.Position = TimeSpan.FromSeconds(Math.Max(0, position.TotalSeconds - seekAmount));
-                }
-                else
-                {
-                    player.Position = TimeSpan.FromSeconds(Math.Min(duration.TotalSeconds, position.TotalSeconds + seekAmount));
-                }
-
+                Japlayer.Helpers.MediaPlaybackHelper.HandleArrowSeek(_activePlayer.MediaPlayer, e.Key, isCtrlPressed, normalSeek, modifierSeek);
                 e.Handled = true;
             }
         }
