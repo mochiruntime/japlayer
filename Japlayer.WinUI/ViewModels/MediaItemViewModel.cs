@@ -36,6 +36,8 @@ namespace Japlayer.ViewModels
         [ObservableProperty]
         public partial ObservableCollection<MediaSceneViewModel>? Scenes { get; set; }
 
+        public LibraryItemViewModel? LibraryItemViewModel { get; set; }
+
         [ObservableProperty]
         public partial ObservableCollection<string>? GalleryImages { get; set; }
 
@@ -113,11 +115,11 @@ namespace Japlayer.ViewModels
             var highlightsGrouped = highlights.GroupBy(h => h.Scene).ToDictionary(g => g.Key, g => g.Select(h => h.Timestamp).ToList());
             var thumbnailsGrouped = thumbnails.GroupBy(t => t.Scene).ToDictionary(g => g.Key, g => g.ToList());
 
-            var viewModels = scenes.Select(s =>
+            var viewModels = scenes.Select(scene =>
             {
                 string? posterPath = null;
-                var sceneNumber = s.SceneNumber ?? 1;
-                if (s.SceneNumber.HasValue && scenePosterDict.TryGetValue(sceneNumber, out var path))
+                var sceneNumber = scene.SceneNumber ?? 1;
+                if (scene.SceneNumber.HasValue && scenePosterDict.TryGetValue(sceneNumber, out var path))
                 {
                     posterPath = path;
                 }
@@ -125,16 +127,31 @@ namespace Japlayer.ViewModels
                 highlightsGrouped.TryGetValue(sceneNumber, out var sceneHighlights);
                 thumbnailsGrouped.TryGetValue(sceneNumber, out var sceneThumbnails);
 
-                var vm = new MediaSceneViewModel(s, posterPath, sceneHighlights ?? [], sceneThumbnails ?? [], _highlightProvider);
-                vm.InitializeDimensions();
-                return vm;
-            });
+                var sceneViewModel = new MediaSceneViewModel(scene, posterPath, sceneHighlights ?? [], sceneThumbnails ?? [], _highlightProvider);
+                sceneViewModel.InitializeDimensions();
+                return sceneViewModel;
+            }).ToList();
             Scenes = new ObservableCollection<MediaSceneViewModel>(viewModels);
+
+            foreach (var sceneViewModel in viewModels)
+            {
+                sceneViewModel.Highlights.CollectionChanged += (sender, eventArgs) => UpdateHighlightCount();
+            }
+
+            UpdateHighlightCount();
 
             var gallery = await _imageProvider.GetGalleryPathsAsync(Id);
             // Combine with ImagePath
             var fullPaths = gallery.Select(p => Path.Combine(_settingsService.ImagePath, p));
             GalleryImages = new ObservableCollection<string>(fullPaths);
+        }
+
+        private void UpdateHighlightCount()
+        {
+            if (LibraryItemViewModel != null && Scenes != null)
+            {
+                LibraryItemViewModel.HighlightCount = Scenes.Sum(scene => scene.Highlights.Count);
+            }
         }
     }
 }
