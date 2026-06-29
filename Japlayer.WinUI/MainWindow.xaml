@@ -21,5 +21,8 @@
         </Grid>
 
         <Frame x:Name="ContentFrame" Grid.Row="1"/>
+
+        <!-- Fullscreen Player Overlay Grid -->
+        <Grid x:Name="FullScreenOverlayGrid" Grid.RowSpan="2" Background="Black" Visibility="Collapsed" Canvas.ZIndex="999"/>
     </Grid>
 </Window>

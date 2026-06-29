@@ -382,7 +382,7 @@
 
                                          <!-- Right side: Fullscreen Toggle only -->
                                          <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                                             <Button x:Name="FullWindowButton" AutomationProperties.AutomationId="FullWindowButton" Style="{StaticResource MediaControlButtonStyle}">
+                                             <Button x:Name="FullWindowButton" AutomationProperties.AutomationId="FullWindowButton" Style="{StaticResource MediaControlButtonStyle}" Visibility="{TemplateBinding IsFullWindowButtonVisible}">
                                                  <SymbolIcon x:Name="FullWindowSymbol" Symbol="FullScreen" />
                                              </Button>
                                          </StackPanel>

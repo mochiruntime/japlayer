@@ -22,6 +22,9 @@ namespace Japlayer
             ContentFrame.Navigate(typeof(Views.LibraryPage));
         }
 
+        public Grid FullScreenOverlay => FullScreenOverlayGrid;
+        public Frame NavigationFrame => ContentFrame;
+
         public void SetTitleBarAndFrameFullscreen(bool isFullscreen)
         {
             if (isFullscreen)
@@ -36,6 +39,38 @@ namespace Japlayer
                 Grid.SetRow(ContentFrame, 1);
                 Grid.SetRowSpan(ContentFrame, 1);
             }
+        }
+
+        public void EnterFullScreen(FrameworkElement content, Panel originalParent)
+        {
+            FullScreenOverlayGrid.Children.Add(content);
+            FullScreenOverlayGrid.Visibility = Visibility.Visible;
+            content.Focus(FocusState.Programmatic);
+
+            SetTitleBarAndFrameFullscreen(true);
+
+            var hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
+            Microsoft.UI.WindowId windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(hWnd);
+            var appWindow = Microsoft.UI.Windowing.AppWindow.GetFromWindowId(windowId);
+            appWindow.SetPresenter(Microsoft.UI.Windowing.AppWindowPresenterKind.FullScreen);
+        }
+
+        public void ExitFullScreen(FrameworkElement content, Panel originalParent, double originalHeight)
+        {
+            FullScreenOverlayGrid.Children.Remove(content);
+            FullScreenOverlayGrid.Visibility = Visibility.Collapsed;
+
+            content.ClearValue(FrameworkElement.DataContextProperty);
+            originalParent.Children.Add(content);
+            originalParent.Height = originalHeight;
+            content.Focus(FocusState.Programmatic);
+
+            SetTitleBarAndFrameFullscreen(false);
+
+            var hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
+            Microsoft.UI.WindowId windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(hWnd);
+            var appWindow = Microsoft.UI.Windowing.AppWindow.GetFromWindowId(windowId);
+            appWindow.SetPresenter(Microsoft.UI.Windowing.AppWindowPresenterKind.Default);
         }
     }
 }
