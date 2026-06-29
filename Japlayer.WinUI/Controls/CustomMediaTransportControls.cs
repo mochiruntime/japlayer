@@ -503,6 +503,24 @@ namespace Japlayer.Controls
                         };
                         thumbnailButton.Resources["ButtonBorderBrushPointerOver"] = (Brush)Application.Current.Resources["SystemControlHighlightAccentBrush"];
                         thumbnailButton.Resources["ButtonBorderBrushPressed"] = (Brush)Application.Current.Resources["SystemControlHighlightAccentBrush"];
+                        // Context menu for deleting highlights
+                        var deleteMenuItem = new MenuFlyoutItem
+                        {
+                            Text = "Delete",
+                            Icon = new SymbolIcon(Symbol.Delete)
+                        };
+                        var timestampToDelete = timestampSeconds;
+                        deleteMenuItem.Click += async (menuSender, menuArgs) =>
+                        {
+                            if (DataContext is ViewModels.MediaSceneViewModel sceneViewModel)
+                            {
+                                await sceneViewModel.RemoveHighlightAsync(timestampToDelete);
+                            }
+                        };
+                        var contextMenu = new MenuFlyout();
+                        contextMenu.Items.Add(deleteMenuItem);
+                        thumbnailButton.ContextFlyout = contextMenu;
+
                         ToolTipService.SetToolTip(thumbnailButton, TimeSpan.FromSeconds(timestampSeconds).ToString(@"mm\:ss"));
 
                         var timestamp = timestampSeconds;
