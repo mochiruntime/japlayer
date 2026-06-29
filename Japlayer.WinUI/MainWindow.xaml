@@ -6,7 +6,7 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d">
 
-    <Grid>
+    <Grid PreviewKeyDown="RootGrid_PreviewKeyDown">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/> <!-- TitleBar -->
             <RowDefinition Height="*"/>    <!-- Content -->

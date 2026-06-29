@@ -23,7 +23,6 @@ namespace Japlayer.Views
             this.InitializeComponent();
             GalleryScrollViewer.AddHandler(UIElement.PointerWheelChangedEvent, new Microsoft.UI.Xaml.Input.PointerEventHandler(GalleryScrollViewer_PointerWheelChanged), true);
             this.Unloaded += MediaItemPage_Unloaded;
-            this.PreviewKeyDown += MediaItemPage_PreviewKeyDown;
         }
 
         protected override async void OnNavigatedTo(NavigationEventArgs e)
@@ -448,7 +447,6 @@ namespace Japlayer.Views
 
         private void MediaItemPage_Unloaded(object sender, RoutedEventArgs e)
         {
-            this.PreviewKeyDown -= MediaItemPage_PreviewKeyDown;
             if (_fullScreenPlayer != null)
             {
                 ToggleFullScreen(_fullScreenPlayer);
@@ -579,39 +577,6 @@ namespace Japlayer.Views
             if (sender is MediaPlayerElement mediaPlayerElement)
             {
                 ActivePlayer = mediaPlayerElement;
-            }
-        }
-
-        private void MediaItemPage_PreviewKeyDown(object sender, Microsoft.UI.Xaml.Input.KeyRoutedEventArgs e)
-        {
-            if (_activePlayer?.MediaPlayer == null)
-            {
-                return;
-            }
-
-            if (e.Key == Windows.System.VirtualKey.Left || e.Key == Windows.System.VirtualKey.Right)
-            {
-                // Retrieve seek interval preferences from custom controls if available, otherwise use defaults
-                var normalSeek = 10.0;
-                var modifierSeek = 60.0;
-
-                var controls = _activePlayer.TransportControls as CustomMediaTransportControls;
-                if (controls != null)
-                {
-                    normalSeek = controls.NormalSeekResolution;
-                    modifierSeek = controls.ModifierSeekResolution;
-                }
-
-                // Check modifier key
-                var isCtrlPressed = false;
-                try
-                {
-                    isCtrlPressed = Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(Windows.System.VirtualKey.Control).HasFlag(Windows.UI.Core.CoreVirtualKeyStates.Down);
-                }
-                catch { }
-
-                Japlayer.Helpers.MediaPlaybackHelper.HandleArrowSeek(_activePlayer.MediaPlayer, e.Key, isCtrlPressed, normalSeek, modifierSeek);
-                e.Handled = true;
             }
         }
     }
