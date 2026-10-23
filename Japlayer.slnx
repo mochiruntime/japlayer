@@ -1,7 +1,13 @@
 <Solution>
   <Folder Name="/Japlayer.WinUI/">
-    <Project Path="Japlayer.WinUI/Japlayer.csproj" />
+    <Project Path="Japlayer.WinUI\Japlayer.csproj">
+      <Platform Solution="*|*" Project="x64" />
+    </Project>
   </Folder>
-  <Project Path="Japlayer.Data/Japlayer.Data.csproj" />
-  <Project Path="Japlayer.CLI/Japlayer.CLI.csproj" />
+  <Folder Name="/tests/">
+    <Project Path="tests\Japlayer.UnitTests\Japlayer.UnitTests.csproj" />
+    <Project Path="tests\Japlayer.UITests\Japlayer.UITests.csproj" />
+  </Folder>
+  <Project Path="Japlayer.Data\Japlayer.Data.csproj" />
+  <Project Path="Japlayer.CLI\Japlayer.CLI.csproj" />
 </Solution>
