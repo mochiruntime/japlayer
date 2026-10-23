@@ -403,7 +403,7 @@
                                  </Border>
                             </Grid>
                         </Border>
-                        <Canvas x:Name="HighlightsCanvas" IsHitTestVisible="True" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" />
+                        <Canvas x:Name="HighlightsCanvas" AutomationProperties.AutomationId="HighlightsCanvas" IsHitTestVisible="True" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" />
 
                         <Border x:Name="FocusVisualWhite" IsHitTestVisible="False" Opacity="0" BorderBrush="{ThemeResource SystemControlFocusVisualWhiteBrush}" BorderThickness="2" />
                         <Border x:Name="FocusVisualBlack" IsHitTestVisible="False" Opacity="0" BorderBrush="{ThemeResource SystemControlFocusVisualBlackBrush}" BorderThickness="1" />

@@ -48,3 +48,10 @@ japlayer.settings.json*
 # Plans folder
 plans/
 
+# Backups and database files
+backups/
+*.db
+
+# Local NuGet config
+nuget.config
+

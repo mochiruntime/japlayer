@@ -16,7 +16,7 @@ namespace Japlayer.ViewModels
         Data.Contracts.IMediaHighlightProvider highlightProvider) : ObservableObject
     {
         private readonly MediaScene _scene = scene;
-        private readonly Microsoft.UI.Dispatching.DispatcherQueue _dispatcherQueue = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
+        private readonly Microsoft.UI.Dispatching.DispatcherQueue? _dispatcherQueue = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
 
         public System.Collections.ObjectModel.ObservableCollection<int> Highlights { get; } = new(highlights.OrderBy(h => h));
         public System.Collections.Generic.List<Data.Entities.MediaThumbnail> Thumbnails { get; } = [.. thumbnails];
@@ -110,11 +110,18 @@ namespace Japlayer.ViewModels
                         {
                             var ratio = (double)videoProperties.Height / videoProperties.Width;
 
-                            // Marshal back to the UI thread
-                            _dispatcherQueue.TryEnqueue(() =>
+                            // Marshal back to the UI thread if running on UI thread, otherwise set directly
+                            if (_dispatcherQueue != null)
+                            {
+                                _dispatcherQueue.TryEnqueue(() =>
+                                {
+                                    AspectRatio = ratio;
+                                });
+                            }
+                            else
                             {
                                 AspectRatio = ratio;
-                            });
+                            }
                         }
                     }
                 }

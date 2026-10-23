@@ -111,23 +111,38 @@ namespace Japlayer.ViewModels
             }
         }
 
+        public void ApplyFilterDirect() => ApplyFilter();
+
         private void QueueApplyFilter()
         {
-            if (_filterDebounceTimer == null)
+            if (Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread() == null)
             {
-                _filterDebounceTimer = new DispatcherTimer
-                {
-                    Interval = TimeSpan.FromMilliseconds(150)
-                };
-                _filterDebounceTimer.Tick += (sender, e) =>
-                {
-                    _filterDebounceTimer.Stop();
-                    ApplyFilter();
-                };
+                ApplyFilter();
+                return;
             }
 
-            _filterDebounceTimer.Stop();
-            _filterDebounceTimer.Start();
+            try
+            {
+                if (_filterDebounceTimer == null)
+                {
+                    _filterDebounceTimer = new DispatcherTimer
+                    {
+                        Interval = TimeSpan.FromMilliseconds(150)
+                    };
+                    _filterDebounceTimer.Tick += (sender, e) =>
+                    {
+                        _filterDebounceTimer.Stop();
+                        ApplyFilter();
+                    };
+                }
+
+                _filterDebounceTimer.Stop();
+                _filterDebounceTimer.Start();
+            }
+            catch
+            {
+                ApplyFilter();
+            }
         }
 
         private void ApplyFilter()

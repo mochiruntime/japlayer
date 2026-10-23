@@ -467,6 +467,7 @@ namespace Japlayer.Controls
                     Fill = (Brush)Application.Current.Resources["SystemControlHighlightAccentBrush"],
                     IsHitTestVisible = false
                 };
+                Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(tick, $"HighlightTick_{timestampSeconds}");
                 Canvas.SetLeft(tick, xPosition - 1.5);
                 Canvas.SetTop(tick, sliderCenterY - 6);
                 _highlightsCanvas.Children.Add(tick);
@@ -507,12 +508,15 @@ namespace Japlayer.Controls
                         };
                         thumbnailButton.Resources["ButtonBorderBrushPointerOver"] = (Brush)Application.Current.Resources["SystemControlHighlightAccentBrush"];
                         thumbnailButton.Resources["ButtonBorderBrushPressed"] = (Brush)Application.Current.Resources["SystemControlHighlightAccentBrush"];
+                        Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(thumbnailButton, $"HighlightButton_{timestampSeconds}");
+
                         // Context menu for deleting highlights
                         var deleteMenuItem = new MenuFlyoutItem
                         {
                             Text = "Delete",
                             Icon = new SymbolIcon(Symbol.Delete)
                         };
+                        Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(deleteMenuItem, "DeleteHighlightMenuItem");
                         var timestampToDelete = timestampSeconds;
                         deleteMenuItem.Click += async (menuSender, menuArgs) =>
                         {

@@ -1,0 +1,8 @@
+<Project>
+  <PropertyGroup>
+    <!-- Prevent named pipe connection failures inside sandboxed builds -->
+    <UseSharedCompilation>false</UseSharedCompilation>
+    <BuildInParallel>false</BuildInParallel>
+    <RestoreBuildInParallel>false</RestoreBuildInParallel>
+  </PropertyGroup>
+</Project>

@@ -12,6 +12,7 @@ namespace Japlayer.Services
     public partial class SettingsService : ObservableObject, ISettingsService
     {
         private const string ConfigFileName = "japlayer.settings.json";
+        private readonly string? _customConfigPath;
 
         [ObservableProperty]
         public partial string ImagePath { get; set; } = string.Empty;
@@ -19,10 +20,36 @@ namespace Japlayer.Services
         [ObservableProperty]
         public partial string SqliteDatabasePath { get; set; } = string.Empty;
 
-        public SettingsService()
+        public SettingsService(string? customConfigPath = null)
         {
+            _customConfigPath = customConfigPath ?? GetCustomConfigPathFromCommandLine();
             LoadSettings();
             InitializeDefaults();
+        }
+
+        private static string? GetCustomConfigPathFromCommandLine()
+        {
+            try
+            {
+                var arguments = Environment.GetCommandLineArgs();
+                for (var index = 0; index < arguments.Length; index++)
+                {
+                    var argument = arguments[index];
+                    if (argument.StartsWith("--settings=", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return argument["--settings=".Length..].Trim('\"');
+                    }
+                    if (argument.Equals("--settings", StringComparison.OrdinalIgnoreCase) && index + 1 < arguments.Length)
+                    {
+                        return arguments[index + 1].Trim('\"');
+                    }
+                }
+            }
+            catch
+            {
+                // Fall back to default config resolution
+            }
+            return null;
         }
 
         private string BaseAppDataPath => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Japlayer");
@@ -90,6 +117,12 @@ namespace Japlayer.Services
 
         private string? GetReadableConfigPath()
         {
+            // 0. Check custom config path override (e.g. for testing)
+            if (!string.IsNullOrEmpty(_customConfigPath) && File.Exists(_customConfigPath))
+            {
+                return _customConfigPath;
+            }
+
             // 1. Check for local dev config in parent directories
             var localDevConfig = FindLocalConfig(AppContext.BaseDirectory);
             if (localDevConfig != null)
@@ -116,6 +149,16 @@ namespace Japlayer.Services
 
         private string GetWritableConfigPath()
         {
+            if (!string.IsNullOrEmpty(_customConfigPath))
+            {
+                var directoryName = Path.GetDirectoryName(_customConfigPath);
+                if (!string.IsNullOrEmpty(directoryName))
+                {
+                    EnsureDirectoryExists(directoryName);
+                }
+                return _customConfigPath;
+            }
+
             EnsureDirectoryExists(BaseAppDataPath);
             return Path.Combine(BaseAppDataPath, ConfigFileName);
         }
