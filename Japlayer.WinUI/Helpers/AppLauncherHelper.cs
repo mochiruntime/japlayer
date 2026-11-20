@@ -1,6 +1,8 @@
 #nullable enable
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.IO;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -13,20 +15,35 @@ namespace Japlayer.Helpers
     public class AppHandlers(
         IReadOnlyList<Windows.ApplicationModel.AppInfo> uwpHandlers,
         IReadOnlyList<Win32FileHandler> win32Handlers,
-        StorageFile sampleFile)
+        StorageFile? sampleFile = null)
     {
         public IReadOnlyList<Windows.ApplicationModel.AppInfo> UwpHandlers { get; } = uwpHandlers;
         public IReadOnlyList<Win32FileHandler> Win32Handlers { get; } = win32Handlers;
-        public StorageFile SampleFile { get; } = sampleFile;
+        public StorageFile? SampleFile { get; } = sampleFile;
+
+        private static readonly ConcurrentDictionary<string, AppHandlers> _handlerCache = new(StringComparer.OrdinalIgnoreCase);
 
         public static async Task<AppHandlers?> LoadForFileAsync(string filePath)
         {
             try
             {
-                var file = await StorageFile.GetFileFromPathAsync(filePath);
-                var uwp = await Launcher.FindFileHandlersAsync(file.FileType);
-                var win32 = FileAssociationResolver.GetHandlers(file.FileType);
-                return new AppHandlers(uwp, win32, file);
+                var extension = Path.GetExtension(filePath);
+                if (string.IsNullOrEmpty(extension))
+                {
+                    return null;
+                }
+
+                var normalizedExtension = extension.ToLowerInvariant();
+                if (_handlerCache.TryGetValue(normalizedExtension, out var cachedHandlers))
+                {
+                    return cachedHandlers;
+                }
+
+                var uwpHandlers = await Launcher.FindFileHandlersAsync(normalizedExtension);
+                var win32Handlers = FileAssociationResolver.GetHandlers(normalizedExtension);
+                var handlers = new AppHandlers(uwpHandlers, win32Handlers);
+                _handlerCache[normalizedExtension] = handlers;
+                return handlers;
             }
             catch (Exception ex)
             {
