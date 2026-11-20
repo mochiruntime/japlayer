@@ -62,6 +62,23 @@
                 "/consoleloggerparameters:NoSummary"
             ],
             "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "install:local",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "publish",
+                "${workspaceFolder}\\Japlayer.WinUI\\Japlayer.csproj",
+                "-c",
+                "Release",
+                "-p:Platform=x64",
+                "-o",
+                "${env:LOCALAPPDATA}\\Programs\\Japlayer",
+                "/property:GenerateFullPaths=true",
+                "/consoleloggerparameters:NoSummary"
+            ],
+            "problemMatcher": "$msCompile"
         }
     ]
 }
