@@ -21,5 +21,9 @@ namespace Japlayer.Data.Models
         public List<string> Staff { get; init; } = [];
 
         public List<string> Genres { get; init; } = [];
+
+        public List<string> UserTags { get; init; } = [];
+
+        public int Rating { get; init; }
     }
 }

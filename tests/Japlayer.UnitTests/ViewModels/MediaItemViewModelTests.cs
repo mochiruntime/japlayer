@@ -47,6 +47,10 @@ namespace Japlayer.UnitTests.ViewModels
                     Studios = ["Studio A"]
                 });
             }
+
+            public Task AddUserTagAsync(string mediaId, string tagName) => Task.CompletedTask;
+            public Task RemoveUserTagAsync(string mediaId, string tagName) => Task.CompletedTask;
+            public Task SetRatingAsync(string mediaId, int rating) => Task.CompletedTask;
         }
 
         private class StubSettingsService : ISettingsService

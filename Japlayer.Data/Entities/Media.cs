@@ -25,4 +25,6 @@ public partial class Media
     public virtual ICollection<MediaThumbnail> MediaThumbnails { get; set; } = [];
 
     public virtual ICollection<MediaHighlight> MediaHighlights { get; set; } = [];
+
+    public virtual UserMediaData? UserMediaData { get; set; }
 }

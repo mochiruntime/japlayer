@@ -63,6 +63,8 @@ namespace Japlayer.Data.Services
                 .Include(m => m.People)
                 .Include(m => m.PeopleNavigation)
                 .Include(m => m.Genres)
+                .Include(m => m.UserTags)
+                .Include(m => m.UserMediaData)
                 .FirstOrDefaultAsync(m => m.MediaId == mediaId);
 
             if (media == null)
@@ -85,8 +87,93 @@ namespace Japlayer.Data.Services
                 Studios = [.. media.Studios.Select(s => s.Name)],
                 Cast = [.. media.People.Select(p => p.Name)],
                 Staff = [.. media.PeopleNavigation.Select(p => p.Name)],
-                Genres = [.. media.Genres.Select(g => g.Name)]
+                Genres = [.. media.Genres.Select(g => g.Name)],
+                UserTags = [.. media.UserTags.Select(userTag => userTag.Name).OrderBy(name => name)],
+                Rating = media.UserMediaData?.Rating ?? 0
             };
+        }
+
+        public async Task AddUserTagAsync(string mediaId, string tagName)
+        {
+            var trimmedTagName = tagName.Trim();
+            if (string.IsNullOrWhiteSpace(trimmedTagName))
+            {
+                return;
+            }
+
+            var media = await _context.Media
+                .Include(m => m.UserTags)
+                .FirstOrDefaultAsync(m => m.MediaId == mediaId);
+
+            if (media == null)
+            {
+                return;
+            }
+
+            if (media.UserTags.Any(userTag => string.Equals(userTag.Name, trimmedTagName, StringComparison.OrdinalIgnoreCase)))
+            {
+                return;
+            }
+
+            var existingTag = await _context.UserTags
+                .FirstOrDefaultAsync(userTag => userTag.Name.ToLower() == trimmedTagName.ToLower());
+
+            if (existingTag == null)
+            {
+                existingTag = new Entities.UserTag { Name = trimmedTagName };
+                _context.UserTags.Add(existingTag);
+            }
+
+            media.UserTags.Add(existingTag);
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task RemoveUserTagAsync(string mediaId, string tagName)
+        {
+            var media = await _context.Media
+                .Include(m => m.UserTags)
+                .FirstOrDefaultAsync(m => m.MediaId == mediaId);
+
+            if (media == null)
+            {
+                return;
+            }
+
+            var existingTag = media.UserTags
+                .FirstOrDefault(userTag => string.Equals(userTag.Name, tagName, StringComparison.OrdinalIgnoreCase));
+
+            if (existingTag != null)
+            {
+                media.UserTags.Remove(existingTag);
+                await _context.SaveChangesAsync();
+            }
+        }
+
+        public async Task SetRatingAsync(string mediaId, int rating)
+        {
+            var clampedRating = Math.Clamp(rating, 0, 5);
+            var existingUserData = await _context.UserMediaData
+                .FirstOrDefaultAsync(userData => userData.MediaId == mediaId);
+
+            if (existingUserData == null)
+            {
+                if (clampedRating == 0)
+                {
+                    return;
+                }
+
+                _context.UserMediaData.Add(new Entities.UserMediaData
+                {
+                    MediaId = mediaId,
+                    Rating = clampedRating
+                });
+            }
+            else
+            {
+                existingUserData.Rating = clampedRating == 0 ? null : clampedRating;
+            }
+
+            await _context.SaveChangesAsync();
         }
     }
 }

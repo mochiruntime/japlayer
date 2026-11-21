@@ -36,6 +36,8 @@ public partial class DatabaseContext : DbContext
 
     public virtual DbSet<MediaHighlight> MediaHighlights { get; set; }
 
+    public virtual DbSet<UserMediaData> UserMediaData { get; set; }
+
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -122,6 +124,28 @@ public partial class DatabaseContext : DbContext
 
             entity.HasOne(d => d.Media).WithMany(p => p.MediaHighlights)
                 .HasForeignKey(d => d.MediaId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<UserMediaData>(entity =>
+        {
+            entity.HasKey(e => e.MediaId);
+
+            entity.Property(e => e.MediaId)
+                .UseCollation("NOCASE")
+                .HasColumnName("mediaId");
+            entity.Property(e => e.Rating)
+                .HasColumnType("INT")
+                .HasColumnName("rating");
+            entity.Property(e => e.TotalPlayTimeSeconds)
+                .HasDefaultValue(0L)
+                .HasColumnType("INTEGER")
+                .HasColumnName("totalPlayTimeSeconds");
+            entity.Property(e => e.LastPlayedAt)
+                .HasColumnName("lastPlayedAt");
+
+            entity.HasOne(d => d.Media).WithOne(p => p.UserMediaData)
+                .HasForeignKey<UserMediaData>(d => d.MediaId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 

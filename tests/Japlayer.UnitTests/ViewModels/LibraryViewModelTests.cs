@@ -29,6 +29,12 @@ namespace Japlayer.UnitTests.ViewModels
 
             public Task<MediaItem> GetMediaItemAsync(string mediaId)
                 => Task.FromResult(new MediaItem { MediaId = mediaId });
+
+            public Task AddUserTagAsync(string mediaId, string tagName) => Task.CompletedTask;
+
+            public Task RemoveUserTagAsync(string mediaId, string tagName) => Task.CompletedTask;
+
+            public Task SetRatingAsync(string mediaId, int rating) => Task.CompletedTask;
         }
 
         private class StubMediaSceneProvider : IMediaSceneProvider
