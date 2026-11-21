@@ -1,5 +1,8 @@
+#nullable enable
 using System;
 using System.IO;
+using System.Runtime.ExceptionServices;
+using System.Threading.Tasks;
 using Japlayer.Contracts;
 using Japlayer.Data.Context;
 using Japlayer.Data.Services;
@@ -15,7 +18,10 @@ namespace Japlayer
 {
     public partial class App : Application
     {
-        private Window m_window;
+        private Window? _window;
+
+        private static string LogDirectory =>
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Japlayer", "Logs");
 
         public IServiceProvider Services { get; }
         public static new App Current => (App)Application.Current;
@@ -25,6 +31,13 @@ namespace Japlayer
             Services = ConfigureServices();
             this.InitializeComponent();
             this.UnhandledException += App_UnhandledException;
+            AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
+            TaskScheduler.UnobservedTaskException += TaskScheduler_UnobservedTaskException;
+
+#if DEBUG
+            this.DebugSettings.BindingFailed += DebugSettings_BindingFailed;
+            AppDomain.CurrentDomain.FirstChanceException += CurrentDomain_FirstChanceException;
+#endif
         }
 
         private static IServiceProvider ConfigureServices()
@@ -35,9 +48,9 @@ namespace Japlayer
             services.AddLogging(loggingBuilder =>
             {
                 loggingBuilder.AddDebug();
+                loggingBuilder.AddFilter("Microsoft.EntityFrameworkCore", LogLevel.Warning);
 
-                var logDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Japlayer", "Logs");
-                var logPath = Path.Combine(logDirectory, "app.log");
+                var logPath = Path.Combine(LogDirectory, "app.log");
                 loggingBuilder.AddFile(logPath);
             });
 
@@ -72,38 +85,77 @@ namespace Japlayer
         public static T GetService<T>() where T : class
             => Current.Services.GetRequiredService<T>();
 
+        private void App_UnhandledException(object sender, Microsoft.UI.Xaml.UnhandledExceptionEventArgs eventArgs) => WriteCrashLog("UI UnhandledException", eventArgs.Message, eventArgs.Exception);
 
-        private void App_UnhandledException(object sender, Microsoft.UI.Xaml.UnhandledExceptionEventArgs e)
+        private void CurrentDomain_UnhandledException(object sender, System.UnhandledExceptionEventArgs eventArgs)
         {
-            Console.WriteLine($"Critical Error: {e.Message}");
+            var exception = eventArgs.ExceptionObject as Exception;
+            WriteCrashLog("AppDomain UnhandledException", exception?.Message ?? eventArgs.ExceptionObject?.ToString() ?? "Unknown", exception);
+        }
+
+        private void TaskScheduler_UnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs eventArgs) => WriteCrashLog("UnobservedTaskException", eventArgs.Exception.Message, eventArgs.Exception);
+
+#if DEBUG
+        private void DebugSettings_BindingFailed(object sender, BindingFailedEventArgs eventArgs)
+        {
             try
             {
-                var crashLogPath = System.IO.Path.Combine(AppContext.BaseDirectory, "crash.log");
-                var errorMessage = $"[{DateTime.Now}] Unhandled Exception: {e.Message}\n" +
-                                   $"StackTrace: {e.Exception?.StackTrace}\n" +
-                                   $"InnerException: {e.Exception?.InnerException?.Message}\n" +
-                                   new string('-', 50) + "\n";
-                System.IO.File.AppendAllText(crashLogPath, errorMessage);
+                GetService<ILogger<App>>().LogWarning("XAML BindingFailed: {Message}", eventArgs.Message);
             }
             catch
             {
-                // Fallback to console if file logging fails
-                Console.WriteLine($"Could not write to crash log");
+            }
+        }
+
+        private void CurrentDomain_FirstChanceException(object? sender, FirstChanceExceptionEventArgs eventArgs)
+        {
+            if (eventArgs.Exception is OperationCanceledException or FileNotFoundException)
+            {
+                return;
+            }
+
+            WriteCrashLog("FirstChanceException", eventArgs.Exception.Message, eventArgs.Exception);
+        }
+#endif
+
+        private void WriteCrashLog(string source, string message, Exception? exception)
+        {
+            try
+            {
+                GetService<ILogger<App>>().LogCritical(exception, "{Source}: {Message}", source, message);
+            }
+            catch
+            {
+            }
+
+            try
+            {
+                Directory.CreateDirectory(LogDirectory);
+                var crashLogPath = Path.Combine(LogDirectory, "crash.log");
+                var errorMessage = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] [{source}] {message}\n" +
+                                   $"Exception: {exception?.GetType().FullName}\n" +
+                                   $"StackTrace: {exception?.StackTrace}\n" +
+                                   $"InnerException: {exception?.InnerException?.Message}\n" +
+                                   new string('-', 50) + "\n";
+                File.AppendAllText(crashLogPath, errorMessage);
+            }
+            catch
+            {
             }
         }
 
         protected override void OnLaunched(LaunchActivatedEventArgs args)
         {
             EnsureDatabaseCreated();
-            m_window = GetService<MainWindow>();
-            m_window.Activate();
+            _window = GetService<MainWindow>();
+            _window.Activate();
         }
 
         private void EnsureDatabaseCreated()
         {
             using var scope = Services.CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<DatabaseContext>();
-            context.Database.EnsureCreated();
+            context.Database.Migrate();
         }
     }
 }
