@@ -4,6 +4,7 @@ using System.Runtime.InteropServices;
 using System.Text.Json;
 using Japlayer.Data.Context;
 using Japlayer.Data.Entities;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Win32.SafeHandles;
 
@@ -14,11 +15,27 @@ public class GenerateThumbnailsApp : BaseApp
     public override string Name => "generate-thumbnails";
     public override string Description => "Scans database and physical drives to extract media thumbnail previews.";
 
+    private const int ThumbnailIntervalSeconds = 60;
+    private const int MaxDatabaseBusyRetries = 5;
+    private const int MaxFileMoveRetries = 3;
+
     private readonly SemaphoreSlim _globalSemaphore = new(Environment.ProcessorCount);
+    private readonly SemaphoreSlim _databaseWriteSemaphore = new(1, 1);
+    private readonly SqlitePragmaInterceptor _sqlitePragmaInterceptor = new();
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _driveSemaphores = new(StringComparer.OrdinalIgnoreCase);
 
     public override async Task RunAsync(string[] args)
     {
+        var forceRegenerate = args.Any(argument =>
+            string.Equals(argument, "--force", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(argument, "--regenerate", StringComparison.OrdinalIgnoreCase));
+
+        if (!TryParseIgnoreRules(args, out var ignoredMediaIds, out var ignoredScenes, out var ignoreParseError))
+        {
+            LogError(ignoreParseError);
+            return;
+        }
+
         var settingsPath = FindSettingsFile();
         if (string.IsNullOrEmpty(settingsPath))
         {
@@ -54,7 +71,8 @@ public class GenerateThumbnailsApp : BaseApp
 
         // Create context
         var optionsBuilder = new DbContextOptionsBuilder<DatabaseContext>();
-        optionsBuilder.UseSqlite($"Data Source={settings.SqliteDatabasePath}");
+        optionsBuilder.UseSqlite($"Data Source={settings.SqliteDatabasePath}")
+            .AddInterceptors(_sqlitePragmaInterceptor);
 
         using var context = new DatabaseContext(optionsBuilder.Options);
 
@@ -70,71 +88,81 @@ public class GenerateThumbnailsApp : BaseApp
             return;
         }
 
+        // Cleanup leftover temp files from any previously interrupted run
+        CleanupLeftoverTempFiles(settings.ImagePath);
+
         // Self-healing: Check if any committed thumbnails are missing their files on disk
-        try
+        if (!forceRegenerate)
         {
-            LogInfo("Verifying thumbnail files on disk consistency...");
-            var databaseThumbnails = await context.MediaThumbnails
-                .AsNoTracking()
-                .Select(thumbnail => new { thumbnail.MediaId, thumbnail.Scene, thumbnail.Path })
-                .ToListAsync();
-
-            var groupedThumbnails = databaseThumbnails
-                .GroupBy(thumbnail => new { thumbnail.MediaId, thumbnail.Scene })
-                .ToList();
-
-            var missingGroups = new List<(string MediaId, int Scene)>();
-            foreach (var group in groupedThumbnails)
+            try
             {
-                // Check if the first file in the group exists on disk
-                var firstThumbnail = group.First();
-                var absolutePath = Path.Combine(settings.ImagePath, firstThumbnail.Path);
-                if (!File.Exists(absolutePath))
+                LogInfo("Verifying thumbnail files on disk consistency...");
+                var databaseThumbnails = await context.MediaThumbnails
+                    .AsNoTracking()
+                    .Select(thumbnail => new { thumbnail.MediaId, thumbnail.Scene, thumbnail.Path })
+                    .ToListAsync();
+
+                var groupedThumbnails = databaseThumbnails
+                    .GroupBy(thumbnail => new { thumbnail.MediaId, thumbnail.Scene })
+                    .ToList();
+
+                var missingGroups = new List<(string MediaId, int Scene)>();
+                foreach (var group in groupedThumbnails)
                 {
-                    missingGroups.Add((group.Key.MediaId, group.Key.Scene));
-                }
-            }
-
-            if (missingGroups.Count > 0)
-            {
-                LogInfo($"Found {missingGroups.Count} processed scenes with missing files on disk. Cleaning up database records for reprocessing...");
-
-                // Delete the database records in batches to avoid SQLite parameter limits
-                const int BatchSize = 100;
-                for (var index = 0; index < missingGroups.Count; index += BatchSize)
-                {
-                    var batch = missingGroups.Skip(index).Take(BatchSize).ToList();
-
-                    using var deleteContext = new DatabaseContext(optionsBuilder.Options);
-                    using var transaction = await deleteContext.Database.BeginTransactionAsync();
-                    try
+                    // Check if the first file in the group exists on disk
+                    var firstThumbnail = group.First();
+                    var absolutePath = Path.Combine(settings.ImagePath, firstThumbnail.Path);
+                    if (!File.Exists(absolutePath))
                     {
-                        foreach (var (MediaId, Scene) in batch)
+                        missingGroups.Add((group.Key.MediaId, group.Key.Scene));
+                    }
+                }
+
+                if (missingGroups.Count > 0)
+                {
+                    LogInfo($"Found {missingGroups.Count} processed scenes with missing files on disk. Cleaning up database records for reprocessing...");
+
+                    // Delete the database records in batches to avoid SQLite parameter limits
+                    const int BatchSize = 100;
+                    for (var index = 0; index < missingGroups.Count; index += BatchSize)
+                    {
+                        var batch = missingGroups.Skip(index).Take(BatchSize).ToList();
+
+                        using var deleteContext = new DatabaseContext(optionsBuilder.Options);
+                        using var transaction = await deleteContext.Database.BeginTransactionAsync();
+                        try
                         {
-                            var recordsToDelete = await deleteContext.MediaThumbnails
-                                .Where(thumbnail => thumbnail.MediaId == MediaId && thumbnail.Scene == Scene)
-                                .ToListAsync();
-                            deleteContext.MediaThumbnails.RemoveRange(recordsToDelete);
+                            foreach (var (MediaId, Scene) in batch)
+                            {
+                                var recordsToDelete = await deleteContext.MediaThumbnails
+                                    .Where(thumbnail => thumbnail.MediaId == MediaId && thumbnail.Scene == Scene)
+                                    .ToListAsync();
+                                deleteContext.MediaThumbnails.RemoveRange(recordsToDelete);
+                            }
+                            await deleteContext.SaveChangesAsync();
+                            await transaction.CommitAsync();
                         }
-                        await deleteContext.SaveChangesAsync();
-                        await transaction.CommitAsync();
+                        catch (Exception exception)
+                        {
+                            await transaction.RollbackAsync();
+                            LogError($"Failed to delete orphan database records: {exception.Message}");
+                        }
                     }
-                    catch (Exception exception)
-                    {
-                        await transaction.RollbackAsync();
-                        LogError($"Failed to delete orphan database records: {exception.Message}");
-                    }
+                    LogInfo("Database consistency cleanup complete.");
                 }
-                LogInfo("Database consistency cleanup complete.");
+                else
+                {
+                    LogInfo("All database preview records have corresponding files on disk.");
+                }
             }
-            else
+            catch (Exception exception)
             {
-                LogInfo("All database preview records have corresponding files on disk.");
+                LogError($"Failed to perform consistency check: {exception.Message}");
             }
         }
-        catch (Exception exception)
+        else
         {
-            LogError($"Failed to perform consistency check: {exception.Message}");
+            LogInfo("Force regeneration enabled (--force): all scenes will be reprocessed.");
         }
 
         // Scan missing items
@@ -150,7 +178,9 @@ public class GenerateThumbnailsApp : BaseApp
                 .ToListAsync();
 
             var processedScenes = existingThumbnails.Select(thumbnail => (thumbnail.MediaId, thumbnail.Scene)).ToHashSet();
-            var rawTargetLocations = mediaLocations.Where(location => !processedScenes.Contains((location.MediaId, location.Scene))).ToList();
+            var rawTargetLocations = forceRegenerate
+                ? mediaLocations
+                : [.. mediaLocations.Where(location => !processedScenes.Contains((location.MediaId, location.Scene)))];
 
             // Group by MediaId and Scene to pick a single representative file location per scene
             targetLocations = [.. rawTargetLocations
@@ -176,6 +206,19 @@ public class GenerateThumbnailsApp : BaseApp
                 })];
 
             LogInfo($"Found {mediaLocations.Count} total media locations. {processedScenes.Count} already have previews. {targetLocations.Count} scenes need processing.");
+
+            if (ignoredMediaIds.Count > 0 || ignoredScenes.Count > 0)
+            {
+                var beforeIgnoreCount = targetLocations.Count;
+                targetLocations =
+                [
+                    .. targetLocations.Where(location =>
+                        !ignoredMediaIds.Contains(location.MediaId) &&
+                        !ignoredScenes.Contains((location.MediaId, location.Scene)))
+                ];
+                var ignoredCount = beforeIgnoreCount - targetLocations.Count;
+                LogInfo($"Ignored {ignoredCount} scenes via --ignore / --ignore-file. {targetLocations.Count} scenes remaining.");
+            }
         }
         catch (Exception exception)
         {
@@ -274,67 +317,78 @@ public class GenerateThumbnailsApp : BaseApp
                                 location.MediaId.Contains("VR", StringComparison.OrdinalIgnoreCase);
 
                     // Select crop filter depending on VR properties
-                    string vfFilter;
+                    string videoFilter;
                     if (isVr)
                     {
                         if (videoInfo.Width > videoInfo.Height)
                         {
                             // Side-by-Side (left-right): crop left eye first, then scale to 720p height
-                            vfFilter = "crop=iw/2:ih:0:0,scale=-2:720";
+                            videoFilter = "crop=iw/2:ih:0:0,scale=-2:720:flags=fast_bilinear";
                             LogInfo($"{logPrefix} VR detected: Side-by-Side. Applying left-eye crop + 720p scale.");
                         }
                         else
                         {
                             // Over-Under (top-bottom): crop top eye first, then scale to 720p height
-                            vfFilter = "crop=iw:ih/2:0:0,scale=-2:720";
+                            videoFilter = "crop=iw:ih/2:0:0,scale=-2:720:flags=fast_bilinear";
                             LogInfo($"{logPrefix} VR detected: Over-Under. Applying top-eye crop + 720p scale.");
                         }
                     }
                     else
                     {
                         // Standard Video: zoom-to-fill 1280x720 (720p) landscape
-                        vfFilter = "scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720";
+                        videoFilter = "scale=1280:720:force_original_aspect_ratio=increase:flags=fast_bilinear,crop=1280:720";
                     }
-
-                    // Determine intervals (every 2 minutes / 120 seconds)
-                    var timestamps = new List<int>();
-                    for (var timestampValue = 0; timestampValue < videoInfo.Duration; timestampValue += 120)
-                    {
-                        timestamps.Add(timestampValue);
-                    }
-
-                    if (timestamps.Count == 0)
-                    {
-                        timestamps.Add(0); // at least extract one frame
-                    }
-
-                    LogInfo($"{logPrefix} Extracting {timestamps.Count} thumbnails...");
 
                     // Create thumbs directory
-                    var thumbsSubdir = Path.Combine(settings.ImagePath, "thumbs", location.MediaId, $"scene_{location.Scene}");
-                    Directory.CreateDirectory(thumbsSubdir);
+                    var thumbsSubdirectory = Path.Combine(settings.ImagePath, "thumbs", location.MediaId, $"scene_{location.Scene}");
+                    Directory.CreateDirectory(thumbsSubdirectory);
 
-                    var thumbsToInsert = new List<MediaThumbnail>();
-                    var filesCreated = new List<string>();
+                    var tempPrefix = $"thumb_tmp_{Guid.NewGuid():N}_";
+                    var tempOutputPattern = Path.Combine(thumbsSubdirectory, $"{tempPrefix}%d.jpg");
 
-                    var allFramesExtracted = true;
+                    LogInfo($"{logPrefix} Extracting thumbnails in single pass (every {ThumbnailIntervalSeconds}s)...");
+                    var extractedSuccess = await ExtractThumbnailsSinglePassAsync(location.Path, videoFilter, tempOutputPattern);
 
-                    foreach (var timestampValue in timestamps)
+                    var tempFiles = Directory.GetFiles(thumbsSubdirectory, $"{tempPrefix}*.jpg")
+                        .Select(filePath => new
+                        {
+                            FilePath = filePath,
+                            Index = int.TryParse(
+                                Path.GetFileNameWithoutExtension(filePath).AsSpan(tempPrefix.Length),
+                                out var parsedIndex)
+                                ? parsedIndex
+                                : -1
+                        })
+                        .Where(item => item.Index >= 0)
+                        .OrderBy(item => item.Index)
+                        .ToList();
+
+                    if (!extractedSuccess || tempFiles.Count == 0)
                     {
+                        foreach (var tempFile in tempFiles)
+                        {
+                            if (File.Exists(tempFile.FilePath))
+                            {
+                                File.Delete(tempFile.FilePath);
+                            }
+                        }
+                        LogError($"{logPrefix} Failed to extract thumbnails in single pass.");
+                        Interlocked.Increment(ref failCount);
+                        return;
+                    }
+
+                    var plannedMoves = new List<(string TempFilePath, string OutputPath)>(tempFiles.Count);
+                    var thumbnailsToInsert = new List<MediaThumbnail>(tempFiles.Count);
+
+                    foreach (var tempFile in tempFiles)
+                    {
+                        var timestampValue = tempFile.Index * ThumbnailIntervalSeconds;
                         var fileName = $"thumb_{timestampValue}.jpg";
-                        var outputPath = Path.Combine(thumbsSubdir, fileName);
+                        var outputPath = Path.Combine(thumbsSubdirectory, fileName);
                         var relativePath = Path.Combine("thumbs", location.MediaId, $"scene_{location.Scene}", fileName).Replace('\\', '/');
 
-                        var extracted = await ExtractFrameAsync(location.Path, timestampValue, vfFilter, outputPath);
-                        if (!extracted)
-                        {
-                            LogError($"{logPrefix} Failed to extract frame at timestamp {timestampValue}s.");
-                            allFramesExtracted = false;
-                            break;
-                        }
-
-                        filesCreated.Add(outputPath);
-                        thumbsToInsert.Add(new MediaThumbnail
+                        plannedMoves.Add((tempFile.FilePath, outputPath));
+                        thumbnailsToInsert.Add(new MediaThumbnail
                         {
                             MediaId = location.MediaId,
                             Scene = location.Scene,
@@ -345,49 +399,21 @@ public class GenerateThumbnailsApp : BaseApp
                         });
                     }
 
-                    if (!allFramesExtracted)
+                    var saved = await SaveSceneThumbnailsAsync(
+                        optionsBuilder.Options,
+                        location.MediaId,
+                        location.Scene,
+                        thumbsSubdirectory,
+                        plannedMoves,
+                        thumbnailsToInsert,
+                        forceRegenerate,
+                        logPrefix,
+                        cancellationToken);
+
+                    if (!saved)
                     {
-                        // Cleanup generated files
-                        foreach (var path in filesCreated)
-                        {
-                            if (File.Exists(path))
-                            {
-                                File.Delete(path);
-                            }
-                        }
                         Interlocked.Increment(ref failCount);
                         return;
-                    }
-
-                    // Save to Database inside atomic transaction
-                    using (var workerContext = new DatabaseContext(optionsBuilder.Options))
-                    {
-                        using var transaction = await workerContext.Database.BeginTransactionAsync(cancellationToken);
-                        try
-                        {
-                            foreach (var thumb in thumbsToInsert)
-                            {
-                                workerContext.MediaThumbnails.Add(thumb);
-                            }
-                            await workerContext.SaveChangesAsync(cancellationToken);
-                            await transaction.CommitAsync(cancellationToken);
-                            LogInfo($"{logPrefix} Successfully saved all metadata to database and committed transaction.");
-                        }
-                        catch (Exception ex)
-                        {
-                            await transaction.RollbackAsync(cancellationToken);
-                            // Cleanup generated files
-                            foreach (var path in filesCreated)
-                            {
-                                if (File.Exists(path))
-                                {
-                                    File.Delete(path);
-                                }
-                            }
-                            LogError($"{logPrefix} Failed to save metadata to database (rolled back): {ex.Message}");
-                            Interlocked.Increment(ref failCount);
-                            return;
-                        }
                     }
 
                     Interlocked.Increment(ref successCount);
@@ -478,12 +504,12 @@ public class GenerateThumbnailsApp : BaseApp
         }
     }
 
-    private static async Task<bool> ExtractFrameAsync(string videoPath, int seconds, string filter, string outputPath)
+    private static async Task<bool> ExtractThumbnailsSinglePassAsync(string videoPath, string filter, string outputPattern)
     {
         var startInfo = new ProcessStartInfo
         {
             FileName = "ffmpeg",
-            Arguments = $"-ss {seconds} -i \"{videoPath}\" -vframes 1 -q:v 4 -vf \"{filter}\" \"{outputPath}\" -y",
+            Arguments = $"-skip_frame nokey -an -sn -dn -threads 1 -i \"{videoPath}\" -vf \"fps=1/{ThumbnailIntervalSeconds},{filter}\" -q:v 4 -start_number 0 \"{outputPattern}\" -y",
             RedirectStandardOutput = false,
             RedirectStandardError = false,
             UseShellExecute = false,
@@ -495,6 +521,273 @@ public class GenerateThumbnailsApp : BaseApp
         await process.WaitForExitAsync();
 
         return process.ExitCode == 0;
+    }
+
+    private async Task<bool> SaveSceneThumbnailsAsync(
+        DbContextOptions<DatabaseContext> databaseOptions,
+        string mediaId,
+        int scene,
+        string thumbsSubdirectory,
+        List<(string TempFilePath, string OutputPath)> plannedMoves,
+        List<MediaThumbnail> thumbnailsToInsert,
+        bool forceRegenerate,
+        string logPrefix,
+        CancellationToken cancellationToken)
+    {
+        await _databaseWriteSemaphore.WaitAsync(cancellationToken);
+        try
+        {
+            for (var attempt = 1; attempt <= MaxDatabaseBusyRetries; attempt++)
+            {
+                var filesMoved = new List<string>(plannedMoves.Count);
+                using var workerContext = new DatabaseContext(databaseOptions);
+                using var transaction = await workerContext.Database.BeginTransactionAsync(cancellationToken);
+                try
+                {
+                    if (forceRegenerate)
+                    {
+                        var existingRecords = await workerContext.MediaThumbnails
+                            .Where(thumbnail => thumbnail.MediaId == mediaId && thumbnail.Scene == scene)
+                            .ToListAsync(cancellationToken);
+                        if (existingRecords.Count > 0)
+                        {
+                            workerContext.MediaThumbnails.RemoveRange(existingRecords);
+                            await workerContext.SaveChangesAsync(cancellationToken);
+                            workerContext.ChangeTracker.Clear();
+                        }
+                    }
+
+                    foreach (var thumbnail in thumbnailsToInsert)
+                    {
+                        workerContext.MediaThumbnails.Add(thumbnail);
+                    }
+
+                    await workerContext.SaveChangesAsync(cancellationToken);
+
+                    foreach (var (tempFilePath, outputPath) in plannedMoves)
+                    {
+                        await MoveFileWithRetryAsync(tempFilePath, outputPath, cancellationToken);
+                        filesMoved.Add(outputPath);
+                    }
+
+                    await transaction.CommitAsync(cancellationToken);
+
+                    if (forceRegenerate)
+                    {
+                        var createdSet = filesMoved.ToHashSet(StringComparer.OrdinalIgnoreCase);
+                        foreach (var existingFile in Directory.GetFiles(thumbsSubdirectory, "thumb_*.jpg"))
+                        {
+                            if (!createdSet.Contains(existingFile) && File.Exists(existingFile))
+                            {
+                                try
+                                {
+                                    File.Delete(existingFile);
+                                }
+                                catch (IOException ioException)
+                                {
+                                    LogInfo($"{logPrefix} Could not delete stale file '{existingFile}' (in use): {ioException.Message}");
+                                }
+                            }
+                        }
+                    }
+
+                    LogInfo($"{logPrefix} Successfully saved {thumbnailsToInsert.Count} thumbnails to database and committed transaction.");
+                    return true;
+                }
+                catch (SqliteException sqliteException) when ((sqliteException.SqliteErrorCode == 5 || sqliteException.SqliteErrorCode == 6) && attempt < MaxDatabaseBusyRetries)
+                {
+                    await transaction.RollbackAsync(cancellationToken);
+                    LogInfo($"{logPrefix} SQLite busy (attempt {attempt}/{MaxDatabaseBusyRetries}), retrying...");
+                    await Task.Delay(100 * attempt, cancellationToken);
+                }
+                catch (Exception exception)
+                {
+                    await transaction.RollbackAsync(cancellationToken);
+                    foreach (var (tempFilePath, _) in plannedMoves)
+                    {
+                        if (File.Exists(tempFilePath))
+                        {
+                            File.Delete(tempFilePath);
+                        }
+                    }
+
+                    if (!forceRegenerate)
+                    {
+                        foreach (var movedPath in filesMoved)
+                        {
+                            if (File.Exists(movedPath))
+                            {
+                                File.Delete(movedPath);
+                            }
+                        }
+                    }
+
+                    LogError($"{logPrefix} Failed to save metadata to database (rolled back): {exception.Message}");
+                    return false;
+                }
+            }
+
+            LogError($"{logPrefix} Failed to save metadata to database after {MaxDatabaseBusyRetries} busy retries.");
+            return false;
+        }
+        finally
+        {
+            _databaseWriteSemaphore.Release();
+        }
+    }
+
+    private static async Task MoveFileWithRetryAsync(string sourcePath, string destinationPath, CancellationToken cancellationToken)
+    {
+        for (var attempt = 1; attempt <= MaxFileMoveRetries; attempt++)
+        {
+            try
+            {
+                File.Move(sourcePath, destinationPath, overwrite: true);
+                return;
+            }
+            catch (IOException) when (attempt < MaxFileMoveRetries)
+            {
+                await Task.Delay(100 * attempt, cancellationToken);
+            }
+        }
+    }
+
+    private void CleanupLeftoverTempFiles(string imagePath)
+    {
+        var thumbsRoot = Path.Combine(imagePath, "thumbs");
+        if (!Directory.Exists(thumbsRoot))
+        {
+            return;
+        }
+
+        try
+        {
+            var leftoverFiles = Directory.GetFiles(thumbsRoot, "thumb_tmp_*.jpg", SearchOption.AllDirectories);
+            foreach (var leftoverFile in leftoverFiles)
+            {
+                File.Delete(leftoverFile);
+            }
+
+            if (leftoverFiles.Length > 0)
+            {
+                LogInfo($"Cleaned up {leftoverFiles.Length} leftover temp thumbnail files from a previous run.");
+            }
+        }
+        catch (Exception exception)
+        {
+            LogError($"Failed to clean up leftover temp files: {exception.Message}");
+        }
+    }
+
+    private static bool TryParseIgnoreRules(
+        string[] args,
+        out HashSet<string> ignoredMediaIds,
+        out HashSet<(string MediaId, int Scene)> ignoredScenes,
+        out string errorMessage)
+    {
+        ignoredMediaIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        ignoredScenes = new HashSet<(string MediaId, int Scene)>(new MediaSceneEqualityComparer());
+        errorMessage = string.Empty;
+
+        for (var index = 0; index < args.Length; index++)
+        {
+            var argument = args[index];
+            if (string.Equals(argument, "--ignore", StringComparison.OrdinalIgnoreCase))
+            {
+                if (index + 1 >= args.Length)
+                {
+                    errorMessage = "Missing value after '--ignore'.";
+                    return false;
+                }
+
+                AddIgnoreTokens(args[++index], ignoredMediaIds, ignoredScenes);
+            }
+            else if (argument.StartsWith("--ignore=", StringComparison.OrdinalIgnoreCase))
+            {
+                AddIgnoreTokens(argument["--ignore=".Length..], ignoredMediaIds, ignoredScenes);
+            }
+            else if (string.Equals(argument, "--ignore-file", StringComparison.OrdinalIgnoreCase))
+            {
+                if (index + 1 >= args.Length)
+                {
+                    errorMessage = "Missing file path after '--ignore-file'.";
+                    return false;
+                }
+
+                if (!TryLoadIgnoreFile(args[++index], ignoredMediaIds, ignoredScenes, out errorMessage))
+                {
+                    return false;
+                }
+            }
+            else if (argument.StartsWith("--ignore-file=", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!TryLoadIgnoreFile(argument["--ignore-file=".Length..], ignoredMediaIds, ignoredScenes, out errorMessage))
+                {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    private static bool TryLoadIgnoreFile(
+        string filePath,
+        HashSet<string> ignoredMediaIds,
+        HashSet<(string MediaId, int Scene)> ignoredScenes,
+        out string errorMessage)
+    {
+        if (!File.Exists(filePath))
+        {
+            errorMessage = $"Ignore file not found: {filePath}";
+            return false;
+        }
+
+        foreach (var rawLine in File.ReadLines(filePath))
+        {
+            var commentIndex = rawLine.IndexOf('#');
+            var cleanedLine = (commentIndex >= 0 ? rawLine[..commentIndex] : rawLine).Trim();
+            if (!string.IsNullOrEmpty(cleanedLine))
+            {
+                AddIgnoreTokens(cleanedLine, ignoredMediaIds, ignoredScenes);
+            }
+        }
+
+        errorMessage = string.Empty;
+        return true;
+    }
+
+    private static void AddIgnoreTokens(
+        string rawValue,
+        HashSet<string> ignoredMediaIds,
+        HashSet<(string MediaId, int Scene)> ignoredScenes)
+    {
+        foreach (var rawToken in rawValue.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            var colonIndex = rawToken.LastIndexOf(':');
+            if (colonIndex > 0 && int.TryParse(rawToken[(colonIndex + 1)..], out var sceneNumber))
+            {
+                var mediaId = rawToken[..colonIndex].Trim();
+                if (!string.IsNullOrEmpty(mediaId))
+                {
+                    ignoredScenes.Add((mediaId, sceneNumber));
+                }
+            }
+            else
+            {
+                ignoredMediaIds.Add(rawToken);
+            }
+        }
+    }
+
+    private sealed class MediaSceneEqualityComparer : IEqualityComparer<(string MediaId, int Scene)>
+    {
+        public bool Equals((string MediaId, int Scene) first, (string MediaId, int Scene) second) =>
+            string.Equals(first.MediaId, second.MediaId, StringComparison.OrdinalIgnoreCase) &&
+            first.Scene == second.Scene;
+
+        public int GetHashCode((string MediaId, int Scene) item) =>
+            HashCode.Combine(StringComparer.OrdinalIgnoreCase.GetHashCode(item.MediaId), item.Scene);
     }
 }
 

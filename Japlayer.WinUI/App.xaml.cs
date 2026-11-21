@@ -45,10 +45,12 @@ namespace Japlayer
             var settingsService = new SettingsService();
             services.AddSingleton<ISettingsService>(settingsService);
 
+            var sqlitePragmaInterceptor = new SqlitePragmaInterceptor();
             services.AddDbContext<DatabaseContext>((serviceProvider, options) =>
             {
                 var settings = serviceProvider.GetRequiredService<ISettingsService>();
-                options.UseSqlite($"Data Source={settings.SqliteDatabasePath}");
+                options.UseSqlite($"Data Source={settings.SqliteDatabasePath}")
+                    .AddInterceptors(sqlitePragmaInterceptor);
             });
 
             services.AddSingleton<Data.Contracts.IMediaProvider, DatabaseMediaProvider>();
