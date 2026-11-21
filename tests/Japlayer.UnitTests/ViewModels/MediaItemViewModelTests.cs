@@ -128,5 +128,58 @@ namespace Japlayer.UnitTests.ViewModels
             // Verify highlight count was synchronized to LibraryItemViewModel (1 in scene 1 + 1 in scene 2 = 2)
             Assert.AreEqual(2, libraryItemViewModel.HighlightCount);
         }
+
+        private class EmptyThumbnailProvider : IMediaThumbnailProvider
+        {
+            public Task<IEnumerable<MediaThumbnail>> GetThumbnailsAsync(string mediaId) => Task.FromResult<IEnumerable<MediaThumbnail>>([]);
+        }
+
+        [TestMethod]
+        public async Task LoadDetailsAsync_WhenNoThumbnailsExist_LeavesScenePosterPathNull()
+        {
+            // Arrange
+            var libraryItem = new LibraryItem { MediaId = "TEST-002", Title = "No Thumbnails" };
+            var settingsService = new StubSettingsService();
+            var viewModel = new MediaItemViewModel(
+                libraryItem,
+                new StubImageProvider(),
+                new StubSceneProvider(),
+                new StubMediaProvider(),
+                settingsService,
+                new EmptyThumbnailProvider(),
+                new StubHighlightProvider());
+
+            // Act
+            await viewModel.LoadDetailsAsync();
+
+            // Assert
+            Assert.IsNotNull(viewModel.SelectedScene);
+            Assert.IsNull(viewModel.SelectedScene.PosterPath);
+        }
+
+        [TestMethod]
+        public void SetGenreCollapseLimit_WhenCalledWithSameValue_DoesNotRaisePropertyChanged()
+        {
+            // Arrange
+            var libraryItem = new LibraryItem { MediaId = "TEST-003", Title = "Genre Limit" };
+            var viewModel = new MediaItemViewModel(
+                libraryItem,
+                new StubImageProvider(),
+                new StubSceneProvider(),
+                new StubMediaProvider(),
+                new StubSettingsService(),
+                new EmptyThumbnailProvider(),
+                new StubHighlightProvider());
+            viewModel.SetGenreCollapseLimit(3);
+
+            var raisedCount = 0;
+            viewModel.PropertyChanged += (_, _) => raisedCount++;
+
+            // Act
+            viewModel.SetGenreCollapseLimit(3);
+
+            // Assert
+            Assert.AreEqual(0, raisedCount);
+        }
     }
 }

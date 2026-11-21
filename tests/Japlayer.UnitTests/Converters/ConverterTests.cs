@@ -106,5 +106,55 @@ namespace Japlayer.UnitTests.Converters
             // Act
             converter.ConvertBack(null!, typeof(string), null!, string.Empty);
         }
+
+        [TestMethod]
+        public void PathToImageSourceConverter_WhenValueIsNull_ReturnsNull()
+        {
+            // Arrange
+            var converter = new PathToImageSourceConverter();
+
+            // Act
+            var result = converter.Convert(null!, typeof(object), null!, string.Empty);
+
+            // Assert
+            Assert.IsNull(result);
+        }
+
+        [TestMethod]
+        public void PathToImageSourceConverter_WhenValueIsWhitespace_ReturnsNull()
+        {
+            // Arrange
+            var converter = new PathToImageSourceConverter();
+
+            // Act
+            var result = converter.Convert("   ", typeof(object), null!, string.Empty);
+
+            // Assert
+            Assert.IsNull(result);
+        }
+
+        [TestMethod]
+        public void PathToImageSourceConverter_WhenValueIsRelativePath_ReturnsNull()
+        {
+            // Arrange
+            var converter = new PathToImageSourceConverter();
+
+            // Act
+            var result = converter.Convert("relative/poster.jpg", typeof(object), null!, string.Empty);
+
+            // Assert
+            Assert.IsNull(result);
+        }
+
+        [TestMethod]
+        [ExpectedException(typeof(NotImplementedException))]
+        public void PathToImageSourceConverter_ConvertBack_ThrowsNotImplementedException()
+        {
+            // Arrange
+            var converter = new PathToImageSourceConverter();
+
+            // Act
+            converter.ConvertBack(null!, typeof(string), null!, string.Empty);
+        }
     }
 }
