@@ -70,11 +70,7 @@
             "args": [
                 "publish",
                 "${workspaceFolder}\\Japlayer.WinUI\\Japlayer.csproj",
-                "-c",
-                "Release",
-                "-p:Platform=x64",
-                "-o",
-                "${env:LOCALAPPDATA}\\Programs\\Japlayer",
+                "-p:PublishProfile=LocalInstall",
                 "/property:GenerateFullPaths=true",
                 "/consoleloggerparameters:NoSummary"
             ],
