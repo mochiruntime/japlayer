@@ -25,3 +25,11 @@ Always perform these steps before submitting or concluding a task.
 # Coding style
 
 Avoid abbreviating variable names to maintain readability and explicitness
+
+# Architecture & Best Practices
+
+Always prefer standard, common, established platform patterns over ad-hoc workarounds:
+
+- **EF Core & Database**: Model all persisted tables as EF Core entities in `Japlayer.Data` and evolve schemas using EF Core Migrations (`dotnet ef migrations add` + `Database.Migrate()`). Avoid raw SQL DDL or ad-hoc `ExecuteSqlRaw` queries when standard LINQ and EF Core change tracking apply.
+- **WinUI 3 Styling & Controls**: Use built-in WinUI 3 `{ThemeResource ...}` brushes (such as `CardBackgroundFillColorDefaultBrush`, `CardStrokeColorDefaultBrush`, and `TextFillColorSecondaryBrush`) so both Light and Dark themes work automatically. Never hardcode theme-specific hex colors outside media/video overlays, and only use layout panels within their supported control types (e.g., `ItemsWrapGrid` only inside `ListViewBase`, never `ItemsControl`).
+- **General**: Reuse existing project helpers, MVVM patterns (`CommunityToolkit.Mvvm`), and standard .NET/WinUI APIs before introducing custom abstractions or one-off workarounds.
