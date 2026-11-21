@@ -46,7 +46,6 @@ namespace Japlayer.Views
                 HeaderBreadcrumbBar.ItemsSource = new[] { "Library", ViewModel.Id };
                 UpdateGenreCollapseLimit();
                 UpdateSceneRailColumnWidth();
-                UpdateTheaterViewportHeight();
             }
         }
 
@@ -78,13 +77,7 @@ namespace Japlayer.Views
             }
         }
 
-        private void RootScrollViewer_SizeChanged(object sender, SizeChangedEventArgs eventArgs)
-        {
-            UpdateTheaterViewportHeight();
-            UpdateSceneRailCardHeights();
-            UpdateMultiGridCardSizes();
-            UpdateLightboxImageHeight();
-        }
+        private void RootScrollViewer_SizeChanged(object sender, SizeChangedEventArgs eventArgs) => UpdateLightboxImageHeight();
 
         private void RootScrollViewer_ViewChanged(object sender, ScrollViewerViewChangedEventArgs eventArgs)
         {
@@ -93,18 +86,6 @@ namespace Japlayer.Views
             ScrollToggleButton.Content = _isDockedToScenes
                 ? "↑ Back to Details & Gallery"
                 : "Scroll to Scenes ↓";
-        }
-
-        private void UpdateTheaterViewportHeight()
-        {
-            var viewportHeight = RootScrollViewer.ViewportHeight > 0
-                ? RootScrollViewer.ViewportHeight
-                : RootScrollViewer.ActualHeight;
-
-            if (viewportHeight > 0 && (double.IsNaN(ScenesTheaterSection.Height) || Math.Abs(ScenesTheaterSection.Height - viewportHeight) > 1.0))
-            {
-                ScenesTheaterSection.Height = Math.Floor(viewportHeight);
-            }
         }
 
         private void UpdateSceneRailColumnWidth()
@@ -121,9 +102,8 @@ namespace Japlayer.Views
 
         private void GenresContainerGrid_SizeChanged(object sender, SizeChangedEventArgs eventArgs)
         {
-            if (Math.Abs(eventArgs.NewSize.Width - _lastGenresAvailableWidth) > 2.0)
+            if (LayoutHelper.HasSignificantChange(ref _lastGenresAvailableWidth, eventArgs.NewSize.Width))
             {
-                _lastGenresAvailableWidth = eventArgs.NewSize.Width;
                 UpdateGenreCollapseLimit();
             }
         }
@@ -368,7 +348,6 @@ namespace Japlayer.Views
             {
                 GridViewButton.Style = style;
             }
-            DispatcherQueue.TryEnqueue(UpdateSceneRailCardHeights);
         }
 
         private void GridViewButton_Click(object sender, RoutedEventArgs eventArgs)
@@ -380,7 +359,6 @@ namespace Japlayer.Views
             {
                 FocusViewButton.Style = style;
             }
-            DispatcherQueue.TryEnqueue(UpdateMultiGridCardSizes);
         }
 
         private void SceneRailItem_Click(object sender, RoutedEventArgs eventArgs)
@@ -391,36 +369,6 @@ namespace Japlayer.Views
                 {
                     PausePlayersIn(FocusTheaterContainer);
                     ViewModel.SelectedScene = sceneViewModel;
-                }
-            }
-        }
-
-        private void SceneRailScrollViewer_SizeChanged(object sender, SizeChangedEventArgs eventArgs) => UpdateSceneRailCardHeights();
-
-        private void SceneRailCard_Loaded(object sender, RoutedEventArgs eventArgs) => UpdateSceneRailCardHeights();
-
-        private void UpdateSceneRailCardHeights()
-        {
-            if (SceneRailItemsControl.ItemsPanelRoot is not StackPanel stackPanel || ViewModel?.Scenes == null || ViewModel.Scenes.Count == 0)
-            {
-                return;
-            }
-
-            var availableHeight = SceneRailScrollViewer.ActualHeight;
-            if (availableHeight <= 0)
-            {
-                return;
-            }
-
-            var sceneCount = ViewModel.Scenes.Count;
-            var totalSpacing = stackPanel.Spacing * Math.Max(0, sceneCount - 1);
-            var cardHeight = Math.Max(110, Math.Floor((availableHeight - totalSpacing) / sceneCount));
-
-            foreach (var child in stackPanel.Children)
-            {
-                if (child is FrameworkElement cardElement && (double.IsNaN(cardElement.Height) || Math.Abs(cardElement.Height - cardHeight) > 1.0))
-                {
-                    cardElement.Height = cardHeight;
                 }
             }
         }
@@ -468,47 +416,6 @@ namespace Japlayer.Views
             }
 
             flyout.ShowAt(element);
-        }
-
-        private void MultiGridCard_Loaded(object sender, RoutedEventArgs eventArgs) => UpdateMultiGridCardSizes();
-
-        private void UpdateMultiGridCardSizes()
-        {
-            if (MultiGridItemsControl.ItemsPanelRoot is not WrapPanel wrapPanel || ViewModel?.Scenes == null)
-            {
-                return;
-            }
-
-            var availableWidth = MultiGridContainer.ActualWidth;
-            var availableHeight = MultiGridContainer.ActualHeight;
-            if (availableWidth <= 0 || availableHeight <= 0)
-            {
-                return;
-            }
-
-            var sceneCount = ViewModel.Scenes.Count;
-            var columnCount = sceneCount <= 1 ? 1 : 2;
-            var rowCount = (int)Math.Ceiling(sceneCount / (double)columnCount);
-            var visibleRows = Math.Min(rowCount, 2);
-
-            var cardWidth = Math.Max(260, Math.Floor((availableWidth - (wrapPanel.HorizontalSpacing * (columnCount - 1))) / columnCount));
-            var cardHeight = Math.Max(220, Math.Floor((availableHeight - (wrapPanel.VerticalSpacing * Math.Max(0, visibleRows - 1))) / visibleRows));
-
-            foreach (var child in wrapPanel.Children)
-            {
-                if (child is FrameworkElement cardElement)
-                {
-                    if (double.IsNaN(cardElement.Width) || Math.Abs(cardElement.Width - cardWidth) > 1.0)
-                    {
-                        cardElement.Width = cardWidth;
-                    }
-
-                    if (double.IsNaN(cardElement.Height) || Math.Abs(cardElement.Height - cardHeight) > 1.0)
-                    {
-                        cardElement.Height = cardHeight;
-                    }
-                }
-            }
         }
 
         private void Button_PointerEntered(object sender, PointerRoutedEventArgs eventArgs)

@@ -7,12 +7,14 @@
     xmlns:vm="using:Japlayer.ViewModels"
     xmlns:converters="using:Japlayer.Converters"
     xmlns:controls="using:Japlayer.Controls"
+    xmlns:helpers="using:Japlayer.Helpers"
     mc:Ignorable="d"
     Background="Transparent"
     PreviewKeyDown="Page_PreviewKeyDown">
 
     <Page.Resources>
         <converters:PathToMediaSourceConverter x:Key="PathToMediaSourceConverter"/>
+        <converters:PathToImageSourceConverter x:Key="PathToImageSourceConverter"/>
     </Page.Resources>
 
     <Grid Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
@@ -370,8 +372,9 @@
                     </Grid>
                 </StackPanel>
 
-                <!-- SECTION 2: FULL-VIEWPORT SCENES THEATER (Height synced dynamically to RootScrollViewer.ViewportHeight) -->
+                <!-- SECTION 2: FULL-VIEWPORT SCENES THEATER (Height synced via LayoutHelper.MatchViewportHeightOf) -->
                 <Grid x:Name="ScenesTheaterSection"
+                      helpers:LayoutHelper.MatchViewportHeightOf="{x:Bind RootScrollViewer}"
                       Padding="24,16"
                       RowSpacing="12">
                     <Grid.RowDefinitions>
@@ -505,7 +508,7 @@
                                                 BorderThickness="0"
                                                 Background="Transparent">
                                             <Grid>
-                                                <Image Source="{x:Bind ViewModel.SelectedScene.PosterPath, Mode=OneWay}"
+                                                <Image Source="{x:Bind ViewModel.SelectedScene.PosterPath, Converter={StaticResource PathToImageSourceConverter}, Mode=OneWay}"
                                                        Stretch="Uniform"
                                                        Opacity="0.78"/>
                                                 <Border Width="64" Height="64" CornerRadius="32"
@@ -553,7 +556,7 @@
                                                                         PointerEntered="Button_PointerEntered"
                                                                         PointerExited="Button_PointerExited">
                                                                     <Grid Width="100" Height="56">
-                                                                        <Image Source="{x:Bind ThumbnailPath}" Stretch="UniformToFill"/>
+                                                                        <Image Source="{x:Bind ThumbnailPath, Converter={StaticResource PathToImageSourceConverter}}" Stretch="UniformToFill"/>
                                                                         <Border HorizontalAlignment="Right" VerticalAlignment="Bottom"
                                                                                 Margin="4" Padding="4,1" CornerRadius="3"
                                                                                 Background="#CC000000">
@@ -578,20 +581,22 @@
                         <ScrollViewer x:Name="SceneRailScrollViewer"
                                       Grid.Column="1"
                                       Visibility="{x:Bind ViewModel.HasMultipleScenes, Mode=OneWay}"
-                                      VerticalScrollBarVisibility="Auto"
-                                      SizeChanged="SceneRailScrollViewer_SizeChanged">
+                                      VerticalScrollBarVisibility="Auto">
                             <ItemsControl x:Name="SceneRailItemsControl"
                                           ItemsSource="{x:Bind ViewModel.Scenes, Mode=OneWay}">
                                 <ItemsControl.ItemsPanel>
                                     <ItemsPanelTemplate>
-                                        <StackPanel Orientation="Vertical" Spacing="10"/>
+                                        <controls:EqualGridPanel MaxColumns="1"
+                                                                 VerticalSpacing="10"
+                                                                 MinItemHeight="110"
+                                                                 MaxVisibleRows="0"/>
                                     </ItemsPanelTemplate>
                                 </ItemsControl.ItemsPanel>
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="vm:MediaSceneViewModel">
                                         <Button Click="SceneRailItem_Click"
-                                                Loaded="SceneRailCard_Loaded"
                                                 HorizontalAlignment="Stretch"
+                                                VerticalAlignment="Stretch"
                                                 HorizontalContentAlignment="Stretch"
                                                 VerticalContentAlignment="Stretch"
                                                 Padding="0"
@@ -607,7 +612,7 @@
                                                     <RowDefinition Height="Auto"/>
                                                 </Grid.RowDefinitions>
                                                 <Grid Grid.Row="0" Background="Black">
-                                                    <Image Source="{x:Bind PosterPath, Mode=OneWay}" Stretch="UniformToFill" Opacity="0.85"/>
+                                                    <Image Source="{x:Bind PosterPath, Converter={StaticResource PathToImageSourceConverter}, Mode=OneWay}" Stretch="UniformToFill" Opacity="0.85"/>
                                                     <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="8"
                                                             Background="#BF000000" CornerRadius="4" Padding="8,2">
                                                         <TextBlock Text="{x:Bind SceneDisplayTitle}" FontSize="11" FontWeight="SemiBold" Foreground="White"/>
@@ -640,7 +645,11 @@
                                       ItemsSource="{x:Bind ViewModel.Scenes, Mode=OneWay}">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
-                                    <controls:WrapPanel HorizontalSpacing="12" VerticalSpacing="12"/>
+                                    <controls:EqualGridPanel MaxColumns="2"
+                                                             HorizontalSpacing="12"
+                                                             VerticalSpacing="12"
+                                                             MinItemHeight="220"
+                                                             MaxVisibleRows="2"/>
                                 </ItemsPanelTemplate>
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
@@ -648,8 +657,7 @@
                                     <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                                             BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                                             BorderThickness="1"
-                                            CornerRadius="8"
-                                            Loaded="MultiGridCard_Loaded">
+                                            CornerRadius="8">
                                         <Grid>
                                             <Grid.RowDefinitions>
                                                 <RowDefinition Height="Auto"/>
@@ -702,7 +710,7 @@
                                                             BorderThickness="0"
                                                             Background="Transparent">
                                                         <Grid>
-                                                            <Image Source="{x:Bind PosterPath, Mode=OneWay}" Stretch="Uniform" Opacity="0.78"/>
+                                                            <Image Source="{x:Bind PosterPath, Converter={StaticResource PathToImageSourceConverter}, Mode=OneWay}" Stretch="Uniform" Opacity="0.78"/>
                                                             <Border Width="52" Height="52" CornerRadius="26"
                                                                     Background="#A6000000" BorderBrush="#40FFFFFF" BorderThickness="1"
                                                                     HorizontalAlignment="Center" VerticalAlignment="Center">
@@ -736,7 +744,7 @@
                                                                                 PointerEntered="Button_PointerEntered"
                                                                                 PointerExited="Button_PointerExited">
                                                                             <Grid Width="78" Height="44">
-                                                                                <Image Source="{x:Bind ThumbnailPath}" Stretch="UniformToFill"/>
+                                                                                <Image Source="{x:Bind ThumbnailPath, Converter={StaticResource PathToImageSourceConverter}}" Stretch="UniformToFill"/>
                                                                                 <Border HorizontalAlignment="Right" VerticalAlignment="Bottom"
                                                                                         Margin="3" Padding="3,1" CornerRadius="2" Background="#CC000000">
                                                                                     <TextBlock Text="{x:Bind FormattedTimestamp}" FontSize="9" Foreground="{ThemeResource SystemAccentColorLight2}"/>
