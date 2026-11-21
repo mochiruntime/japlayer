@@ -21,6 +21,7 @@ namespace Japlayer.Views
         private MediaPlayerElement? _activePlayer;
         private int _lightboxIndex;
         private bool _isDockedToScenes;
+        private double _lastGenresAvailableWidth;
         private readonly PointerEventHandler _highlightsWheelHandler;
 
         public MediaItemPage()
@@ -100,9 +101,9 @@ namespace Japlayer.Views
                 ? RootScrollViewer.ViewportHeight
                 : RootScrollViewer.ActualHeight;
 
-            if (viewportHeight > 0)
+            if (viewportHeight > 0 && (double.IsNaN(ScenesTheaterSection.Height) || Math.Abs(ScenesTheaterSection.Height - viewportHeight) > 1.0))
             {
-                ScenesTheaterSection.Height = viewportHeight;
+                ScenesTheaterSection.Height = Math.Floor(viewportHeight);
             }
         }
 
@@ -118,7 +119,14 @@ namespace Japlayer.Views
 
         private void ToggleGenres_Click(object sender, RoutedEventArgs eventArgs) => ViewModel.ToggleGenresExpanded();
 
-        private void GenresContainerGrid_SizeChanged(object sender, SizeChangedEventArgs eventArgs) => UpdateGenreCollapseLimit();
+        private void GenresContainerGrid_SizeChanged(object sender, SizeChangedEventArgs eventArgs)
+        {
+            if (Math.Abs(eventArgs.NewSize.Width - _lastGenresAvailableWidth) > 2.0)
+            {
+                _lastGenresAvailableWidth = eventArgs.NewSize.Width;
+                UpdateGenreCollapseLimit();
+            }
+        }
 
         private void UpdateGenreCollapseLimit()
         {
@@ -406,11 +414,11 @@ namespace Japlayer.Views
 
             var sceneCount = ViewModel.Scenes.Count;
             var totalSpacing = stackPanel.Spacing * Math.Max(0, sceneCount - 1);
-            var cardHeight = Math.Max(110, (availableHeight - totalSpacing) / sceneCount);
+            var cardHeight = Math.Max(110, Math.Floor((availableHeight - totalSpacing) / sceneCount));
 
             foreach (var child in stackPanel.Children)
             {
-                if (child is FrameworkElement cardElement)
+                if (child is FrameworkElement cardElement && (double.IsNaN(cardElement.Height) || Math.Abs(cardElement.Height - cardHeight) > 1.0))
                 {
                     cardElement.Height = cardHeight;
                 }
@@ -483,15 +491,22 @@ namespace Japlayer.Views
             var rowCount = (int)Math.Ceiling(sceneCount / (double)columnCount);
             var visibleRows = Math.Min(rowCount, 2);
 
-            var cardWidth = Math.Max(260, (availableWidth - (wrapPanel.HorizontalSpacing * (columnCount - 1))) / columnCount);
-            var cardHeight = Math.Max(220, (availableHeight - (wrapPanel.VerticalSpacing * Math.Max(0, visibleRows - 1))) / visibleRows);
+            var cardWidth = Math.Max(260, Math.Floor((availableWidth - (wrapPanel.HorizontalSpacing * (columnCount - 1))) / columnCount));
+            var cardHeight = Math.Max(220, Math.Floor((availableHeight - (wrapPanel.VerticalSpacing * Math.Max(0, visibleRows - 1))) / visibleRows));
 
             foreach (var child in wrapPanel.Children)
             {
                 if (child is FrameworkElement cardElement)
                 {
-                    cardElement.Width = cardWidth;
-                    cardElement.Height = cardHeight;
+                    if (double.IsNaN(cardElement.Width) || Math.Abs(cardElement.Width - cardWidth) > 1.0)
+                    {
+                        cardElement.Width = cardWidth;
+                    }
+
+                    if (double.IsNaN(cardElement.Height) || Math.Abs(cardElement.Height - cardHeight) > 1.0)
+                    {
+                        cardElement.Height = cardHeight;
+                    }
                 }
             }
         }
