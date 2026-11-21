@@ -6,234 +6,815 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:vm="using:Japlayer.ViewModels"
     xmlns:converters="using:Japlayer.Converters"
-    xmlns:models="using:Japlayer.Models"
     xmlns:controls="using:Japlayer.Controls"
     mc:Ignorable="d"
-    Background="Transparent">
+    Background="Transparent"
+    PreviewKeyDown="Page_PreviewKeyDown">
 
     <Page.Resources>
         <converters:PathToMediaSourceConverter x:Key="PathToMediaSourceConverter"/>
     </Page.Resources>
 
     <Grid Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
-        <!-- Fixed Header (Translucent with Shadow) -->
-        <Border Background="{ThemeResource AcrylicBackgroundFillColorDefaultBrush}" 
-                BorderBrush="{ThemeResource SystemControlForegroundBaseLowBrush}" 
+        <Grid.RowDefinitions>
+            <RowDefinition Height="64"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Fixed Acrylic Header (64px) -->
+        <Border Grid.Row="0"
+                Background="{ThemeResource AcrylicBackgroundFillColorDefaultBrush}"
+                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                 BorderThickness="0,0,0,1"
-                Height="64"
-                VerticalAlignment="Top"
-                Canvas.ZIndex="1"
+                Canvas.ZIndex="2"
                 Translation="0,0,8">
             <Border.Shadow>
                 <ThemeShadow />
             </Border.Shadow>
-            <Grid>
-                <Button x:Name="BackButton" 
-                        AutomationProperties.AutomationId="BackButton"
-                        Click="BackButton_Click" 
-                        Style="{StaticResource NavigationBackButtonNormalStyle}" 
-                        Margin="24,0,0,0" 
-                        VerticalAlignment="Center"/>
+            <Grid Padding="24,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                    <Button x:Name="BackButton"
+                            AutomationProperties.AutomationId="BackButton"
+                            Click="BackButton_Click"
+                            Style="{StaticResource NavigationBackButtonNormalStyle}"
+                            VerticalAlignment="Center"/>
+                    <BreadcrumbBar x:Name="HeaderBreadcrumbBar"
+                                   ItemClicked="HeaderBreadcrumbBar_ItemClicked"
+                                   VerticalAlignment="Center"/>
+                </StackPanel>
+
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                    <Button x:Name="ScrollToggleButton"
+                            Content="Scroll to Scenes ↓"
+                            Click="ScrollToggleButton_Click"
+                            VerticalAlignment="Center"/>
+                </StackPanel>
             </Grid>
         </Border>
 
-        <!-- Main Content Area (Scrolls behind header) -->
-        <ScrollViewer x:Name="RootScrollViewer" VerticalScrollBarVisibility="Auto">
-            <Grid MaxWidth="1200" HorizontalAlignment="Center" Margin="0,64,0,0" Padding="0,24,0,0">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/> <!-- Top Section: Cover + Info -->
-                    <RowDefinition Height="Auto"/>    <!-- Bottom Section: Gallery -->
-                    <RowDefinition Height="*"/>    <!-- Scenes Section -->
-                </Grid.RowDefinitions>
+        <!-- Main Content Area -->
+        <ScrollViewer x:Name="RootScrollViewer"
+                      Grid.Row="1"
+                      VerticalScrollBarVisibility="Auto"
+                      SizeChanged="RootScrollViewer_SizeChanged"
+                      ViewChanged="RootScrollViewer_ViewChanged">
+            <StackPanel Orientation="Vertical">
 
-                <!-- Top Section Container -->
-                <Grid Margin="24,0,24,24" ColumnSpacing="24">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/> <!-- Cover -->
-                        <ColumnDefinition Width="*"/>    <!-- Details -->
-                    </Grid.ColumnDefinitions>
+                <!-- SECTION 1: HERO + METADATA + GALLERY -->
+                <StackPanel x:Name="OverviewSection"
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                            BorderThickness="0,0,0,1">
 
-                    <!-- Cover Image -->
-                    <controls:MediaCoverView Grid.Column="0" 
-                        Source="{x:Bind ViewModel.DisplayCover, Mode=OneWay}" 
-                        Width="500" 
-                        CornerRadius="4"
-                        Stretch="Uniform" 
-                        VerticalAlignment="Top"/>
+                    <!-- Hero Banner (WinUI 3 Theme-Aware Card Styling) -->
+                    <Grid Padding="24,20,24,0">
+                        <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                BorderThickness="1"
+                                CornerRadius="8"
+                                Padding="24">
+                            <Grid ColumnSpacing="24">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="440"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
 
-                    <!-- Metadata -->
-                    <StackPanel Grid.Column="1" Spacing="8">
-                        <TextBlock Text="{x:Bind ViewModel.Title, Mode=OneWay}" 
-                                   AutomationProperties.AutomationId="MediaItemTitle"
-                                   Style="{StaticResource TitleTextBlockStyle}" 
-                                   TextWrapping="Wrap"/>
-                        
-                        <StackPanel Orientation="Horizontal" Spacing="8" Opacity="0.8">
-                            <TextBlock Text="{x:Bind ViewModel.ReleaseDate, Mode=OneWay}"
-                                       AutomationProperties.AutomationId="MediaItemReleaseDate"/>
-                            <TextBlock Text="•"/>
-                            <TextBlock Text="{x:Bind ViewModel.Runtime, Mode=OneWay}"
-                                       AutomationProperties.AutomationId="MediaItemRuntime"/>
-                            <TextBlock Text="•"/>
-                            <TextBlock Text="{x:Bind ViewModel.ContentId, Mode=OneWay}"
-                                       AutomationProperties.AutomationId="MediaItemContentId"/>
+                            <!-- Poster / Cover -->
+                            <controls:MediaCoverView Grid.Column="0"
+                                                     Source="{x:Bind ViewModel.DisplayCover, Mode=OneWay}"
+                                                     Width="440"
+                                                     CornerRadius="8"
+                                                     Stretch="Uniform"
+                                                     VerticalAlignment="Top"/>
+
+                            <!-- Full-Width Title + Aligned Metadata Grid -->
+                            <StackPanel Grid.Column="1" Spacing="14">
+                                <StackPanel Spacing="6">
+                                    <TextBlock Text="{x:Bind ViewModel.Title, Mode=OneWay}"
+                                               AutomationProperties.AutomationId="MediaItemTitle"
+                                               FontSize="22"
+                                               FontWeight="SemiBold"
+                                               TextWrapping="Wrap"/>
+                                    <TextBlock Text="{x:Bind ViewModel.FactsSummary, Mode=OneWay}"
+                                               AutomationProperties.AutomationId="MediaItemFactsSummary"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                               FontSize="13"
+                                               TextWrapping="Wrap"/>
+                                </StackPanel>
+
+                                <Border BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                        BorderThickness="0,1,0,0"
+                                        Padding="0,12,0,0">
+                                    <Grid ColumnSpacing="16" RowSpacing="10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="76"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/> <!-- Studio / Series -->
+                                            <RowDefinition Height="Auto"/> <!-- Cast -->
+                                            <RowDefinition Height="Auto"/> <!-- Staff -->
+                                            <RowDefinition Height="Auto"/> <!-- Genres -->
+                                            <RowDefinition Height="Auto"/> <!-- Rating -->
+                                            <RowDefinition Height="Auto"/> <!-- Tags -->
+                                        </Grid.RowDefinitions>
+
+                                        <!-- Studio & Series -->
+                                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Studio"
+                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                   FontSize="12" VerticalAlignment="Center"/>
+                                        <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                                            <TextBlock Text="{x:Bind ViewModel.PrimaryStudio, Mode=OneWay}"
+                                                       Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+                                                       FontWeight="SemiBold" FontSize="13" VerticalAlignment="Center"/>
+                                            <TextBlock Text="|" Foreground="{ThemeResource TextFillColorTertiaryBrush}" FontSize="13" VerticalAlignment="Center"/>
+                                            <TextBlock Text="Series:" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="13" VerticalAlignment="Center"/>
+                                            <TextBlock Text="{x:Bind ViewModel.SeriesSummary, Mode=OneWay}" FontSize="13" VerticalAlignment="Center"/>
+                                        </StackPanel>
+
+                                        <!-- Cast -->
+                                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Cast"
+                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                   FontSize="12" Margin="0,4,0,0"/>
+                                        <Grid Grid.Row="1" Grid.Column="1">
+                                            <TextBlock Text="—"
+                                                       Visibility="{x:Bind ViewModel.NoCast, Mode=OneWay}"
+                                                       Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                                       FontSize="12"/>
+                                            <ItemsControl ItemsSource="{x:Bind ViewModel.Cast, Mode=OneWay}"
+                                                          Visibility="{x:Bind ViewModel.HasCast, Mode=OneWay}">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <controls:WrapPanel HorizontalSpacing="6" VerticalSpacing="6"/>
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="x:String">
+                                                        <Border Background="{ThemeResource ControlFillColorDefaultBrush}"
+                                                                BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
+                                                                BorderThickness="1"
+                                                                CornerRadius="4"
+                                                                Padding="10,3">
+                                                            <TextBlock Text="{x:Bind}" FontSize="12"/>
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </Grid>
+
+                                        <!-- Staff -->
+                                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Staff"
+                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                   FontSize="12" Margin="0,4,0,0"/>
+                                        <Grid Grid.Row="2" Grid.Column="1">
+                                            <TextBlock Text="—"
+                                                       Visibility="{x:Bind ViewModel.NoStaff, Mode=OneWay}"
+                                                       Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                                       FontSize="12"/>
+                                            <ItemsControl ItemsSource="{x:Bind ViewModel.Staff, Mode=OneWay}"
+                                                          Visibility="{x:Bind ViewModel.HasStaff, Mode=OneWay}">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <controls:WrapPanel HorizontalSpacing="6" VerticalSpacing="6"/>
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="x:String">
+                                                        <Border Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                                                                CornerRadius="4"
+                                                                Padding="8,3">
+                                                            <TextBlock Text="{x:Bind}" FontSize="12"/>
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </Grid>
+
+                                        <!-- Genres -->
+                                        <TextBlock Grid.Row="3" Grid.Column="0" Text="Genres"
+                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                   FontSize="12" Margin="0,4,0,0"/>
+                                        <Grid x:Name="GenresContainerGrid"
+                                              Grid.Row="3"
+                                              Grid.Column="1"
+                                              ColumnSpacing="8"
+                                              SizeChanged="GenresContainerGrid_SizeChanged">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <ItemsControl Grid.Column="0" ItemsSource="{x:Bind ViewModel.VisibleGenres, Mode=OneWay}">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <controls:WrapPanel HorizontalSpacing="6" VerticalSpacing="6"/>
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="x:String">
+                                                        <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                                                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                                                BorderThickness="1"
+                                                                CornerRadius="4"
+                                                                Padding="10,3">
+                                                            <TextBlock Text="{x:Bind}" FontSize="12"/>
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                            <Button Grid.Column="1"
+                                                    Content="{x:Bind ViewModel.ToggleGenresButtonText, Mode=OneWay}"
+                                                    Visibility="{x:Bind ViewModel.HasHiddenGenres, Mode=OneWay}"
+                                                    Click="ToggleGenres_Click"
+                                                    Style="{StaticResource SubtleButtonStyle}"
+                                                    FontSize="12"
+                                                    Padding="8,3"
+                                                    VerticalAlignment="Top"/>
+                                        </Grid>
+
+                                        <!-- 5-Star Rating -->
+                                        <TextBlock Grid.Row="4" Grid.Column="0" Text="Rating"
+                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                   FontSize="12" VerticalAlignment="Center"/>
+                                        <StackPanel Grid.Row="4" Grid.Column="1" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                                            <RatingControl x:Name="ItemRatingControl"
+                                                           Value="{x:Bind ViewModel.Rating, Mode=TwoWay}"
+                                                           IsClearEnabled="True"
+                                                           MaxRating="5"
+                                                           VerticalAlignment="Center"/>
+                                            <TextBlock Text="{x:Bind ViewModel.RatingDisplayText, Mode=OneWay}"
+                                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                       FontSize="12"
+                                                       VerticalAlignment="Center"/>
+                                        </StackPanel>
+
+                                        <!-- Tags (Chips + AutoSuggestBox) -->
+                                        <TextBlock Grid.Row="5" Grid.Column="0" Text="Tags"
+                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                   FontSize="12" Margin="0,6,0,0"/>
+                                        <controls:WrapPanel Grid.Row="5" Grid.Column="1" HorizontalSpacing="6" VerticalSpacing="6">
+                                            <ItemsControl ItemsSource="{x:Bind ViewModel.UserTags, Mode=OneWay}">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <controls:WrapPanel HorizontalSpacing="6" VerticalSpacing="6"/>
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="x:String">
+                                                        <Border Background="{ThemeResource SystemFillColorAttentionBackgroundBrush}"
+                                                                BorderBrush="{ThemeResource AccentFillColorDefaultBrush}"
+                                                                BorderThickness="1"
+                                                                CornerRadius="4"
+                                                                Padding="8,2">
+                                                            <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                                                <TextBlock Text="{x:Bind}" FontSize="12" VerticalAlignment="Center"/>
+                                                                <Button Content="×"
+                                                                        Tag="{x:Bind}"
+                                                                        Click="RemoveTag_Click"
+                                                                        Padding="2,0"
+                                                                        MinWidth="0"
+                                                                        MinHeight="0"
+                                                                        FontSize="12"
+                                                                        Style="{StaticResource SubtleButtonStyle}"
+                                                                        VerticalAlignment="Center"/>
+                                                            </StackPanel>
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+
+                                            <AutoSuggestBox x:Name="TagAutoSuggestBox"
+                                                            PlaceholderText="+ Add tag..."
+                                                            Width="180"
+                                                            Height="26"
+                                                            MinHeight="26"
+                                                            FontSize="12"
+                                                            VerticalAlignment="Center"
+                                                            GotFocus="TagAutoSuggestBox_GotFocus"
+                                                            TextChanged="TagAutoSuggestBox_TextChanged"
+                                                            SuggestionChosen="TagAutoSuggestBox_SuggestionChosen"
+                                                            QuerySubmitted="TagAutoSuggestBox_QuerySubmitted">
+                                                <AutoSuggestBox.Resources>
+                                                    <x:Double x:Key="TextControlThemeMinHeight">24</x:Double>
+                                                    <Thickness x:Key="TextControlThemePadding">8,2,8,2</Thickness>
+                                                </AutoSuggestBox.Resources>
+                                                <AutoSuggestBox.ItemTemplate>
+                                                    <DataTemplate x:DataType="vm:TagSuggestionItem">
+                                                        <TextBlock Text="{x:Bind DisplayLabel}" FontSize="12"/>
+                                                    </DataTemplate>
+                                                </AutoSuggestBox.ItemTemplate>
+                                            </AutoSuggestBox>
+                                        </controls:WrapPanel>
+                                    </Grid>
+                                </Border>
+                            </StackPanel>
+                            </Grid>
+                        </Border>
+                    </Grid>
+
+                    <!-- Full-Width Horizontal Scrollable Gallery -->
+                    <Grid Padding="24,16" Visibility="{x:Bind ViewModel.HasGalleryImages, Mode=OneWay}">
+                        <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                BorderThickness="1"
+                                CornerRadius="8"
+                                Padding="16">
+                            <StackPanel Spacing="10">
+                                <Grid>
+                                    <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                        <TextBlock Text="Gallery" Style="{StaticResource BodyStrongTextBlockStyle}"/>
+                                        <TextBlock Text="{x:Bind ViewModel.GalleryCountText, Mode=OneWay}"
+                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                   VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                    <TextBlock Text="Click an image to expand"
+                                               HorizontalAlignment="Right"
+                                               VerticalAlignment="Center"
+                                               FontSize="12"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                </Grid>
+
+                                <ScrollViewer x:Name="GalleryScrollViewer"
+                                              HorizontalScrollBarVisibility="Auto"
+                                              VerticalScrollBarVisibility="Disabled">
+                                    <ItemsControl x:Name="GalleryItemsControl"
+                                                  AutomationProperties.AutomationId="GalleryItemsControl"
+                                                  ItemsSource="{x:Bind ViewModel.GalleryImages, Mode=OneWay}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <StackPanel Orientation="Horizontal" Spacing="10"/>
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="x:String">
+                                                <Button Click="GalleryImage_Click"
+                                                        Tag="{x:Bind}"
+                                                        Padding="0"
+                                                        BorderThickness="1"
+                                                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                                        CornerRadius="4"
+                                                        Background="Transparent"
+                                                        PointerEntered="Button_PointerEntered"
+                                                        PointerExited="Button_PointerExited">
+                                                    <Image Source="{x:Bind}" Height="120" Stretch="Uniform"/>
+                                                </Button>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </ScrollViewer>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                </StackPanel>
+
+                <!-- SECTION 2: FULL-VIEWPORT SCENES THEATER (Height synced dynamically to RootScrollViewer.ViewportHeight) -->
+                <Grid x:Name="ScenesTheaterSection"
+                      Padding="24,16"
+                      RowSpacing="12">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Theater Header -->
+                    <Grid Grid.Row="0">
+                        <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                            <TextBlock Text="Scenes Theater" Style="{StaticResource SubtitleTextBlockStyle}"/>
+                            <TextBlock Text="{x:Bind ViewModel.ScenesSummaryText, Mode=OneWay}"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                       FontSize="13"
+                                       VerticalAlignment="Center"/>
                         </StackPanel>
 
-                        <ItemsControl ItemsSource="{x:Bind ViewModel.Genres, Mode=OneWay}">
+                        <Border Visibility="{x:Bind ViewModel.HasMultipleScenes, Mode=OneWay}"
+                                HorizontalAlignment="Right"
+                                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                BorderThickness="1"
+                                CornerRadius="6"
+                                Padding="2">
+                            <StackPanel Orientation="Horizontal" Spacing="2">
+                                <Button x:Name="FocusViewButton"
+                                        Content="Focus Player"
+                                        Click="FocusViewButton_Click"
+                                        Padding="12,5"
+                                        FontSize="12"/>
+                                <Button x:Name="GridViewButton"
+                                        Content="Multi-Scene Grid"
+                                        Click="GridViewButton_Click"
+                                        Padding="12,5"
+                                        FontSize="12"
+                                        Style="{StaticResource SubtleButtonStyle}"/>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+
+                    <!-- Focus Player Mode -->
+                    <Grid Grid.Row="1"
+                          x:Name="FocusTheaterContainer"
+                          Visibility="{x:Bind ViewModel.IsFocusMode, Mode=OneWay}"
+                          ColumnSpacing="16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition x:Name="SceneRailColumn" Width="320"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Active Scene Player Card -->
+                        <Border Grid.Column="0"
+                                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                BorderThickness="1"
+                                CornerRadius="8"
+                                DataContext="{x:Bind ViewModel.SelectedScene, Mode=OneWay}">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
+
+                                <!-- Scene Header + Source Selector + Open in... -->
+                                <Grid Grid.Row="0" Padding="14,8" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="0,0,0,1">
+                                    <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                                        <Border Background="{ThemeResource AccentFillColorDefaultBrush}" CornerRadius="4" Padding="8,2">
+                                            <TextBlock Text="{x:Bind ViewModel.SelectedScene.SceneDisplayTitle, Mode=OneWay}"
+                                                       Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}"
+                                                       FontWeight="SemiBold"
+                                                       FontSize="12"/>
+                                        </Border>
+
+                                        <!-- Single source filename -->
+                                        <TextBlock Text="{x:Bind ViewModel.SelectedScene.SelectedSourceDisplay, Mode=OneWay}"
+                                                   Visibility="{x:Bind ViewModel.SelectedScene.IsSingleSource, Mode=OneWay}"
+                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                   FontSize="12"
+                                                   VerticalAlignment="Center"/>
+
+                                        <!-- Multi-source DropDownButton -->
+                                        <DropDownButton x:Name="FocusSourceDropDownButton"
+                                                        Visibility="{x:Bind ViewModel.SelectedScene.HasMultipleSources, Mode=OneWay}"
+                                                        Content="{x:Bind ViewModel.SelectedScene.SelectedSourceDisplay, Mode=OneWay}"
+                                                        Click="FocusSourceDropDownButton_Click"
+                                                        FontSize="12"
+                                                        Padding="10,4"/>
+                                    </StackPanel>
+
+                                    <Button AutomationProperties.AutomationId="SceneOpenInButton"
+                                            Content="Open in..."
+                                            HorizontalAlignment="Right"
+                                            Click="OpenIn_Click"
+                                            Style="{StaticResource SubtleButtonStyle}">
+                                        <Button.KeyboardAccelerators>
+                                            <KeyboardAccelerator Key="O" Modifiers="Control"/>
+                                        </Button.KeyboardAccelerators>
+                                    </Button>
+                                </Grid>
+
+                                <!-- Player Surface -->
+                                <Grid Grid.Row="1" x:Name="PlayerContainer" Background="Black">
+                                    <MediaPlayerElement x:Name="FocusMediaPlayer"
+                                                        AutomationProperties.AutomationId="Player"
+                                                        Source="{x:Bind ViewModel.SelectedScene.PlayerSource, Converter={StaticResource PathToMediaSourceConverter}, Mode=OneWay}"
+                                                        AreTransportControlsEnabled="True"
+                                                        AutoPlay="True"
+                                                        HorizontalAlignment="Stretch"
+                                                        VerticalAlignment="Stretch"
+                                                        Stretch="Uniform"
+                                                        Loaded="MediaPlayerElement_Loaded"
+                                                        Unloaded="MediaPlayerElement_Unloaded">
+                                        <MediaPlayerElement.TransportControls>
+                                            <controls:CustomMediaTransportControls x:Name="TransportControls"/>
+                                        </MediaPlayerElement.TransportControls>
+                                    </MediaPlayerElement>
+
+                                    <!-- Unloaded Placeholder with Bottom Highlight Thumbnails Strip -->
+                                    <Grid x:Name="PlayOverlay"
+                                          AutomationProperties.AutomationId="PlayOverlay"
+                                          Visibility="{x:Bind ViewModel.SelectedScene.PlayOverlayVisibility, Mode=OneWay}"
+                                          Background="Black">
+                                        <Button Click="PlayOverlay_Click"
+                                                PointerEntered="Button_PointerEntered"
+                                                PointerExited="Button_PointerExited"
+                                                HorizontalAlignment="Stretch"
+                                                VerticalAlignment="Stretch"
+                                                HorizontalContentAlignment="Stretch"
+                                                VerticalContentAlignment="Stretch"
+                                                Padding="0"
+                                                BorderThickness="0"
+                                                Background="Transparent">
+                                            <Grid>
+                                                <Image Source="{x:Bind ViewModel.SelectedScene.PosterPath, Mode=OneWay}"
+                                                       Stretch="Uniform"
+                                                       Opacity="0.78"/>
+                                                <Border Width="64" Height="64" CornerRadius="32"
+                                                        Background="#A6000000"
+                                                        BorderBrush="#40FFFFFF"
+                                                        BorderThickness="1"
+                                                        HorizontalAlignment="Center"
+                                                        VerticalAlignment="Center">
+                                                    <SymbolIcon Symbol="Play" Foreground="White"/>
+                                                </Border>
+                                            </Grid>
+                                        </Button>
+
+                                        <!-- Bottom Highlights Strip (Inside Placeholder Frame) -->
+                                        <Border VerticalAlignment="Bottom" Padding="12,18,12,10" IsHitTestVisible="True">
+                                            <Border.Background>
+                                                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                                    <GradientStop Color="#00000000" Offset="0"/>
+                                                    <GradientStop Color="#E6000000" Offset="1"/>
+                                                </LinearGradientBrush>
+                                            </Border.Background>
+                                            <StackPanel Spacing="6">
+                                                <TextBlock Text="{x:Bind ViewModel.SelectedScene.HighlightSummaryText, Mode=OneWay}"
+                                                           Foreground="{ThemeResource SystemAccentColorLight2}"
+                                                           FontSize="11"
+                                                           FontWeight="SemiBold"/>
+                                                <ScrollViewer Visibility="{x:Bind ViewModel.SelectedScene.HasHighlightThumbnails, Mode=OneWay}"
+                                                              HorizontalScrollBarVisibility="Auto"
+                                                              VerticalScrollBarVisibility="Disabled"
+                                                              Loaded="HighlightsScrollViewer_Loaded">
+                                                    <ItemsControl ItemsSource="{x:Bind ViewModel.SelectedScene.HighlightThumbnails, Mode=OneWay}">
+                                                        <ItemsControl.ItemsPanel>
+                                                            <ItemsPanelTemplate>
+                                                                <StackPanel Orientation="Horizontal" Spacing="8"/>
+                                                            </ItemsPanelTemplate>
+                                                        </ItemsControl.ItemsPanel>
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate x:DataType="vm:HighlightThumbnailItem">
+                                                                <Button Click="HighlightThumbnail_Click"
+                                                                        Padding="0"
+                                                                        BorderThickness="1"
+                                                                        BorderBrush="#33FFFFFF"
+                                                                        CornerRadius="4"
+                                                                        Background="Black"
+                                                                        PointerEntered="Button_PointerEntered"
+                                                                        PointerExited="Button_PointerExited">
+                                                                    <Grid Width="100" Height="56">
+                                                                        <Image Source="{x:Bind ThumbnailPath}" Stretch="UniformToFill"/>
+                                                                        <Border HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                                                                                Margin="4" Padding="4,1" CornerRadius="3"
+                                                                                Background="#CC000000">
+                                                                            <TextBlock Text="{x:Bind FormattedTimestamp}"
+                                                                                       FontSize="10"
+                                                                                       Foreground="{ThemeResource SystemAccentColorLight2}"/>
+                                                                        </Border>
+                                                                    </Grid>
+                                                                </Button>
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+                                                </ScrollViewer>
+                                            </StackPanel>
+                                        </Border>
+                                    </Grid>
+                                </Grid>
+                            </Grid>
+                        </Border>
+
+                        <!-- Right Scene Rail (Visible when HasMultipleScenes, shares available height equally) -->
+                        <ScrollViewer x:Name="SceneRailScrollViewer"
+                                      Grid.Column="1"
+                                      Visibility="{x:Bind ViewModel.HasMultipleScenes, Mode=OneWay}"
+                                      VerticalScrollBarVisibility="Auto"
+                                      SizeChanged="SceneRailScrollViewer_SizeChanged">
+                            <ItemsControl x:Name="SceneRailItemsControl"
+                                          ItemsSource="{x:Bind ViewModel.Scenes, Mode=OneWay}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <StackPanel Orientation="Vertical" Spacing="10"/>
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:MediaSceneViewModel">
+                                        <Button Click="SceneRailItem_Click"
+                                                Loaded="SceneRailCard_Loaded"
+                                                HorizontalAlignment="Stretch"
+                                                HorizontalContentAlignment="Stretch"
+                                                VerticalContentAlignment="Stretch"
+                                                Padding="0"
+                                                CornerRadius="8"
+                                                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                                BorderThickness="1"
+                                                PointerEntered="Button_PointerEntered"
+                                                PointerExited="Button_PointerExited">
+                                            <Grid>
+                                                <Grid.RowDefinitions>
+                                                    <RowDefinition Height="*"/>
+                                                    <RowDefinition Height="Auto"/>
+                                                </Grid.RowDefinitions>
+                                                <Grid Grid.Row="0" Background="Black">
+                                                    <Image Source="{x:Bind PosterPath, Mode=OneWay}" Stretch="UniformToFill" Opacity="0.85"/>
+                                                    <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="8"
+                                                            Background="#BF000000" CornerRadius="4" Padding="8,2">
+                                                        <TextBlock Text="{x:Bind SceneDisplayTitle}" FontSize="11" FontWeight="SemiBold" Foreground="White"/>
+                                                    </Border>
+                                                    <Border Visibility="{x:Bind HasMultipleSources, Mode=OneWay}"
+                                                            HorizontalAlignment="Right" VerticalAlignment="Top" Margin="8"
+                                                            Background="{ThemeResource AccentFillColorDefaultBrush}" CornerRadius="4" Padding="6,2">
+                                                        <TextBlock Text="{x:Bind SourceCountLabel}" FontSize="10" FontWeight="SemiBold"
+                                                                   Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}"/>
+                                                    </Border>
+                                                </Grid>
+                                                <Grid Grid.Row="1" Padding="10,8">
+                                                    <TextBlock Text="{x:Bind HighlightSummaryText, Mode=OneWay}"
+                                                               Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" FontSize="12"/>
+                                                </Grid>
+                                            </Grid>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </Grid>
+
+                    <!-- Multi-Scene Grid Mode -->
+                    <ScrollViewer Grid.Row="1"
+                                  x:Name="MultiGridContainer"
+                                  Visibility="{x:Bind ViewModel.IsGridMode, Mode=OneWay}"
+                                  VerticalScrollBarVisibility="Auto">
+                        <ItemsControl x:Name="MultiGridItemsControl"
+                                      ItemsSource="{x:Bind ViewModel.Scenes, Mode=OneWay}">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
-                                    <StackPanel Orientation="Horizontal" Spacing="8"/>
+                                    <controls:WrapPanel HorizontalSpacing="12" VerticalSpacing="12"/>
                                 </ItemsPanelTemplate>
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <Border Background="{ThemeResource SystemControlBackgroundChromeMediumLowBrush}" CornerRadius="4" Padding="8,4">
-                                        <TextBlock Text="{Binding}"/>
+                                <DataTemplate x:DataType="vm:MediaSceneViewModel">
+                                    <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                            BorderThickness="1"
+                                            CornerRadius="8"
+                                            Loaded="MultiGridCard_Loaded">
+                                        <Grid>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="*"/>
+                                            </Grid.RowDefinitions>
+
+                                            <Grid Grid.Row="0" Padding="12,8" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="0,0,0,1">
+                                                <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                                    <TextBlock Text="{x:Bind SceneDisplayTitle}" FontWeight="SemiBold" FontSize="13" VerticalAlignment="Center"/>
+                                                    <TextBlock Text="{x:Bind SelectedSourceDisplay, Mode=OneWay}"
+                                                               Visibility="{x:Bind IsSingleSource, Mode=OneWay}"
+                                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                               FontSize="11" VerticalAlignment="Center"/>
+                                                    <ComboBox ItemsSource="{x:Bind Sources}"
+                                                              SelectedItem="{x:Bind SelectedSource, Mode=TwoWay}"
+                                                              DisplayMemberPath="DisplayLabel"
+                                                              Visibility="{x:Bind HasMultipleSources, Mode=OneWay}"
+                                                              FontSize="11"
+                                                              MaxWidth="240"/>
+                                                </StackPanel>
+                                                <Button Content="Open in..."
+                                                        HorizontalAlignment="Right"
+                                                        Click="OpenIn_Click"
+                                                        Style="{StaticResource SubtleButtonStyle}"/>
+                                            </Grid>
+
+                                            <Grid Grid.Row="1" x:Name="PlayerContainer" Background="Black">
+                                                <MediaPlayerElement Source="{x:Bind PlayerSource, Converter={StaticResource PathToMediaSourceConverter}, Mode=OneWay}"
+                                                                    AreTransportControlsEnabled="True"
+                                                                    AutoPlay="True"
+                                                                    HorizontalAlignment="Stretch"
+                                                                    VerticalAlignment="Stretch"
+                                                                    Stretch="Uniform"
+                                                                    Loaded="MediaPlayerElement_Loaded"
+                                                                    Unloaded="MediaPlayerElement_Unloaded">
+                                                    <MediaPlayerElement.TransportControls>
+                                                        <controls:CustomMediaTransportControls/>
+                                                    </MediaPlayerElement.TransportControls>
+                                                </MediaPlayerElement>
+
+                                                <Grid Visibility="{x:Bind PlayOverlayVisibility, Mode=OneWay}" Background="Black">
+                                                    <Button Click="PlayOverlay_Click"
+                                                            PointerEntered="Button_PointerEntered"
+                                                            PointerExited="Button_PointerExited"
+                                                            HorizontalAlignment="Stretch"
+                                                            VerticalAlignment="Stretch"
+                                                            HorizontalContentAlignment="Stretch"
+                                                            VerticalContentAlignment="Stretch"
+                                                            Padding="0"
+                                                            BorderThickness="0"
+                                                            Background="Transparent">
+                                                        <Grid>
+                                                            <Image Source="{x:Bind PosterPath, Mode=OneWay}" Stretch="Uniform" Opacity="0.78"/>
+                                                            <Border Width="52" Height="52" CornerRadius="26"
+                                                                    Background="#A6000000" BorderBrush="#40FFFFFF" BorderThickness="1"
+                                                                    HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                                <SymbolIcon Symbol="Play" Foreground="White"/>
+                                                            </Border>
+                                                        </Grid>
+                                                    </Button>
+
+                                                    <Border VerticalAlignment="Bottom" Padding="10,14,10,8">
+                                                        <Border.Background>
+                                                            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                                                <GradientStop Color="#00000000" Offset="0"/>
+                                                                <GradientStop Color="#E6000000" Offset="1"/>
+                                                            </LinearGradientBrush>
+                                                        </Border.Background>
+                                                        <ScrollViewer Visibility="{x:Bind HasHighlightThumbnails, Mode=OneWay}"
+                                                                      HorizontalScrollBarVisibility="Auto"
+                                                                      VerticalScrollBarVisibility="Disabled"
+                                                                      Loaded="HighlightsScrollViewer_Loaded">
+                                                            <ItemsControl ItemsSource="{x:Bind HighlightThumbnails, Mode=OneWay}">
+                                                                <ItemsControl.ItemsPanel>
+                                                                    <ItemsPanelTemplate>
+                                                                        <StackPanel Orientation="Horizontal" Spacing="6"/>
+                                                                    </ItemsPanelTemplate>
+                                                                </ItemsControl.ItemsPanel>
+                                                                <ItemsControl.ItemTemplate>
+                                                                    <DataTemplate x:DataType="vm:HighlightThumbnailItem">
+                                                                        <Button Click="HighlightThumbnail_Click"
+                                                                                Padding="0" BorderThickness="1" BorderBrush="#33FFFFFF"
+                                                                                CornerRadius="4" Background="Black"
+                                                                                PointerEntered="Button_PointerEntered"
+                                                                                PointerExited="Button_PointerExited">
+                                                                            <Grid Width="78" Height="44">
+                                                                                <Image Source="{x:Bind ThumbnailPath}" Stretch="UniformToFill"/>
+                                                                                <Border HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                                                                                        Margin="3" Padding="3,1" CornerRadius="2" Background="#CC000000">
+                                                                                    <TextBlock Text="{x:Bind FormattedTimestamp}" FontSize="9" Foreground="{ThemeResource SystemAccentColorLight2}"/>
+                                                                                </Border>
+                                                                            </Grid>
+                                                                        </Button>
+                                                                    </DataTemplate>
+                                                                </ItemsControl.ItemTemplate>
+                                                            </ItemsControl>
+                                                        </ScrollViewer>
+                                                    </Border>
+                                                </Grid>
+                                            </Grid>
+                                        </Grid>
                                     </Border>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
-
-                        <TextBlock Text="Series:" Style="{StaticResource SubtitleTextBlockStyle}" Margin="0,12,0,0"/>
-                        <ItemsControl ItemsSource="{x:Bind ViewModel.Series, Mode=OneWay}"/>
-
-                        <TextBlock Text="Studios:" Style="{StaticResource SubtitleTextBlockStyle}" Margin="0,12,0,0"/>
-                        <ItemsControl ItemsSource="{x:Bind ViewModel.Studios, Mode=OneWay}"/>
-                        
-                        <TextBlock Text="Staff:" Style="{StaticResource SubtitleTextBlockStyle}" Margin="0,12,0,0"/>
-                        <ItemsControl ItemsSource="{x:Bind ViewModel.Staff, Mode=OneWay}"/>
-                        
-                        <TextBlock Text="Cast:" Style="{StaticResource SubtitleTextBlockStyle}" Margin="0,12,0,0"/>
-                        <ItemsControl ItemsSource="{x:Bind ViewModel.Cast, Mode=OneWay}"/>
-                    </StackPanel>
-                </Grid>
-
-                <!-- Gallery Section -->
-                <Grid Grid.Row="1" Margin="0,0,0,24">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-
-                    <Button Grid.Column="0"
-                            AutomationProperties.AutomationId="GalleryScrollLeftButton"
-                            Content="◀"
-                            Click="ScrollLeft_Click"
-                            PointerEntered="Button_PointerEntered"
-                            PointerExited="Button_PointerExited"/>
-
-                    <ScrollViewer x:Name="GalleryScrollViewer"
-                                Grid.Column="1"
-                                HorizontalScrollBarVisibility="Auto"
-                                VerticalScrollBarVisibility="Disabled"
-                                Margin="12,0,12,0">
-                        <ItemsControl x:Name="GalleryItemsControl"
-                                    AutomationProperties.AutomationId="GalleryItemsControl"
-                                    ItemsSource="{x:Bind ViewModel.GalleryImages, Mode=OneWay}">
-                            <ItemsControl.ItemsPanel>
-                                <ItemsPanelTemplate>
-                                    <StackPanel Orientation="Horizontal" Spacing="12"/>
-                                </ItemsPanelTemplate>
-                            </ItemsControl.ItemsPanel>
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <Image Source="{Binding}" Height="300" Stretch="Uniform"/>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
                     </ScrollViewer>
-
-                    <Button Grid.Column="2"
-                            AutomationProperties.AutomationId="GalleryScrollRightButton"
-                            Content="▶"
-                            Click="ScrollRight_Click"
-                            PointerEntered="Button_PointerEntered"
-                            PointerExited="Button_PointerExited"/>
                 </Grid>
-                
-                <StackPanel Grid.Row="2" Margin="24,0,24,24" Spacing="12">
-                    <TextBlock Text="Scenes" Style="{StaticResource SubtitleTextBlockStyle}"/>
-                    <ItemsControl ItemsSource="{x:Bind ViewModel.Scenes, Mode=OneWay}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="vm:MediaSceneViewModel">
-                                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                                        BorderThickness="1"
-                                        CornerRadius="8"
-                                        Margin="0,0,0,24"
-                                        Padding="0">
-                                    <Grid>
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="*"/>
-                                        </Grid.RowDefinitions>
 
-                                        <Grid Grid.Row="0" Margin="16,8,8,8">
-                                            <TextBlock Text="{x:Bind SceneNumber, Mode=OneWay}"
-                                                       VerticalAlignment="Center"
-                                                       Style="{StaticResource BodyStrongTextBlockStyle}"/>
-                                            
-                                            <Button AutomationProperties.AutomationId="SceneOpenInButton"
-                                                    Content="Open in..."
-                                                    HorizontalAlignment="Right"
-                                                    Click="OpenIn_Click"
-                                                    Style="{StaticResource SubtleButtonStyle}">
-                                                <Button.KeyboardAccelerators>
-                                                    <KeyboardAccelerator Key="O" Modifiers="Control"/>
-                                                </Button.KeyboardAccelerators>
-                                            </Button>
-                                        </Grid>
-
-                                        <Grid Grid.Row="1" x:Name="PlayerContainer" Margin="1,0,1,1" SizeChanged="PlayerContainer_SizeChanged">
-                                            <MediaPlayerElement x:Name="Player"
-                                                              AutomationProperties.AutomationId="Player"
-                                                              Source="{x:Bind PlayerSource, Converter={StaticResource PathToMediaSourceConverter}, Mode=OneWay}" 
-                                                              AreTransportControlsEnabled="True" 
-                                                              AutoPlay="True"
-                                                              HorizontalAlignment="Stretch"
-                                                              VerticalAlignment="Stretch"
-                                                              Stretch="Uniform"
-                                                              Loaded="MediaPlayerElement_Loaded"
-                                                              Unloaded="MediaPlayerElement_Unloaded">
-                                                <MediaPlayerElement.TransportControls>
-                                                     <controls:CustomMediaTransportControls x:Name="TransportControls" />
-                                                </MediaPlayerElement.TransportControls>
-                                            </MediaPlayerElement>
-
-                                            <Button x:Name="PlayOverlay"
-                                                   AutomationProperties.AutomationId="PlayOverlay"
-                                                   Visibility="{x:Bind PlayOverlayVisibility, Mode=OneWay}"
-                                                   Background="Black"
-                                                   Click="PlayOverlay_Click"
-                                                   PointerEntered="Button_PointerEntered"
-                                                   PointerExited="Button_PointerExited"
-                                                   HorizontalAlignment="Stretch"
-                                                   VerticalAlignment="Stretch"
-                                                   HorizontalContentAlignment="Stretch"
-                                                   VerticalContentAlignment="Stretch"
-                                                   Padding="0"
-                                                   BorderThickness="0"
-                                                   CornerRadius="0">
-                                                 <Grid>
-                                                     <Image Source="{x:Bind PosterPath, Mode=OneWay}"
-                                                            Stretch="UniformToFill"
-                                                            HorizontalAlignment="Center"
-                                                            VerticalAlignment="Center"
-                                                            Opacity="0.75"/>
-                                                     <Viewbox Width="64" Height="64" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                                         <SymbolIcon Symbol="Play" Foreground="White"/>
-                                                     </Viewbox>
-                                                 </Grid>
-                                             </Button>
-                                        </Grid>
-                                    </Grid>
-                                </Border>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </StackPanel>
-            </Grid>
+            </StackPanel>
         </ScrollViewer>
+
+        <!-- Gallery Lightbox Overlay (Fixed Image Height + Stationary Bottom Controls) -->
+        <Grid x:Name="LightboxOverlay"
+              Grid.RowSpan="2"
+              Visibility="Collapsed"
+              Background="#E0000000"
+              Canvas.ZIndex="10"
+              PointerPressed="LightboxOverlay_PointerPressed">
+            <StackPanel HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Spacing="16"
+                        Padding="32">
+                <Border CornerRadius="8"
+                        BorderBrush="#26FFFFFF"
+                        BorderThickness="1"
+                        Background="Black"
+                        Height="620"
+                        HorizontalAlignment="Center">
+                    <Image x:Name="LightboxImage"
+                           Height="620"
+                           Stretch="Uniform"/>
+                </Border>
+                <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Center">
+                    <Button Content="◀ Previous"
+                            Click="LightboxPrevious_Click"
+                            Foreground="White"
+                            Background="#26FFFFFF"
+                            BorderBrush="#40FFFFFF"
+                            BorderThickness="1"
+                            CornerRadius="4"
+                            Padding="14,7"/>
+                    <TextBlock x:Name="LightboxCounterText"
+                               Text="1 / 1"
+                               VerticalAlignment="Center"
+                               Foreground="#CCFFFFFF"
+                               Margin="4,0"/>
+                    <Button Content="Next ▶"
+                            Click="LightboxNext_Click"
+                            Foreground="White"
+                            Background="#26FFFFFF"
+                            BorderBrush="#40FFFFFF"
+                            BorderThickness="1"
+                            CornerRadius="4"
+                            Padding="14,7"/>
+                    <Button Content="Close (Esc)"
+                            Click="LightboxClose_Click"
+                            Foreground="White"
+                            Background="#33FFFFFF"
+                            BorderBrush="#4DFFFFFF"
+                            BorderThickness="1"
+                            CornerRadius="4"
+                            Padding="14,7"
+                            Margin="8,0,0,0"/>
+                </StackPanel>
+            </StackPanel>
+        </Grid>
     </Grid>
 </Page>

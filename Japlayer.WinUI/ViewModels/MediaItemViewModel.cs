@@ -1,4 +1,5 @@
 #nullable enable
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
@@ -11,8 +12,22 @@ using Japlayer.Data.Models;
 
 namespace Japlayer.ViewModels
 {
-    public partial class MediaItemViewModel(LibraryItem libraryItem, IImageProvider imageProvider, IMediaSceneProvider sceneProvider, IMediaProvider mediaProvider, ISettingsService settingsService, IMediaThumbnailProvider thumbnailProvider, IMediaHighlightProvider highlightProvider) : ObservableObject
+    public record TagSuggestionItem(string Name, bool IsNew)
     {
+        public string DisplayLabel => IsNew ? $"+ Create \"{Name}\"" : Name;
+    }
+
+    public partial class MediaItemViewModel(
+        LibraryItem libraryItem,
+        IImageProvider imageProvider,
+        IMediaSceneProvider sceneProvider,
+        IMediaProvider mediaProvider,
+        ISettingsService settingsService,
+        IMediaThumbnailProvider thumbnailProvider,
+        IMediaHighlightProvider highlightProvider) : ObservableObject
+    {
+        private int _genreCollapseLimit = 6;
+
         private readonly LibraryItem _libraryItem = libraryItem;
         private readonly IImageProvider _imageProvider = imageProvider;
         private readonly IMediaSceneProvider _sceneProvider = sceneProvider;
@@ -20,29 +35,100 @@ namespace Japlayer.ViewModels
         private readonly ISettingsService _settingsService = settingsService;
         private readonly IMediaThumbnailProvider _thumbnailProvider = thumbnailProvider;
         private readonly IMediaHighlightProvider _highlightProvider = highlightProvider;
+        private bool _isInitializingRating;
 
         [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(Title))]
         [NotifyPropertyChangedFor(nameof(ContentId))]
         [NotifyPropertyChangedFor(nameof(ReleaseDate))]
         [NotifyPropertyChangedFor(nameof(Runtime))]
+        [NotifyPropertyChangedFor(nameof(FactsSummary))]
         [NotifyPropertyChangedFor(nameof(Genres))]
+        [NotifyPropertyChangedFor(nameof(VisibleGenres))]
+        [NotifyPropertyChangedFor(nameof(HasHiddenGenres))]
+        [NotifyPropertyChangedFor(nameof(ToggleGenresButtonText))]
         [NotifyPropertyChangedFor(nameof(Series))]
+        [NotifyPropertyChangedFor(nameof(SeriesSummary))]
         [NotifyPropertyChangedFor(nameof(Studios))]
+        [NotifyPropertyChangedFor(nameof(PrimaryStudio))]
         [NotifyPropertyChangedFor(nameof(Staff))]
+        [NotifyPropertyChangedFor(nameof(HasStaff))]
+        [NotifyPropertyChangedFor(nameof(NoStaff))]
         [NotifyPropertyChangedFor(nameof(Cast))]
+        [NotifyPropertyChangedFor(nameof(HasCast))]
+        [NotifyPropertyChangedFor(nameof(NoCast))]
         [NotifyPropertyChangedFor(nameof(IsDetailsLoaded))]
         public partial MediaItem? MediaItemData { get; set; }
 
         [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(HasMultipleScenes))]
+        [NotifyPropertyChangedFor(nameof(IsSingleScene))]
+        [NotifyPropertyChangedFor(nameof(ScenesSummaryText))]
         public partial ObservableCollection<MediaSceneViewModel>? Scenes { get; set; }
+
+        [ObservableProperty]
+        public partial MediaSceneViewModel? SelectedScene { get; set; }
+
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(IsFocusMode))]
+        public partial bool IsGridMode { get; set; }
+
+        public bool IsFocusMode => !IsGridMode;
+
+        [ObservableProperty]
+        public partial bool IsGenresExpanded { get; set; }
+
+        partial void OnIsGenresExpandedChanged(bool value)
+        {
+            OnPropertyChanged(nameof(VisibleGenres));
+            OnPropertyChanged(nameof(HasHiddenGenres));
+            OnPropertyChanged(nameof(ToggleGenresButtonText));
+        }
+
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(RatingDisplayText))]
+        public partial double Rating { get; set; } = -1;
+
+        partial void OnRatingChanged(double value)
+        {
+            if (_isInitializingRating)
+            {
+                return;
+            }
+
+            var integerRating = value <= 0 ? 0 : (int)Math.Round(Math.Clamp(value, 0, 5));
+            _ = SaveRatingAsync(integerRating);
+        }
+
+        private async Task SaveRatingAsync(int rating)
+        {
+            try
+            {
+                await _mediaProvider.SetRatingAsync(Id, rating);
+            }
+            catch (Exception exception)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to save rating: {exception.Message}");
+            }
+        }
+
+        public string RatingDisplayText => Rating <= 0 ? "Unrated" : $"{(int)Math.Round(Rating)} / 5";
 
         public LibraryItemViewModel? LibraryItemViewModel { get; set; }
 
         [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(GalleryCountText))]
+        [NotifyPropertyChangedFor(nameof(HasGalleryImages))]
         public partial ObservableCollection<string>? GalleryImages { get; set; }
 
+        public ObservableCollection<string> UserTags { get; } = [];
+        public List<string> AllAvailableTags { get; private set; } = [];
+
         public string Id => _libraryItem.MediaId;
-        public string Title => _libraryItem.MediaId + " " + _libraryItem.Title;
+        public string Title => !string.IsNullOrWhiteSpace(MediaItemData?.Title)
+            ? MediaItemData.Title
+            : (_libraryItem.Title ?? _libraryItem.MediaId);
+
         public string DisplayCover
         {
             get
@@ -57,16 +143,145 @@ namespace Japlayer.ViewModels
         }
 
         public string? ContentId => MediaItemData?.ContentId;
-        public string? ReleaseDate => MediaItemData?.ReleaseDate?.ToString();
+        public string? ReleaseDate => MediaItemData?.ReleaseDate?.ToString("yyyy-MM-dd");
         public string? Runtime => MediaItemData?.Runtime?.ToString();
 
+        public string FactsSummary
+        {
+            get
+            {
+                var parts = new List<string> { Id };
+                if (!string.IsNullOrWhiteSpace(ReleaseDate))
+                {
+                    parts.Add(ReleaseDate);
+                }
+
+                if (MediaItemData?.Runtime is TimeSpan duration)
+                {
+                    parts.Add($"{(int)duration.TotalHours:D2}:{duration.Minutes:D2}:{duration.Seconds:D2} ({(int)duration.TotalMinutes}m)");
+                }
+
+                if (!string.IsNullOrWhiteSpace(ContentId))
+                {
+                    parts.Add(ContentId);
+                }
+
+                return string.Join("  •  ", parts);
+            }
+        }
+
         public IReadOnlyList<string> Genres => MediaItemData?.Genres ?? [];
+        public IReadOnlyList<string> VisibleGenres => IsGenresExpanded || Genres.Count <= _genreCollapseLimit
+            ? Genres
+            : [.. Genres.Take(_genreCollapseLimit)];
+
+        public bool HasHiddenGenres => Genres.Count > _genreCollapseLimit;
+        public string ToggleGenresButtonText => IsGenresExpanded
+            ? "Show less"
+            : $"+{Genres.Count - _genreCollapseLimit} more";
+
+        public void SetGenreCollapseLimit(int limit)
+        {
+            var clampedLimit = Math.Max(1, limit);
+            if (_genreCollapseLimit == clampedLimit)
+            {
+                return;
+            }
+
+            _genreCollapseLimit = clampedLimit;
+            OnPropertyChanged(nameof(VisibleGenres));
+            OnPropertyChanged(nameof(HasHiddenGenres));
+            OnPropertyChanged(nameof(ToggleGenresButtonText));
+        }
+
         public IReadOnlyList<string> Series => MediaItemData?.Series ?? [];
+        public string SeriesSummary => Series.Count > 0 ? string.Join(", ", Series) : "—";
         public IReadOnlyList<string> Studios => MediaItemData?.Studios ?? [];
+        public string PrimaryStudio => Studios.Count > 0 ? string.Join(", ", Studios) : "—";
         public IReadOnlyList<string> Staff => MediaItemData?.Staff ?? [];
+        public bool HasStaff => Staff.Count > 0;
+        public bool NoStaff => !HasStaff;
         public IReadOnlyList<string> Cast => MediaItemData?.Cast ?? [];
+        public bool HasCast => Cast.Count > 0;
+        public bool NoCast => !HasCast;
+
+        public bool HasMultipleScenes => Scenes != null && Scenes.Count > 1;
+        public bool IsSingleScene => Scenes == null || Scenes.Count <= 1;
+        public string ScenesSummaryText
+        {
+            get
+            {
+                var sceneCount = Scenes?.Count ?? 0;
+                var highlightCount = Scenes?.Sum(scene => scene.Highlights.Count) ?? 0;
+                var sceneWord = sceneCount == 1 ? "scene" : "scenes";
+                var highlightWord = highlightCount == 1 ? "saved highlight" : "saved highlights";
+                return $"{sceneCount} {sceneWord} • {highlightCount} {highlightWord}";
+            }
+        }
+
+        public string GalleryCountText => $"({GalleryImages?.Count ?? 0})";
+        public bool HasGalleryImages => GalleryImages != null && GalleryImages.Count > 0;
 
         public bool IsDetailsLoaded => MediaItemData != null;
+
+        public void ToggleGenresExpanded() => IsGenresExpanded = !IsGenresExpanded;
+
+        public List<TagSuggestionItem> GetTagSuggestions(string query)
+        {
+            var trimmedQuery = query.Trim();
+            var suggestions = AllAvailableTags
+                .Where(tag => !UserTags.Contains(tag, StringComparer.OrdinalIgnoreCase))
+                .Where(tag => string.IsNullOrEmpty(trimmedQuery) || tag.Contains(trimmedQuery, StringComparison.OrdinalIgnoreCase))
+                .Select(tag => new TagSuggestionItem(tag, false))
+                .ToList();
+
+            if (!string.IsNullOrEmpty(trimmedQuery))
+            {
+                var existsInAvailable = AllAvailableTags.Any(tag => string.Equals(tag, trimmedQuery, StringComparison.OrdinalIgnoreCase));
+                var existsInCurrent = UserTags.Any(tag => string.Equals(tag, trimmedQuery, StringComparison.OrdinalIgnoreCase));
+                if (!existsInAvailable && !existsInCurrent)
+                {
+                    suggestions.Add(new TagSuggestionItem(trimmedQuery, true));
+                }
+            }
+
+            return suggestions;
+        }
+
+        public async Task AddUserTagAsync(string tagName)
+        {
+            var trimmedTagName = tagName.Trim();
+            if (string.IsNullOrWhiteSpace(trimmedTagName))
+            {
+                return;
+            }
+
+            if (UserTags.Any(tag => string.Equals(tag, trimmedTagName, StringComparison.OrdinalIgnoreCase)))
+            {
+                return;
+            }
+
+            await _mediaProvider.AddUserTagAsync(Id, trimmedTagName);
+            UserTags.Add(trimmedTagName);
+
+            if (!AllAvailableTags.Any(tag => string.Equals(tag, trimmedTagName, StringComparison.OrdinalIgnoreCase)))
+            {
+                AllAvailableTags.Add(trimmedTagName);
+                AllAvailableTags.Sort(StringComparer.OrdinalIgnoreCase);
+            }
+        }
+
+        public async Task RemoveUserTagAsync(string tagName)
+        {
+            var existing = UserTags.FirstOrDefault(tag => string.Equals(tag, tagName, StringComparison.OrdinalIgnoreCase));
+            if (existing == null)
+            {
+                return;
+            }
+
+            await _mediaProvider.RemoveUserTagAsync(Id, existing);
+            UserTags.Remove(existing);
+        }
 
         public async Task LoadDetailsAsync()
         {
@@ -76,26 +291,40 @@ namespace Japlayer.ViewModels
             }
 
             MediaItemData = await _mediaProvider.GetMediaItemAsync(Id);
+            AllAvailableTags = [.. await _mediaProvider.GetUserTagsAsync()];
+
+            UserTags.Clear();
+            if (MediaItemData != null)
+            {
+                foreach (var tag in MediaItemData.UserTags)
+                {
+                    UserTags.Add(tag);
+                }
+
+                _isInitializingRating = true;
+                Rating = MediaItemData.Rating <= 0 ? -1 : MediaItemData.Rating;
+                _isInitializingRating = false;
+            }
 
             var scenes = await _sceneProvider.GetMediaScenesAsync(Id);
             var thumbnails = await _thumbnailProvider.GetThumbnailsAsync(Id);
-            var scenePosterDict = System.Linq.Enumerable.Any(thumbnails)
+            var scenePosterDictionary = thumbnails.Any()
                 ? thumbnails
-                    .GroupBy(t => t.Scene)
+                    .GroupBy(thumbnail => thumbnail.Scene)
                     .ToDictionary(
-                        g => g.Key,
-                        g =>
+                        group => group.Key,
+                        group =>
                         {
-                            var list = g.OrderBy(t => t.Timestamp).ToList();
+                            var list = group.OrderBy(thumbnail => thumbnail.Timestamp).ToList();
                             if (list.Count == 0)
                             {
                                 return null;
                             }
 
-                            var min = list[0].Timestamp;
-                            var max = list[^1].Timestamp;
-                            var target = min + 0.75 * (max - min);
-                            var best = list.OrderBy(t => System.Math.Abs(t.Timestamp - target)).First();
+                            var minimum = list[0].Timestamp;
+                            var maximum = list[^1].Timestamp;
+                            var target = minimum + 0.75 * (maximum - minimum);
+                            var best = list.OrderBy(thumbnail => Math.Abs(thumbnail.Timestamp - target)).First();
                             return Path.Combine(_settingsService.ImagePath, best.Path);
                         }
                     )
@@ -108,18 +337,23 @@ namespace Japlayer.ViewModels
             {
                 highlights = await _highlightProvider.GetHighlightsAsync(Id);
             }
-            catch (System.Exception exception)
+            catch (Exception exception)
             {
                 System.Diagnostics.Debug.WriteLine($"Failed to load highlights from database (table might not exist yet): {exception.Message}");
             }
-            var highlightsGrouped = highlights.GroupBy(h => h.Scene).ToDictionary(g => g.Key, g => g.Select(h => h.Timestamp).ToList());
-            var thumbnailsGrouped = thumbnails.GroupBy(t => t.Scene).ToDictionary(g => g.Key, g => g.ToList());
+
+            var highlightsGrouped = highlights
+                .GroupBy(highlight => highlight.Scene)
+                .ToDictionary(group => group.Key, group => group.Select(highlight => highlight.Timestamp).ToList());
+            var thumbnailsGrouped = thumbnails
+                .GroupBy(thumbnail => thumbnail.Scene)
+                .ToDictionary(group => group.Key, group => group.ToList());
 
             var viewModels = scenes.Select(scene =>
             {
                 string? posterPath = null;
                 var sceneNumber = scene.SceneNumber ?? 1;
-                if (scene.SceneNumber.HasValue && scenePosterDict.TryGetValue(sceneNumber, out var path))
+                if (scene.SceneNumber.HasValue && scenePosterDictionary.TryGetValue(sceneNumber, out var path))
                 {
                     posterPath = path;
                 }
@@ -127,11 +361,19 @@ namespace Japlayer.ViewModels
                 highlightsGrouped.TryGetValue(sceneNumber, out var sceneHighlights);
                 thumbnailsGrouped.TryGetValue(sceneNumber, out var sceneThumbnails);
 
-                var sceneViewModel = new MediaSceneViewModel(scene, posterPath, sceneHighlights ?? [], sceneThumbnails ?? [], _highlightProvider);
+                var sceneViewModel = new MediaSceneViewModel(
+                    scene,
+                    posterPath,
+                    sceneHighlights ?? [],
+                    sceneThumbnails ?? [],
+                    _highlightProvider,
+                    _settingsService.ImagePath);
                 sceneViewModel.InitializeDimensions();
                 return sceneViewModel;
             }).ToList();
+
             Scenes = new ObservableCollection<MediaSceneViewModel>(viewModels);
+            SelectedScene = Scenes.FirstOrDefault();
 
             foreach (var sceneViewModel in viewModels)
             {
@@ -141,8 +383,7 @@ namespace Japlayer.ViewModels
             UpdateHighlightCount();
 
             var gallery = await _imageProvider.GetGalleryPathsAsync(Id);
-            // Combine with ImagePath
-            var fullPaths = gallery.Select(p => Path.Combine(_settingsService.ImagePath, p));
+            var fullPaths = gallery.Select(path => Path.Combine(_settingsService.ImagePath, path));
             GalleryImages = new ObservableCollection<string>(fullPaths);
         }
 
@@ -152,6 +393,8 @@ namespace Japlayer.ViewModels
             {
                 LibraryItemViewModel.HighlightCount = Scenes.Sum(scene => scene.Highlights.Count);
             }
+
+            OnPropertyChanged(nameof(ScenesSummaryText));
         }
     }
 }

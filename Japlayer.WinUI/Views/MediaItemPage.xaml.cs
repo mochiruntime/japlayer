@@ -5,6 +5,9 @@ using Japlayer.Helpers;
 using Japlayer.ViewModels;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Media.Imaging;
 using Microsoft.UI.Xaml.Navigation;
 
 namespace Japlayer.Views
@@ -12,32 +15,41 @@ namespace Japlayer.Views
     public sealed partial class MediaItemPage : Page
     {
         public MediaItemViewModel ViewModel { get; private set; } = null!;
-        private int _targetGalleryIndex = 0;
         private MediaPlayerElement? _fullScreenPlayer;
         private Grid? _originalPlayerParent;
         private double _originalParentHeight;
         private MediaPlayerElement? _activePlayer;
+        private int _lightboxIndex;
+        private bool _isDockedToScenes;
+        private readonly PointerEventHandler _highlightsWheelHandler;
 
         public MediaItemPage()
         {
             this.InitializeComponent();
-            GalleryScrollViewer.AddHandler(UIElement.PointerWheelChangedEvent, new Microsoft.UI.Xaml.Input.PointerEventHandler(GalleryScrollViewer_PointerWheelChanged), true);
+            _highlightsWheelHandler = new PointerEventHandler(HighlightsScrollViewer_PointerWheelChanged);
+            GalleryScrollViewer.AddHandler(UIElement.PointerWheelChangedEvent, new PointerEventHandler(GalleryScrollViewer_PointerWheelChanged), true);
             this.Unloaded += MediaItemPage_Unloaded;
         }
 
-        protected override async void OnNavigatedTo(NavigationEventArgs e)
+        protected override async void OnNavigatedTo(NavigationEventArgs eventArgs)
         {
-            base.OnNavigatedTo(e);
+            base.OnNavigatedTo(eventArgs);
 
-            if (e.Parameter is LibraryItemViewModel libraryItem)
+            if (eventArgs.Parameter is LibraryItemViewModel libraryItem)
             {
                 ViewModel = Microsoft.Extensions.DependencyInjection.ActivatorUtilities.CreateInstance<MediaItemViewModel>(App.Current.Services, libraryItem.LibraryItem);
                 ViewModel.LibraryItemViewModel = libraryItem;
                 await ViewModel.LoadDetailsAsync();
+
+                Bindings.Update();
+                HeaderBreadcrumbBar.ItemsSource = new[] { "Library", ViewModel.Id };
+                UpdateGenreCollapseLimit();
+                UpdateSceneRailColumnWidth();
+                UpdateTheaterViewportHeight();
             }
         }
 
-        private void BackButton_Click(object sender, RoutedEventArgs e)
+        private void BackButton_Click(object sender, RoutedEventArgs eventArgs)
         {
             if (Frame.CanGoBack)
             {
@@ -45,128 +57,498 @@ namespace Japlayer.Views
             }
         }
 
-        private void ScrollLeft_Click(object sender, RoutedEventArgs e)
+        private void HeaderBreadcrumbBar_ItemClicked(BreadcrumbBar sender, BreadcrumbBarItemClickedEventArgs eventArgs)
         {
-            _targetGalleryIndex = Math.Max(_targetGalleryIndex - 1, 0);
-            ScrollToImage(_targetGalleryIndex);
-        }
-
-        private void ScrollRight_Click(object sender, RoutedEventArgs e)
-        {
-            _targetGalleryIndex = Math.Min(_targetGalleryIndex + 1, GalleryItemsControl.ItemsPanelRoot.Children.Count - 1);
-            ScrollToImage(_targetGalleryIndex);
-        }
-
-        private int GetCurrentImageIndex()
-        {
-            if (GalleryItemsControl.ItemsPanelRoot is not StackPanel panel)
+            if (eventArgs.Index == 0 && Frame.CanGoBack)
             {
-                return 0;
+                Frame.GoBack();
             }
-
-            var scrollOffset = GalleryScrollViewer.HorizontalOffset;
-
-            // Loop through the children and find the first one that begins AFTER the offset
-            double cumulative = 0;
-            for (var i = 0; i < panel.Children.Count; i++)
-            {
-                UIElement element = panel.Children[i];
-
-                var elementWidth = ((FrameworkElement)element).ActualWidth;
-                var spacing = (panel.Spacing);
-                var elementEnd = cumulative + elementWidth;
-
-                if (scrollOffset < elementEnd)
-                {
-                    // This is the current item in view
-                    return i;
-                }
-
-                cumulative += elementWidth + spacing;
-            }
-
-            return panel.Children.Count - 1;
         }
 
-        private void ScrollToImage(int index)
+        private void ScrollToggleButton_Click(object sender, RoutedEventArgs eventArgs)
         {
-            if (GalleryItemsControl.ItemsPanelRoot is not StackPanel panel)
+            if (_isDockedToScenes)
+            {
+                RootScrollViewer.ChangeView(null, 0, null, false);
+            }
+            else
+            {
+                RootScrollViewer.ChangeView(null, OverviewSection.ActualHeight, null, false);
+            }
+        }
+
+        private void RootScrollViewer_SizeChanged(object sender, SizeChangedEventArgs eventArgs)
+        {
+            UpdateTheaterViewportHeight();
+            UpdateSceneRailCardHeights();
+            UpdateMultiGridCardSizes();
+            UpdateLightboxImageHeight();
+        }
+
+        private void RootScrollViewer_ViewChanged(object sender, ScrollViewerViewChangedEventArgs eventArgs)
+        {
+            var dockThreshold = Math.Max(0, OverviewSection.ActualHeight - 40);
+            _isDockedToScenes = RootScrollViewer.VerticalOffset >= dockThreshold && dockThreshold > 0;
+            ScrollToggleButton.Content = _isDockedToScenes
+                ? "↑ Back to Details & Gallery"
+                : "Scroll to Scenes ↓";
+        }
+
+        private void UpdateTheaterViewportHeight()
+        {
+            var viewportHeight = RootScrollViewer.ViewportHeight > 0
+                ? RootScrollViewer.ViewportHeight
+                : RootScrollViewer.ActualHeight;
+
+            if (viewportHeight > 0)
+            {
+                ScenesTheaterSection.Height = viewportHeight;
+            }
+        }
+
+        private void UpdateSceneRailColumnWidth()
+        {
+            if (ViewModel == null)
             {
                 return;
             }
 
-            index = Math.Clamp(index, 0, panel.Children.Count - 1);
-
-            double targetOffset = 0;
-
-            for (var i = 0; i < index; i++)
-            {
-                var element = (FrameworkElement)panel.Children[i];
-                targetOffset += element.ActualWidth + panel.Spacing;
-            }
-
-            GalleryScrollViewer.ChangeView(targetOffset, null, null, false);
+            SceneRailColumn.Width = ViewModel.HasMultipleScenes ? new GridLength(320) : new GridLength(0);
         }
 
-        private void GalleryScrollViewer_PointerWheelChanged(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+        private void ToggleGenres_Click(object sender, RoutedEventArgs eventArgs) => ViewModel.ToggleGenresExpanded();
+
+        private void GenresContainerGrid_SizeChanged(object sender, SizeChangedEventArgs eventArgs) => UpdateGenreCollapseLimit();
+
+        private void UpdateGenreCollapseLimit()
         {
-            var pointerPoint = e.GetCurrentPoint(GalleryScrollViewer);
-            if (pointerPoint.Properties.IsHorizontalMouseWheel)
+            if (ViewModel == null || ViewModel.Genres.Count == 0)
+            {
+                return;
+            }
+
+            var availableWidth = GenresContainerGrid.ActualWidth;
+            if (availableWidth <= 0)
+            {
+                return;
+            }
+
+            // Reserve space for the "+XX more" button + column spacing (8px) when items overflow
+            const double overflowButtonReserveWidth = 84d;
+            const double chipHorizontalPaddingAndBorder = 22d;
+            const double chipSpacing = 6d;
+
+            var totalAllChipsWidth = 0d;
+            var chipWidths = new double[ViewModel.Genres.Count];
+            var measureBlock = new TextBlock { FontSize = 12 };
+
+            for (var index = 0; index < ViewModel.Genres.Count; index++)
+            {
+                measureBlock.Text = ViewModel.Genres[index];
+                measureBlock.Measure(new Windows.Foundation.Size(double.PositiveInfinity, double.PositiveInfinity));
+                var chipWidth = measureBlock.DesiredSize.Width + chipHorizontalPaddingAndBorder;
+                chipWidths[index] = chipWidth;
+                totalAllChipsWidth += chipWidth + (index > 0 ? chipSpacing : 0d);
+            }
+
+            if (totalAllChipsWidth <= availableWidth)
+            {
+                ViewModel.SetGenreCollapseLimit(ViewModel.Genres.Count);
+                return;
+            }
+
+            var maxChipsWidth = Math.Max(100d, availableWidth - overflowButtonReserveWidth);
+            var cumulativeWidth = 0d;
+            var fitCount = 0;
+
+            for (var index = 0; index < chipWidths.Length; index++)
+            {
+                var nextWidth = index == 0 ? chipWidths[index] : cumulativeWidth + chipSpacing + chipWidths[index];
+                if (nextWidth > maxChipsWidth && fitCount > 0)
+                {
+                    break;
+                }
+
+                cumulativeWidth = nextWidth;
+                fitCount++;
+            }
+
+            ViewModel.SetGenreCollapseLimit(Math.Max(1, fitCount));
+        }
+
+        private async void RemoveTag_Click(object sender, RoutedEventArgs eventArgs)
+        {
+            if (sender is FrameworkElement element && element.Tag is string tagName)
+            {
+                await ViewModel.RemoveUserTagAsync(tagName);
+            }
+        }
+
+        private void TagAutoSuggestBox_GotFocus(object sender, RoutedEventArgs eventArgs)
+        {
+            if (sender is AutoSuggestBox autoSuggestBox)
+            {
+                autoSuggestBox.ItemsSource = ViewModel.GetTagSuggestions(autoSuggestBox.Text);
+                autoSuggestBox.IsSuggestionListOpen = true;
+            }
+        }
+
+        private void TagAutoSuggestBox_TextChanged(AutoSuggestBox sender, AutoSuggestBoxTextChangedEventArgs eventArgs)
+        {
+            if (eventArgs.Reason == AutoSuggestionBoxTextChangeReason.UserInput)
+            {
+                sender.ItemsSource = ViewModel.GetTagSuggestions(sender.Text);
+            }
+        }
+
+        private async void TagAutoSuggestBox_SuggestionChosen(AutoSuggestBox sender, AutoSuggestBoxSuggestionChosenEventArgs eventArgs)
+        {
+            if (eventArgs.SelectedItem is TagSuggestionItem suggestion)
+            {
+                await ViewModel.AddUserTagAsync(suggestion.Name);
+                sender.Text = string.Empty;
+            }
+        }
+
+        private async void TagAutoSuggestBox_QuerySubmitted(AutoSuggestBox sender, AutoSuggestBoxQuerySubmittedEventArgs eventArgs)
+        {
+            var tagName = eventArgs.ChosenSuggestion is TagSuggestionItem suggestion
+                ? suggestion.Name
+                : eventArgs.QueryText;
+
+            if (!string.IsNullOrWhiteSpace(tagName))
+            {
+                await ViewModel.AddUserTagAsync(tagName);
+                sender.Text = string.Empty;
+            }
+        }
+
+        private void GalleryScrollViewer_PointerWheelChanged(object sender, PointerRoutedEventArgs eventArgs) => HandleHorizontalWheelScroll(GalleryScrollViewer, eventArgs);
+
+        private void HighlightsScrollViewer_Loaded(object sender, RoutedEventArgs eventArgs)
+        {
+            if (sender is ScrollViewer scrollViewer)
+            {
+                scrollViewer.RemoveHandler(UIElement.PointerWheelChangedEvent, _highlightsWheelHandler);
+                scrollViewer.AddHandler(UIElement.PointerWheelChangedEvent, _highlightsWheelHandler, true);
+            }
+        }
+
+        private void HighlightsScrollViewer_PointerWheelChanged(object sender, PointerRoutedEventArgs eventArgs)
+        {
+            if (sender is ScrollViewer scrollViewer)
+            {
+                HandleHorizontalWheelScroll(scrollViewer, eventArgs);
+            }
+        }
+
+        private static void HandleHorizontalWheelScroll(ScrollViewer scrollViewer, PointerRoutedEventArgs eventArgs)
+        {
+            var pointerPoint = eventArgs.GetCurrentPoint(scrollViewer);
+            if (pointerPoint.Properties.IsHorizontalMouseWheel || scrollViewer.ScrollableWidth <= 0)
             {
                 return;
             }
 
             var delta = pointerPoint.Properties.MouseWheelDelta;
-
-            // Manual bubble up to parent if we've reached the ends
-            if (delta > 0 && GalleryScrollViewer.HorizontalOffset <= 0)
-            {
-                // Scroll Up (to the left) but already at the left edge
-                // Manually scroll RootScrollViewer UP
-                RootScrollViewer.ChangeView(null, RootScrollViewer.VerticalOffset - (delta * 0.5), null, false);
-                return;
-            }
-            if (delta < 0 && GalleryScrollViewer.HorizontalOffset >= GalleryScrollViewer.ScrollableWidth)
-            {
-                // Scroll Down (to the right) but already at the right edge
-                // Manually scroll RootScrollViewer DOWN
-                RootScrollViewer.ChangeView(null, RootScrollViewer.VerticalOffset - (delta * 0.5), null, false);
-                return;
-            }
-
-            double scrollAmount = -delta * 5;
-            var newOffset = GalleryScrollViewer.HorizontalOffset + scrollAmount;
-
-            GalleryScrollViewer.ChangeView(newOffset, null, null, false);
-
-            // Sync the target index for the manual buttons
-            _targetGalleryIndex = GetCurrentImageIndex();
-
-            e.Handled = true;
+            var newOffset = Math.Clamp(scrollViewer.HorizontalOffset - (delta * 2.5), 0, scrollViewer.ScrollableWidth);
+            scrollViewer.ChangeView(newOffset, null, null, false);
+            eventArgs.Handled = true;
         }
 
-        private void Button_PointerEntered(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e) => ProtectedCursor = Microsoft.UI.Input.InputSystemCursor.Create(Microsoft.UI.Input.InputSystemCursorShape.Hand);
-        private void Button_PointerExited(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e) => ProtectedCursor = null; // Revert to default cursor
-
-        private void PlayOverlay_Click(object sender, RoutedEventArgs e)
+        private void GalleryImage_Click(object sender, RoutedEventArgs eventArgs)
         {
-            if (sender is FrameworkElement element && element.DataContext is MediaSceneViewModel sceneVm)
+            if (sender is FrameworkElement element && element.Tag is string imagePath && ViewModel.GalleryImages != null)
             {
-                sceneVm.PlayerSource = sceneVm.File;
-                sceneVm.IsPlayerLoaded = true;
+                var index = ViewModel.GalleryImages.IndexOf(imagePath);
+                OpenLightbox(Math.Max(0, index));
             }
         }
 
-        private void MediaPlayerElement_Loaded(object sender, RoutedEventArgs e)
+        private void OpenLightbox(int index)
+        {
+            if (ViewModel.GalleryImages == null || ViewModel.GalleryImages.Count == 0)
+            {
+                return;
+            }
+
+            _lightboxIndex = Math.Clamp(index, 0, ViewModel.GalleryImages.Count - 1);
+            var imagePath = ViewModel.GalleryImages[_lightboxIndex];
+            LightboxImage.Source = new BitmapImage(new Uri(imagePath));
+            LightboxCounterText.Text = $"{_lightboxIndex + 1} / {ViewModel.GalleryImages.Count}";
+            UpdateLightboxImageHeight();
+            LightboxOverlay.Visibility = Visibility.Visible;
+        }
+
+        private void UpdateLightboxImageHeight()
+        {
+            if (ActualHeight <= 0)
+            {
+                return;
+            }
+
+            var targetHeight = Math.Clamp(ActualHeight * 0.72, 320, 660);
+            LightboxImage.Height = targetHeight;
+            if (LightboxImage.Parent is FrameworkElement parentBorder)
+            {
+                parentBorder.Height = targetHeight;
+            }
+        }
+
+        private void LightboxPrevious_Click(object sender, RoutedEventArgs eventArgs)
+        {
+            if (ViewModel.GalleryImages == null || ViewModel.GalleryImages.Count == 0)
+            {
+                return;
+            }
+
+            var previousIndex = (_lightboxIndex - 1 + ViewModel.GalleryImages.Count) % ViewModel.GalleryImages.Count;
+            OpenLightbox(previousIndex);
+        }
+
+        private void LightboxNext_Click(object sender, RoutedEventArgs eventArgs)
+        {
+            if (ViewModel.GalleryImages == null || ViewModel.GalleryImages.Count == 0)
+            {
+                return;
+            }
+
+            var nextIndex = (_lightboxIndex + 1) % ViewModel.GalleryImages.Count;
+            OpenLightbox(nextIndex);
+        }
+
+        private void LightboxClose_Click(object sender, RoutedEventArgs eventArgs) => LightboxOverlay.Visibility = Visibility.Collapsed;
+
+        private void LightboxOverlay_PointerPressed(object sender, PointerRoutedEventArgs eventArgs)
+        {
+            if (ReferenceEquals(eventArgs.OriginalSource, LightboxOverlay))
+            {
+                LightboxOverlay.Visibility = Visibility.Collapsed;
+            }
+        }
+
+        private void Page_PreviewKeyDown(object sender, KeyRoutedEventArgs eventArgs)
+        {
+            if (LightboxOverlay.Visibility != Visibility.Visible)
+            {
+                return;
+            }
+
+            if (eventArgs.Key == Windows.System.VirtualKey.Escape)
+            {
+                LightboxOverlay.Visibility = Visibility.Collapsed;
+                eventArgs.Handled = true;
+            }
+            else if (eventArgs.Key == Windows.System.VirtualKey.Left)
+            {
+                LightboxPrevious_Click(this, new RoutedEventArgs());
+                eventArgs.Handled = true;
+            }
+            else if (eventArgs.Key == Windows.System.VirtualKey.Right)
+            {
+                LightboxNext_Click(this, new RoutedEventArgs());
+                eventArgs.Handled = true;
+            }
+        }
+
+        private void FocusViewButton_Click(object sender, RoutedEventArgs eventArgs)
+        {
+            PausePlayersIn(MultiGridContainer);
+            ViewModel.IsGridMode = false;
+            FocusViewButton.Style = null;
+            if (Application.Current.Resources.TryGetValue("SubtleButtonStyle", out var subtleStyle) && subtleStyle is Style style)
+            {
+                GridViewButton.Style = style;
+            }
+            DispatcherQueue.TryEnqueue(UpdateSceneRailCardHeights);
+        }
+
+        private void GridViewButton_Click(object sender, RoutedEventArgs eventArgs)
+        {
+            PausePlayersIn(FocusTheaterContainer);
+            ViewModel.IsGridMode = true;
+            GridViewButton.Style = null;
+            if (Application.Current.Resources.TryGetValue("SubtleButtonStyle", out var subtleStyle) && subtleStyle is Style style)
+            {
+                FocusViewButton.Style = style;
+            }
+            DispatcherQueue.TryEnqueue(UpdateMultiGridCardSizes);
+        }
+
+        private void SceneRailItem_Click(object sender, RoutedEventArgs eventArgs)
+        {
+            if (sender is FrameworkElement element && element.DataContext is MediaSceneViewModel sceneViewModel)
+            {
+                if (ViewModel.SelectedScene != sceneViewModel)
+                {
+                    PausePlayersIn(FocusTheaterContainer);
+                    ViewModel.SelectedScene = sceneViewModel;
+                }
+            }
+        }
+
+        private void SceneRailScrollViewer_SizeChanged(object sender, SizeChangedEventArgs eventArgs) => UpdateSceneRailCardHeights();
+
+        private void SceneRailCard_Loaded(object sender, RoutedEventArgs eventArgs) => UpdateSceneRailCardHeights();
+
+        private void UpdateSceneRailCardHeights()
+        {
+            if (SceneRailItemsControl.ItemsPanelRoot is not StackPanel stackPanel || ViewModel?.Scenes == null || ViewModel.Scenes.Count == 0)
+            {
+                return;
+            }
+
+            var availableHeight = SceneRailScrollViewer.ActualHeight;
+            if (availableHeight <= 0)
+            {
+                return;
+            }
+
+            var sceneCount = ViewModel.Scenes.Count;
+            var totalSpacing = stackPanel.Spacing * Math.Max(0, sceneCount - 1);
+            var cardHeight = Math.Max(110, (availableHeight - totalSpacing) / sceneCount);
+
+            foreach (var child in stackPanel.Children)
+            {
+                if (child is FrameworkElement cardElement)
+                {
+                    cardElement.Height = cardHeight;
+                }
+            }
+        }
+
+        private static void PausePlayersIn(DependencyObject parent)
+        {
+            var childrenCount = VisualTreeHelper.GetChildrenCount(parent);
+            for (var index = 0; index < childrenCount; index++)
+            {
+                var child = VisualTreeHelper.GetChild(parent, index);
+                if (child is MediaPlayerElement mediaPlayerElement)
+                {
+                    try
+                    {
+                        mediaPlayerElement.MediaPlayer?.Pause();
+                    }
+                    catch
+                    {
+                    }
+                }
+                else
+                {
+                    PausePlayersIn(child);
+                }
+            }
+        }
+
+        private void FocusSourceDropDownButton_Click(object sender, RoutedEventArgs eventArgs)
+        {
+            if (sender is not FrameworkElement element || ViewModel.SelectedScene is not MediaSceneViewModel sceneViewModel)
+            {
+                return;
+            }
+
+            var flyout = new MenuFlyout();
+            foreach (var source in sceneViewModel.Sources)
+            {
+                var item = new ToggleMenuFlyoutItem
+                {
+                    Text = source.DisplayLabel,
+                    IsChecked = source == sceneViewModel.SelectedSource
+                };
+                item.Click += (_, _) => sceneViewModel.SelectedSource = source;
+                flyout.Items.Add(item);
+            }
+
+            flyout.ShowAt(element);
+        }
+
+        private void MultiGridCard_Loaded(object sender, RoutedEventArgs eventArgs) => UpdateMultiGridCardSizes();
+
+        private void UpdateMultiGridCardSizes()
+        {
+            if (MultiGridItemsControl.ItemsPanelRoot is not WrapPanel wrapPanel || ViewModel?.Scenes == null)
+            {
+                return;
+            }
+
+            var availableWidth = MultiGridContainer.ActualWidth;
+            var availableHeight = MultiGridContainer.ActualHeight;
+            if (availableWidth <= 0 || availableHeight <= 0)
+            {
+                return;
+            }
+
+            var sceneCount = ViewModel.Scenes.Count;
+            var columnCount = sceneCount <= 1 ? 1 : 2;
+            var rowCount = (int)Math.Ceiling(sceneCount / (double)columnCount);
+            var visibleRows = Math.Min(rowCount, 2);
+
+            var cardWidth = Math.Max(260, (availableWidth - (wrapPanel.HorizontalSpacing * (columnCount - 1))) / columnCount);
+            var cardHeight = Math.Max(220, (availableHeight - (wrapPanel.VerticalSpacing * Math.Max(0, visibleRows - 1))) / visibleRows);
+
+            foreach (var child in wrapPanel.Children)
+            {
+                if (child is FrameworkElement cardElement)
+                {
+                    cardElement.Width = cardWidth;
+                    cardElement.Height = cardHeight;
+                }
+            }
+        }
+
+        private void Button_PointerEntered(object sender, PointerRoutedEventArgs eventArgs)
+            => ProtectedCursor = Microsoft.UI.Input.InputSystemCursor.Create(Microsoft.UI.Input.InputSystemCursorShape.Hand);
+
+        private void Button_PointerExited(object sender, PointerRoutedEventArgs eventArgs)
+            => ProtectedCursor = null;
+
+        private void PlayOverlay_Click(object sender, RoutedEventArgs eventArgs)
+        {
+            if (sender is FrameworkElement element && element.DataContext is MediaSceneViewModel sceneViewModel)
+            {
+                sceneViewModel.PendingSeekPosition = null;
+                sceneViewModel.PlayerSource = sceneViewModel.File;
+                sceneViewModel.IsPlayerLoaded = true;
+            }
+        }
+
+        private void HighlightThumbnail_Click(object sender, RoutedEventArgs eventArgs)
+        {
+            if (sender is not FrameworkElement element || element.DataContext is not HighlightThumbnailItem highlightItem)
+            {
+                return;
+            }
+
+            var sceneViewModel = FindAncestorDataContext<MediaSceneViewModel>(element) ?? ViewModel.SelectedScene;
+            if (sceneViewModel == null)
+            {
+                return;
+            }
+
+            sceneViewModel.PendingSeekPosition = TimeSpan.FromSeconds(highlightItem.TimestampSeconds);
+            sceneViewModel.PlayerSource = sceneViewModel.File;
+            sceneViewModel.IsPlayerLoaded = true;
+        }
+
+        private static T? FindAncestorDataContext<T>(DependencyObject element) where T : class
+        {
+            var parent = VisualTreeHelper.GetParent(element);
+            while (parent != null)
+            {
+                if (parent is FrameworkElement frameworkElement && frameworkElement.DataContext is T match)
+                {
+                    return match;
+                }
+                parent = VisualTreeHelper.GetParent(parent);
+            }
+            return null;
+        }
+
+        private void MediaPlayerElement_Loaded(object sender, RoutedEventArgs eventArgs)
         {
             if (sender is MediaPlayerElement mediaPlayerElement)
             {
                 _activePlayer = mediaPlayerElement;
-
-                if (mediaPlayerElement.DataContext is MediaSceneViewModel sceneViewModel)
-                {
-                    sceneViewModel.PropertyChanged += SceneVm_PropertyChanged;
-                }
 
                 try
                 {
@@ -176,30 +558,19 @@ namespace Japlayer.Views
                         player.MediaOpened += MediaPlayer_MediaOpened;
                     }
                 }
-                catch (Exception)
+                catch
                 {
-                }
-
-                var container = FindParentGrid(mediaPlayerElement);
-                if (container != null)
-                {
-                    UpdatePlayerContainerHeight(container);
                 }
 
                 mediaPlayerElement.Focus(FocusState.Programmatic);
-                mediaPlayerElement.AddHandler(UIElement.PointerPressedEvent, new Microsoft.UI.Xaml.Input.PointerEventHandler(MediaPlayerElement_PointerPressed), true);
+                mediaPlayerElement.AddHandler(UIElement.PointerPressedEvent, new PointerEventHandler(MediaPlayerElement_PointerPressed), true);
             }
         }
 
-        private void MediaPlayerElement_Unloaded(object sender, RoutedEventArgs e)
+        private void MediaPlayerElement_Unloaded(object sender, RoutedEventArgs eventArgs)
         {
             if (sender is MediaPlayerElement mediaPlayerElement)
             {
-                if (mediaPlayerElement.DataContext is MediaSceneViewModel sceneViewModel)
-                {
-                    sceneViewModel.PropertyChanged -= SceneVm_PropertyChanged;
-                }
-
                 try
                 {
                     var player = mediaPlayerElement.MediaPlayer;
@@ -208,11 +579,11 @@ namespace Japlayer.Views
                         player.MediaOpened -= MediaPlayer_MediaOpened;
                     }
                 }
-                catch (Exception)
+                catch
                 {
                 }
 
-                mediaPlayerElement.RemoveHandler(UIElement.PointerPressedEvent, new Microsoft.UI.Xaml.Input.PointerEventHandler(MediaPlayerElement_PointerPressed));
+                mediaPlayerElement.RemoveHandler(UIElement.PointerPressedEvent, new PointerEventHandler(MediaPlayerElement_PointerPressed));
 
                 if (_activePlayer == mediaPlayerElement)
                 {
@@ -220,17 +591,9 @@ namespace Japlayer.Views
                 }
 
                 // IMPORTANT: Setting Source to null is enough to release the file handle.
-                // Do NOT call mediaPlayerElement.MediaPlayer.Dispose() as it can cause COMException 
+                // Do NOT call mediaPlayerElement.MediaPlayer.Dispose() as it can cause COMException
                 // if the framework tries to access the player during/after unload.
                 mediaPlayerElement.Source = null;
-            }
-        }
-
-        private void PlayerContainer_SizeChanged(object sender, SizeChangedEventArgs e)
-        {
-            if (sender is Grid container)
-            {
-                UpdatePlayerContainerHeight(container);
             }
         }
 
@@ -238,44 +601,19 @@ namespace Japlayer.Views
         {
             DispatcherQueue.TryEnqueue(() =>
             {
-                var container = FindPlayerContainer(RootScrollViewer, sender);
-                if (container != null)
+                var mediaPlayerElement = FindMediaPlayerElement(ScenesTheaterSection, sender);
+                if (mediaPlayerElement?.DataContext is MediaSceneViewModel sceneViewModel && sceneViewModel.PendingSeekPosition.HasValue)
                 {
-                    UpdatePlayerContainerHeight(container);
+                    try
+                    {
+                        sender.PlaybackSession.Position = sceneViewModel.PendingSeekPosition.Value;
+                    }
+                    catch
+                    {
+                    }
+                    sceneViewModel.PendingSeekPosition = null;
                 }
             });
-        }
-
-        private void SceneVm_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
-        {
-            if (e.PropertyName == nameof(MediaSceneViewModel.AspectRatio))
-            {
-                DispatcherQueue.TryEnqueue(() =>
-                {
-                    if (sender is MediaSceneViewModel sceneVm)
-                    {
-                        var container = FindPlayerContainerByDataContext(RootScrollViewer, sceneVm);
-                        if (container != null)
-                        {
-                            UpdatePlayerContainerHeight(container);
-                        }
-                    }
-                });
-            }
-        }
-
-        private Grid? FindParentGrid(DependencyObject child)
-        {
-            var parent = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetParent(child);
-            while (parent != null)
-            {
-                if (parent is Grid grid && grid.Name == "PlayerContainer")
-                {
-                    return grid;
-                }
-                parent = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetParent(parent);
-            }
-            return null;
         }
 
         private MediaPlayerElement? FindMediaPlayerElement(DependencyObject parent, Windows.Media.Playback.MediaPlayer player)
@@ -285,22 +623,24 @@ namespace Japlayer.Views
                 return null;
             }
 
-            if (parent is MediaPlayerElement mpe)
+            if (parent is MediaPlayerElement mediaPlayerElement)
             {
                 try
                 {
-                    if (mpe.MediaPlayer == player)
+                    if (mediaPlayerElement.MediaPlayer == player)
                     {
-                        return mpe;
+                        return mediaPlayerElement;
                     }
                 }
-                catch { }
+                catch
+                {
+                }
             }
 
-            var childrenCount = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChildrenCount(parent);
-            for (var i = 0; i < childrenCount; i++)
+            var childrenCount = VisualTreeHelper.GetChildrenCount(parent);
+            for (var index = 0; index < childrenCount; index++)
             {
-                var child = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChild(parent, i);
+                var child = VisualTreeHelper.GetChild(parent, index);
                 var result = FindMediaPlayerElement(child, player);
                 if (result != null)
                 {
@@ -311,142 +651,41 @@ namespace Japlayer.Views
             return null;
         }
 
-        private Grid? FindPlayerContainer(DependencyObject parent, Windows.Media.Playback.MediaPlayer player)
+        private async void OpenIn_Click(object sender, RoutedEventArgs eventArgs)
         {
-            var mpe = FindMediaPlayerElement(parent, player);
-            if (mpe != null)
-            {
-                return FindParentGrid(mpe);
-            }
-            return null;
-        }
-
-        private Grid? FindPlayerContainerByDataContext(DependencyObject parent, MediaSceneViewModel dataContext)
-        {
-            if (parent == null)
-            {
-                return null;
-            }
-
-            if (parent is Grid grid && grid.Name == "PlayerContainer" && grid.DataContext == dataContext)
-            {
-                return grid;
-            }
-
-            var childrenCount = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChildrenCount(parent);
-            for (var i = 0; i < childrenCount; i++)
-            {
-                var child = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChild(parent, i);
-                var result = FindPlayerContainerByDataContext(child, dataContext);
-                if (result != null)
-                {
-                    return result;
-                }
-            }
-
-            return null;
-        }
-
-        private T? FindVisualChild<T>(DependencyObject parent) where T : DependencyObject
-        {
-            if (parent == null)
-            {
-                return null;
-            }
-
-            if (parent is T typedChild)
-            {
-                return typedChild;
-            }
-
-            var childrenCount = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChildrenCount(parent);
-            for (var i = 0; i < childrenCount; i++)
-            {
-                var child = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChild(parent, i);
-                var result = FindVisualChild<T>(child);
-                if (result != null)
-                {
-                    return result;
-                }
-            }
-
-            return null;
-        }
-
-        private void UpdatePlayerContainerHeight(Grid container)
-        {
-            if (container == null || container.DataContext is not MediaSceneViewModel sceneVm)
+            if (sender is not FrameworkElement element || element.DataContext is not MediaSceneViewModel sceneViewModel)
             {
                 return;
             }
 
-            if (container.ActualWidth <= 0)
-            {
-                return;
-            }
-
-            // Use the cached aspect ratio if available to avoid calling COM properties on the UI thread
-            if (sceneVm.AspectRatio.HasValue)
-            {
-                container.Height = container.ActualWidth * sceneVm.AspectRatio.Value;
-                return;
-            }
-
-            // Only retrieve dimensions if player is active and we are in or after the MediaOpened event
-            if (sceneVm.IsPlayerLoaded)
-            {
-                try
-                {
-                    var mpe = FindVisualChild<MediaPlayerElement>(container);
-                    var player = mpe?.MediaPlayer;
-                    if (player != null && player.PlaybackSession != null && player.PlaybackSession.NaturalVideoWidth > 0)
-                    {
-                        var ratio = (double)player.PlaybackSession.NaturalVideoHeight / player.PlaybackSession.NaturalVideoWidth;
-                        sceneVm.AspectRatio = ratio;
-                        container.Height = container.ActualWidth * ratio;
-                    }
-                }
-                catch (Exception)
-                {
-                    // Prevent crashes if player is disposed or in an invalid state
-                }
-            }
-        }
-        private async void OpenIn_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is not FrameworkElement element || element.DataContext is not MediaSceneViewModel sceneVm)
-            {
-                return;
-            }
-
-            if (string.IsNullOrEmpty(sceneVm.File))
+            if (string.IsNullOrEmpty(sceneViewModel.File))
             {
                 return;
             }
 
             try
             {
-                var handlers = await AppHandlers.LoadForFileAsync(sceneVm.File);
+                var handlers = await AppHandlers.LoadForFileAsync(sceneViewModel.File);
                 if (handlers == null)
                 {
                     return;
                 }
 
                 var menu = new MenuFlyout();
-                AppLauncherHelper.PopulateAppMenu(menu.Items, sceneVm.File, handlers, DispatcherQueue, XamlRoot);
+                AppLauncherHelper.PopulateAppMenu(menu.Items, sceneViewModel.File, handlers, DispatcherQueue, XamlRoot);
 
                 if (menu.Items.Count > 0)
                 {
                     menu.ShowAt(element);
                 }
             }
-            catch (Exception ex)
+            catch (Exception exception)
             {
-                await AppLauncherHelper.ShowErrorDialogAsync($"Could not open file handlers: {ex.Message}", XamlRoot);
+                await AppLauncherHelper.ShowErrorDialogAsync($"Could not open file handlers: {exception.Message}", XamlRoot);
             }
         }
 
-        private void MediaItemPage_Unloaded(object sender, RoutedEventArgs e)
+        private void MediaItemPage_Unloaded(object sender, RoutedEventArgs eventArgs)
         {
             if (_fullScreenPlayer != null)
             {
@@ -464,7 +703,6 @@ namespace Japlayer.Views
 
             if (_fullScreenPlayer != null)
             {
-                // Save playing state
                 var wasPlaying = false;
                 try
                 {
@@ -473,16 +711,16 @@ namespace Japlayer.Views
                         wasPlaying = _fullScreenPlayer.MediaPlayer.PlaybackSession.PlaybackState == Windows.Media.Playback.MediaPlaybackState.Playing;
                     }
                 }
-                catch { }
+                catch
+                {
+                }
 
-                // Temporarily unsubscribe Unloaded to prevent clearing Source
                 _fullScreenPlayer.Unloaded -= MediaPlayerElement_Unloaded;
 
                 if (_originalPlayerParent != null)
                 {
                     mainWindow.ExitFullScreen(_fullScreenPlayer, _originalPlayerParent, _originalParentHeight);
 
-                    // Scroll back to the player on the next layout pass
                     var targetParent = _originalPlayerParent;
                     DispatcherQueue.TryEnqueue(() =>
                     {
@@ -490,22 +728,20 @@ namespace Japlayer.Views
                     });
                 }
 
-                // Resubscribe Unloaded
                 _fullScreenPlayer.Unloaded += MediaPlayerElement_Unloaded;
 
-                // Resume playback if it was playing
                 if (wasPlaying)
                 {
                     try
                     {
                         _fullScreenPlayer.MediaPlayer?.Play();
                     }
-                    catch { }
+                    catch
+                    {
+                    }
                 }
 
-                // Notify controls
-                var controls = _fullScreenPlayer.TransportControls as CustomMediaTransportControls;
-                if (controls != null)
+                if (_fullScreenPlayer.TransportControls is CustomMediaTransportControls controls)
                 {
                     VisualStateManager.GoToState(controls, "NonFullWindowState", true);
                 }
@@ -515,11 +751,9 @@ namespace Japlayer.Views
             }
             else
             {
-                // Enter Fullscreen
                 var sceneDataContext = player.DataContext;
-                _originalPlayerParent = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetParent(player) as Grid;
+                _originalPlayerParent = VisualTreeHelper.GetParent(player) as Grid;
 
-                // Save playing state
                 var wasPlaying = false;
                 try
                 {
@@ -528,39 +762,38 @@ namespace Japlayer.Views
                         wasPlaying = player.MediaPlayer.PlaybackSession.PlaybackState == Windows.Media.Playback.MediaPlaybackState.Playing;
                     }
                 }
-                catch { }
+                catch
+                {
+                }
 
                 if (_originalPlayerParent != null)
                 {
                     _originalParentHeight = _originalPlayerParent.Height;
 
-                    // Temporarily unsubscribe Unloaded to prevent clearing Source
                     player.Unloaded -= MediaPlayerElement_Unloaded;
 
                     _originalPlayerParent.Children.Remove(player);
-                    _originalPlayerParent.Height = 0; // Collapse container
+                    _originalPlayerParent.Height = 0;
                 }
 
                 _fullScreenPlayer = player;
                 mainWindow.EnterFullScreen(_fullScreenPlayer, _originalPlayerParent!);
                 _fullScreenPlayer.DataContext = sceneDataContext;
 
-                // Resubscribe Unloaded
                 _fullScreenPlayer.Unloaded += MediaPlayerElement_Unloaded;
 
-                // Resume playback if it was playing
                 if (wasPlaying)
                 {
                     try
                     {
                         _fullScreenPlayer.MediaPlayer?.Play();
                     }
-                    catch { }
+                    catch
+                    {
+                    }
                 }
 
-                // Notify controls
-                var controls = _fullScreenPlayer.TransportControls as CustomMediaTransportControls;
-                if (controls != null)
+                if (_fullScreenPlayer.TransportControls is CustomMediaTransportControls controls)
                 {
                     VisualStateManager.GoToState(controls, "FullWindowState", true);
                 }
@@ -573,7 +806,7 @@ namespace Japlayer.Views
             set => _activePlayer = value;
         }
 
-        private void MediaPlayerElement_PointerPressed(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+        private void MediaPlayerElement_PointerPressed(object sender, PointerRoutedEventArgs eventArgs)
         {
             if (sender is MediaPlayerElement mediaPlayerElement)
             {
