@@ -18,6 +18,7 @@ public class GenerateThumbnailsApp : BaseApp
     private const int ThumbnailIntervalSeconds = 60;
     private const int MaxDatabaseBusyRetries = 5;
     private const int MaxFileMoveRetries = 3;
+    private static readonly int FfmpegThreads = Math.Clamp(Environment.ProcessorCount / 4, 1, 4);
 
     private readonly SemaphoreSlim _globalSemaphore = new(Environment.ProcessorCount);
     private readonly SemaphoreSlim _databaseWriteSemaphore = new(1, 1);
@@ -371,6 +372,16 @@ public class GenerateThumbnailsApp : BaseApp
                     _ => await ExtractThumbnailsSeekAsync(location.Path, videoInfo.Duration, videoFilter, thumbsSubdirectory, tempPrefix, logPrefix)
                 };
 
+                // Under --strategy auto, fall back to seek if single-pass fails (e.g. -hwaccel or -skip_frame incompatibility).
+                if (extractedFrames.Count == 0 &&
+                    strategy == ExtractionStrategy.Auto &&
+                    resolvedStrategy == ExtractionStrategy.SinglePass)
+                {
+                    DeleteTempFiles(thumbsSubdirectory, tempPrefix);
+                    LogInfo($"{logPrefix} Single-pass failed under auto strategy; falling back to seek (-ss)...");
+                    extractedFrames = await ExtractThumbnailsSeekAsync(location.Path, videoInfo.Duration, videoFilter, thumbsSubdirectory, tempPrefix, logPrefix);
+                }
+
                 if (extractedFrames.Count == 0)
                 {
                     DeleteTempFiles(thumbsSubdirectory, tempPrefix);
@@ -449,7 +460,8 @@ public class GenerateThumbnailsApp : BaseApp
         string logPrefix)
     {
         var timestamps = new List<int>();
-        for (var timestampValue = 0; timestampValue < durationSeconds; timestampValue += ThumbnailIntervalSeconds)
+        // Avoid seeking within the final second where container audio duration can outlast the last video frame.
+        for (var timestampValue = 0; timestampValue < durationSeconds - 1; timestampValue += ThumbnailIntervalSeconds)
         {
             timestamps.Add(timestampValue);
         }
@@ -468,6 +480,19 @@ public class GenerateThumbnailsApp : BaseApp
             if (!await ExtractFrameAsync(videoPath, timestampValue, videoFilter, tempFilePath))
             {
                 LogError($"{logPrefix} Failed to extract frame at timestamp {timestampValue}s.");
+                return [];
+            }
+
+            if (!File.Exists(tempFilePath))
+            {
+                // ffmpeg can exit 0 without writing a frame if the video stream ends slightly before container duration.
+                if (timestampValue > 0 && timestampValue >= durationSeconds - 10)
+                {
+                    LogInfo($"{logPrefix} No frame written near end of stream at {timestampValue}s (duration {durationSeconds:F2}s); stopping extraction.");
+                    break;
+                }
+
+                LogError($"{logPrefix} Frame file was not created at timestamp {timestampValue}s.");
                 return [];
             }
 
@@ -494,7 +519,8 @@ public class GenerateThumbnailsApp : BaseApp
         var startInfo = new ProcessStartInfo
         {
             FileName = "ffmpeg",
-            Arguments = $"-skip_frame nokey -an -sn -dn -threads 1 -i \"{videoPath}\" -vf \"fps=1/{ThumbnailIntervalSeconds},{videoFilter}\" -q:v 4 -start_number 0 \"{tempOutputPattern}\" -y",
+            // Enable -hwaccel auto only on single-pass (1 process per scene) where GPU init cost amortizes across the whole video.
+            Arguments = $"-skip_frame nokey -hwaccel auto -an -sn -dn -threads {FfmpegThreads} -i \"{videoPath}\" -vf \"fps=1/{ThumbnailIntervalSeconds},{videoFilter}\" -q:v 4 -start_number 0 \"{tempOutputPattern}\" -y",
             RedirectStandardOutput = false,
             RedirectStandardError = false,
             UseShellExecute = false,
@@ -624,8 +650,8 @@ public class GenerateThumbnailsApp : BaseApp
         var startInfo = new ProcessStartInfo
         {
             FileName = "ffmpeg",
-            // Skip audio/subtitles/data and cap to 1 thread per process to avoid N*N oversubscription across parallel workers.
-            Arguments = $"-ss {seconds} -an -sn -dn -threads 1 -i \"{videoPath}\" -vframes 1 -q:v 4 -vf \"{filter}\" \"{outputPath}\" -y",
+            // Skip audio/subtitles/data and cap threads per process (no -hwaccel here: per-process GPU init hurts seek speed).
+            Arguments = $"-ss {seconds} -an -sn -dn -threads {FfmpegThreads} -i \"{videoPath}\" -vframes 1 -q:v 4 -vf \"{filter}\" \"{outputPath}\" -y",
             RedirectStandardOutput = false,
             RedirectStandardError = false,
             UseShellExecute = false,
