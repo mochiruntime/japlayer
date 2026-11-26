@@ -1,12 +1,10 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
-using System.Runtime.InteropServices;
-using System.Text.Json;
+using Japlayer.CLI.Helpers;
 using Japlayer.Data.Context;
 using Japlayer.Data.Entities;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Win32.SafeHandles;
 
 namespace Japlayer.CLI.Apps;
 
@@ -107,7 +105,7 @@ public class GenerateThumbnailsApp : BaseApp
             return;
         }
 
-        targetLocations = InterleaveByDrive(targetLocations);
+        targetLocations = MediaProbeHelper.InterleaveByDrive(targetLocations, location => location.Path);
 
         var globalLimit = Environment.ProcessorCount;
         var pipelineLimit = Math.Max(100, globalLimit * 4);
@@ -289,34 +287,6 @@ public class GenerateThumbnailsApp : BaseApp
         return candidates.First();
     }
 
-    private static List<MediaLocation> InterleaveByDrive(List<MediaLocation> targetLocations)
-    {
-        var driveGroups = targetLocations
-            .GroupBy(location => Path.GetPathRoot(location.Path) ?? "", StringComparer.OrdinalIgnoreCase)
-            .Select(group => group.ToList())
-            .ToList();
-
-        if (driveGroups.Count == 0)
-        {
-            return targetLocations;
-        }
-
-        var interleaved = new List<MediaLocation>(targetLocations.Count);
-        var maxGroupSize = driveGroups.Max(group => group.Count);
-        for (var index = 0; index < maxGroupSize; index++)
-        {
-            foreach (var group in driveGroups)
-            {
-                if (index < group.Count)
-                {
-                    interleaved.Add(group[index]);
-                }
-            }
-        }
-
-        return interleaved;
-    }
-
     private async Task<bool> ProcessLocationAsync(
         MediaLocation location,
         DbContextOptions<DatabaseContext> databaseOptions,
@@ -351,7 +321,7 @@ public class GenerateThumbnailsApp : BaseApp
             {
                 LogInfo($"{logPrefix} Starting processing on drive '{driveRoot}'...");
 
-                var videoInfo = await GetVideoInfoAsync(location.Path);
+                var videoInfo = await MediaProbeHelper.GetVideoInfoAsync(location.Path, cancellationToken);
                 if (videoInfo == null || videoInfo.Duration <= 0)
                 {
                     LogError($"{logPrefix} Could not retrieve video metadata. skipping.");
@@ -587,64 +557,6 @@ public class GenerateThumbnailsApp : BaseApp
         await command.ExecuteNonQueryAsync();
     }
 
-    private static async Task<VideoInfo?> GetVideoInfoAsync(string videoPath)
-    {
-        var startInfo = new ProcessStartInfo
-        {
-            FileName = "ffprobe",
-            Arguments = $"-v error -select_streams v:0 -show_entries format=duration:stream=width,height,codec_name -of json \"{videoPath}\"",
-            RedirectStandardOutput = true,
-            RedirectStandardError = false,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
-
-        using var process = new Process { StartInfo = startInfo };
-        process.Start();
-
-        var stdoutTask = process.StandardOutput.ReadToEndAsync();
-        await process.WaitForExitAsync();
-
-        if (process.ExitCode != 0)
-        {
-            return null;
-        }
-
-        try
-        {
-            var output = await stdoutTask;
-            using var doc = JsonDocument.Parse(output);
-
-            var streams = doc.RootElement.GetProperty("streams");
-            var width = 0;
-            var height = 0;
-            string? codecName = null;
-            if (streams.GetArrayLength() > 0)
-            {
-                var firstStream = streams[0];
-                width = firstStream.GetProperty("width").GetInt32();
-                height = firstStream.GetProperty("height").GetInt32();
-                if (firstStream.TryGetProperty("codec_name", out var codecProperty))
-                {
-                    codecName = codecProperty.GetString();
-                }
-            }
-
-            var format = doc.RootElement.GetProperty("format");
-            double duration = 0;
-            if (format.TryGetProperty("duration", out var durationProp))
-            {
-                duration = double.Parse(durationProp.GetString()!, System.Globalization.CultureInfo.InvariantCulture);
-            }
-
-            return new VideoInfo { Width = width, Height = height, Duration = duration, CodecName = codecName };
-        }
-        catch
-        {
-            return null;
-        }
-    }
-
     private static async Task<bool> ExtractFrameAsync(string videoPath, int seconds, string filter, string outputPath)
     {
         var startInfo = new ProcessStartInfo
@@ -847,7 +759,7 @@ public class GenerateThumbnailsApp : BaseApp
             {
                 forceRegenerate = true;
             }
-            else if (TryReadFlagValue(args, ref index, argument, "--strategy", out var strategyValue, out errorMessage))
+            else if (CliArgumentHelper.TryReadFlagValue(args, ref index, argument, "--strategy", out var strategyValue, out errorMessage))
             {
                 if (!TryParseStrategy(strategyValue, out strategy, out errorMessage))
                 {
@@ -858,7 +770,7 @@ public class GenerateThumbnailsApp : BaseApp
             {
                 return false;
             }
-            else if (TryReadFlagValue(args, ref index, argument, "--ignore", out var ignoreValue, out errorMessage))
+            else if (CliArgumentHelper.TryReadFlagValue(args, ref index, argument, "--ignore", out var ignoreValue, out errorMessage))
             {
                 if (ignoreValue != null)
                 {
@@ -869,7 +781,7 @@ public class GenerateThumbnailsApp : BaseApp
             {
                 return false;
             }
-            else if (TryReadFlagValue(args, ref index, argument, "--ignore-file", out var ignoreFilePath, out errorMessage))
+            else if (CliArgumentHelper.TryReadFlagValue(args, ref index, argument, "--ignore-file", out var ignoreFilePath, out errorMessage))
             {
                 if (ignoreFilePath != null && !ignoredFilter.TryLoadFile(ignoreFilePath, out errorMessage))
                 {
@@ -880,8 +792,8 @@ public class GenerateThumbnailsApp : BaseApp
             {
                 return false;
             }
-            else if (TryReadFlagValue(args, ref index, argument, "--only", out var onlyValue, out errorMessage) ||
-                     TryReadFlagValue(args, ref index, argument, "--scenes", out onlyValue, out errorMessage))
+            else if (CliArgumentHelper.TryReadFlagValue(args, ref index, argument, "--only", out var onlyValue, out errorMessage) ||
+                     CliArgumentHelper.TryReadFlagValue(args, ref index, argument, "--scenes", out onlyValue, out errorMessage))
             {
                 if (onlyValue != null)
                 {
@@ -895,92 +807,6 @@ public class GenerateThumbnailsApp : BaseApp
         }
 
         return true;
-    }
-
-    private static bool TryReadFlagValue(
-        string[] args,
-        ref int index,
-        string argument,
-        string flagName,
-        out string? value,
-        out string errorMessage)
-    {
-        errorMessage = string.Empty;
-        if (string.Equals(argument, flagName, StringComparison.OrdinalIgnoreCase))
-        {
-            if (index + 1 >= args.Length)
-            {
-                errorMessage = $"Missing value after '{flagName}'.";
-                value = null;
-                return false;
-            }
-
-            value = args[++index];
-            return true;
-        }
-
-        var prefix = $"{flagName}=";
-        if (argument.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-        {
-            value = argument[prefix.Length..];
-            return true;
-        }
-
-        value = null;
-        return false;
-    }
-
-    private sealed class SceneFilterSet
-    {
-        private readonly HashSet<string> _mediaIds = new(StringComparer.OrdinalIgnoreCase);
-        private readonly HashSet<(string MediaId, int Scene)> _scenes = new(new MediaSceneEqualityComparer());
-
-        public bool HasRules => _mediaIds.Count > 0 || _scenes.Count > 0;
-
-        public bool Matches(string mediaId, int scene) =>
-            _mediaIds.Contains(mediaId) || _scenes.Contains((mediaId, scene));
-
-        public bool TryLoadFile(string filePath, out string errorMessage)
-        {
-            if (!File.Exists(filePath))
-            {
-                errorMessage = $"Filter file not found: {filePath}";
-                return false;
-            }
-
-            foreach (var rawLine in File.ReadLines(filePath))
-            {
-                var commentIndex = rawLine.IndexOf('#');
-                var cleanedLine = (commentIndex >= 0 ? rawLine[..commentIndex] : rawLine).Trim();
-                if (!string.IsNullOrEmpty(cleanedLine))
-                {
-                    AddTokens(cleanedLine);
-                }
-            }
-
-            errorMessage = string.Empty;
-            return true;
-        }
-
-        public void AddTokens(string rawValue)
-        {
-            foreach (var rawToken in rawValue.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-            {
-                var colonIndex = rawToken.LastIndexOf(':');
-                if (colonIndex > 0 && int.TryParse(rawToken[(colonIndex + 1)..], out var sceneNumber))
-                {
-                    var mediaId = rawToken[..colonIndex].Trim();
-                    if (!string.IsNullOrEmpty(mediaId))
-                    {
-                        _scenes.Add((mediaId, sceneNumber));
-                    }
-                }
-                else
-                {
-                    _mediaIds.Add(rawToken);
-                }
-            }
-        }
     }
 
     private ExtractionStrategy ResolveExtractionStrategy(
@@ -1047,128 +873,5 @@ public class GenerateThumbnailsApp : BaseApp
         Auto,
         Seek,
         SinglePass
-    }
-
-    private sealed class MediaSceneEqualityComparer : IEqualityComparer<(string MediaId, int Scene)>
-    {
-        public bool Equals((string MediaId, int Scene) first, (string MediaId, int Scene) second) =>
-            string.Equals(first.MediaId, second.MediaId, StringComparison.OrdinalIgnoreCase) &&
-            first.Scene == second.Scene;
-
-        public int GetHashCode((string MediaId, int Scene) item) =>
-            HashCode.Combine(StringComparer.OrdinalIgnoreCase.GetHashCode(item.MediaId), item.Scene);
-    }
-}
-
-public class VideoInfo
-{
-    public int Width { get; set; }
-    public int Height { get; set; }
-    public double Duration { get; set; }
-    public string? CodecName { get; set; }
-}
-
-public static class DiskTypeDetector
-{
-    private const uint IOCTL_STORAGE_QUERY_PROPERTY = 0x002D1400;
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct STORAGE_PROPERTY_QUERY
-    {
-        public uint PropertyId;
-        public uint QueryType;
-        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 1)]
-        public byte[] AdditionalParameters;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct DEVICE_SEEK_PENALTY_DESCRIPTOR
-    {
-        public uint Version;
-        public uint Size;
-        [MarshalAs(UnmanagedType.I1)]
-        public bool IncursSeekPenalty;
-    }
-
-    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Auto)]
-    private static extern SafeFileHandle CreateFile(
-        string lpFileName,
-        uint dwDesiredAccess,
-        uint dwShareMode,
-        IntPtr lpSecurityAttributes,
-        uint dwCreationDisposition,
-        uint dwFlagsAndAttributes,
-        IntPtr hTemplateFile);
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern bool DeviceIoControl(
-        SafeFileHandle hDevice,
-        uint dwIoControlCode,
-        ref STORAGE_PROPERTY_QUERY lpInBuffer,
-        uint nInBufferSize,
-        ref DEVICE_SEEK_PENALTY_DESCRIPTOR lpOutBuffer,
-        uint nOutBufferSize,
-        out uint lpBytesReturned,
-        IntPtr lpOverlapped);
-
-    private const uint FILE_SHARE_READ = 0x00000001;
-    private const uint FILE_SHARE_WRITE = 0x00000002;
-    private const uint OPEN_EXISTING = 3;
-
-    public static bool IsSsd(string path)
-    {
-        try
-        {
-            var root = Path.GetPathRoot(path);
-            if (string.IsNullOrEmpty(root))
-            {
-                return false;
-            }
-
-            var volumeName = @"\\.\" + root.TrimEnd('\\');
-
-            using var handle = CreateFile(
-                volumeName,
-                0,
-                FILE_SHARE_READ | FILE_SHARE_WRITE,
-                IntPtr.Zero,
-                OPEN_EXISTING,
-                0,
-                IntPtr.Zero);
-
-            if (handle.IsInvalid)
-            {
-                return false;
-            }
-
-            var query = new STORAGE_PROPERTY_QUERY
-            {
-                PropertyId = 7,
-                QueryType = 0,
-                AdditionalParameters = new byte[1]
-            };
-
-            var descriptor = new DEVICE_SEEK_PENALTY_DESCRIPTOR();
-
-            var result = DeviceIoControl(
-                handle,
-                IOCTL_STORAGE_QUERY_PROPERTY,
-                ref query,
-                (uint)Marshal.SizeOf(query),
-                ref descriptor,
-                (uint)Marshal.SizeOf(descriptor),
-                out _,
-                IntPtr.Zero);
-
-            if (result)
-            {
-                return !descriptor.IncursSeekPenalty;
-            }
-        }
-        catch
-        {
-            // Fallback
-        }
-        return false;
     }
 }

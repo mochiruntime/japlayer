@@ -180,5 +180,55 @@ namespace Japlayer.UnitTests.Data
             Assert.AreEqual("EXT-001", items[0].MediaId);
             Assert.AreEqual("thumbs/t100.jpg", items[0].FallbackThumbnailPath);
         }
+
+        [TestMethod]
+        public async Task GetMediaItemAsync_PrefersSceneDurationSecondsOverMetadataRuntime()
+        {
+            // Arrange
+            var media = new Media { MediaId = "LOC-DUR-001" };
+            media.MediaMetadata.Add(new MediaMetadata
+            {
+                MetadataUrl = "https://example.com/loc-dur-001",
+                MediaId = "LOC-DUR-001",
+                Title = "Location Duration Movie",
+                RuntimeMinutes = 999999
+            });
+            // Scene 1 has two copies (e.g. 4K + 8K) -> should not double-count Scene 1
+            media.MediaLocations.Add(new MediaLocation
+            {
+                MediaId = "LOC-DUR-001",
+                Scene = 1,
+                Hostname = "host",
+                Path = @"C:\videos\scene1_4k.mp4",
+                DurationSeconds = 3600
+            });
+            media.MediaLocations.Add(new MediaLocation
+            {
+                MediaId = "LOC-DUR-001",
+                Scene = 1,
+                Hostname = "host",
+                Path = @"C:\videos\scene1_8k.mp4",
+                DurationSeconds = 3602
+            });
+            // Scene 2 -> should be summed with Scene 1
+            media.MediaLocations.Add(new MediaLocation
+            {
+                MediaId = "LOC-DUR-001",
+                Scene = 2,
+                Hostname = "host",
+                Path = @"C:\videos\scene2.mp4",
+                DurationSeconds = 1800
+            });
+
+            _databaseContext.Media.Add(media);
+            await _databaseContext.SaveChangesAsync();
+
+            // Act
+            var mediaItem = await _mediaProvider.GetMediaItemAsync("LOC-DUR-001");
+
+            // Assert
+            Assert.IsNotNull(mediaItem);
+            Assert.AreEqual(TimeSpan.FromSeconds(5402), mediaItem.Runtime);
+        }
     }
 }

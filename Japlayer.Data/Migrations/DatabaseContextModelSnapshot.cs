@@ -156,6 +156,10 @@ namespace Japlayer.Data.Migrations
                         .HasColumnName("createdAt")
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
+                    b.Property<int?>("DurationSeconds")
+                        .HasColumnType("INT")
+                        .HasColumnName("durationSeconds");
+
                     b.HasKey("MediaId", "Scene", "Hostname", "Path");
 
                     b.ToTable("MediaLocations");

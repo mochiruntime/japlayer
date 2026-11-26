@@ -12,5 +12,7 @@ public partial class MediaLocation
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
+    public int? DurationSeconds { get; set; }
+
     public virtual Media Media { get; set; } = null!;
 }

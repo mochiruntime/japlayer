@@ -80,6 +80,9 @@ public partial class DatabaseContext : DbContext
             entity.Property(e => e.CreatedAt)
                 .HasDefaultValueSql("CURRENT_TIMESTAMP")
                 .HasColumnName("createdAt");
+            entity.Property(e => e.DurationSeconds)
+                .HasColumnType("INT")
+                .HasColumnName("durationSeconds");
 
             entity.HasOne(d => d.Media).WithMany(p => p.MediaLocations)
                 .HasForeignKey(d => d.MediaId)

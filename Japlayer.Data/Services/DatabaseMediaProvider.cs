@@ -151,6 +151,7 @@ namespace Japlayer.Data.Services
             var media = await context.Media
                 .AsNoTracking()
                 .Include(m => m.MediaMetadata)
+                .Include(m => m.MediaLocations)
                 .Include(m => m.Series)
                 .Include(m => m.Studios)
                 .Include(m => m.People)
@@ -167,15 +168,29 @@ namespace Japlayer.Data.Services
 
             var metadata = media.MediaMetadata.FirstOrDefault();
 
+            var sceneDurations = media.MediaLocations
+                .GroupBy(location => location.Scene)
+                .Select(group => group
+                    .Where(location => location.DurationSeconds.HasValue && location.DurationSeconds.Value > 0)
+                    .Select(location => location.DurationSeconds!.Value)
+                    .DefaultIfEmpty(0)
+                    .Max())
+                .Where(seconds => seconds > 0)
+                .ToList();
+
+            TimeSpan? runtime = sceneDurations.Count > 0
+                ? TimeSpan.FromSeconds(sceneDurations.Sum())
+                : metadata?.RuntimeMinutes.HasValue == true
+                    ? TimeSpan.FromMinutes(metadata.RuntimeMinutes.Value)
+                    : null;
+
             return new MediaItem
             {
                 MediaId = mediaId,
                 Title = metadata?.Title,
                 ContentId = metadata?.ContentId,
                 ReleaseDate = metadata?.ReleaseDate,
-                Runtime = metadata?.RuntimeMinutes.HasValue == true
-                    ? TimeSpan.FromMinutes(metadata.RuntimeMinutes.Value)
-                    : null,
+                Runtime = runtime,
                 Series = [.. media.Series.Select(s => s.Name)],
                 Studios = [.. media.Studios.Select(s => s.Name)],
                 Cast = [.. media.People.Select(p => p.Name)],

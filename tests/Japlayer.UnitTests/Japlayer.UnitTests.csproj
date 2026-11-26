@@ -20,6 +20,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\Japlayer.CLI\Japlayer.CLI.csproj" />
     <ProjectReference Include="..\..\Japlayer.Data\Japlayer.Data.csproj" />
     <ProjectReference Include="..\..\Japlayer.WinUI\Japlayer.csproj" />
   </ItemGroup>
