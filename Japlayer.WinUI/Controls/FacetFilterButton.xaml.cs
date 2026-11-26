@@ -2,6 +2,7 @@
 using Japlayer.Helpers;
 using Japlayer.ViewModels;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 
 namespace Japlayer.Controls
@@ -55,6 +56,30 @@ namespace Japlayer.Controls
                 () => OverlayPassThroughElement,
                 onOpening: () => Facet?.BeginInteraction(),
                 onClosed: () => Facet?.EndInteraction());
+        }
+
+        private void FacetListView_ItemClick(object sender, ItemClickEventArgs e)
+        {
+            if (e.ClickedItem is FilterItem filterItem)
+            {
+                filterItem.CycleStateCommand.Execute(null);
+            }
+        }
+
+        private void FacetListView_ContainerContentChanging(
+            ListViewBase sender,
+            ContainerContentChangingEventArgs args)
+        {
+            if (args.InRecycleQueue)
+            {
+                AutomationProperties.SetAutomationId(args.ItemContainer, string.Empty);
+                return;
+            }
+
+            if (args.Item is FilterItem filterItem)
+            {
+                AutomationProperties.SetAutomationId(args.ItemContainer, filterItem.Name);
+            }
         }
     }
 }

@@ -36,60 +36,67 @@
                              PlaceholderText="Filter..."
                              HorizontalAlignment="Stretch"/>
 
-                    <ScrollViewer MaxHeight="260" VerticalScrollBarVisibility="Auto">
-                        <ItemsControl ItemsSource="{x:Bind Facet.FilteredItems, Mode=OneWay}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate x:DataType="vm:FilterItem">
-                                    <Button AutomationProperties.AutomationId="{x:Bind Name}"
-                                            Command="{x:Bind CycleStateCommand}"
-                                            HorizontalAlignment="Stretch"
-                                            HorizontalContentAlignment="Stretch"
-                                            Background="Transparent"
-                                            BorderThickness="0"
-                                            Padding="6,5"
-                                            Margin="0,1">
-                                        <Grid ColumnSpacing="8">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                            </Grid.ColumnDefinitions>
+                    <ListView x:Name="FacetListView"
+                              ItemsSource="{x:Bind Facet.FilteredItems, Mode=OneWay}"
+                              MaxHeight="260"
+                              SelectionMode="None"
+                              IsItemClickEnabled="True"
+                              ShowsScrollingPlaceholders="False"
+                              ScrollViewer.VerticalScrollBarVisibility="Auto"
+                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                              ItemClick="FacetListView_ItemClick"
+                              ContainerContentChanging="FacetListView_ContainerContentChanging">
+                        <ListView.ItemContainerStyle>
+                            <Style TargetType="ListViewItem" BasedOn="{StaticResource DefaultListViewItemStyle}">
+                                <Setter Property="MinHeight" Value="32"/>
+                                <Setter Property="Padding" Value="6,5"/>
+                                <Setter Property="Margin" Value="0,1"/>
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                <Setter Property="CornerRadius" Value="4"/>
+                            </Style>
+                        </ListView.ItemContainerStyle>
+                        <ListView.ItemTemplate>
+                            <DataTemplate x:DataType="vm:FilterItem">
+                                <Grid ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
 
-                                            <!-- 3-State Indicator: Unset / + Include / − Exclude -->
-                                            <Grid Width="20" Height="20" CornerRadius="4"
-                                                  Background="{ThemeResource ControlFillColorDefaultBrush}"
-                                                  BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
-                                                  BorderThickness="1">
-                                                <Border Background="{ThemeResource SystemFillColorSuccessBrush}"
-                                                        CornerRadius="4"
-                                                        Visibility="{x:Bind IsIncluded, Mode=OneWay}"/>
-                                                <Border Background="{ThemeResource SystemFillColorCriticalBrush}"
-                                                        CornerRadius="4"
-                                                        Visibility="{x:Bind IsExcluded, Mode=OneWay}"/>
-                                                <TextBlock Text="{x:Bind StateSymbol, Mode=OneWay}"
-                                                           Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}"
-                                                           FontWeight="Bold"
-                                                           FontSize="12"
-                                                           HorizontalAlignment="Center"
-                                                           VerticalAlignment="Center"/>
-                                            </Grid>
+                                    <!-- 3-State Indicator: Unset / + Include / − Exclude -->
+                                    <Grid Width="20" Height="20" CornerRadius="4"
+                                          Background="{ThemeResource ControlFillColorDefaultBrush}"
+                                          BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
+                                          BorderThickness="1">
+                                        <Border Background="{ThemeResource SystemFillColorSuccessBrush}"
+                                                CornerRadius="4"
+                                                Visibility="{x:Bind IsIncluded, Mode=OneWay}"/>
+                                        <Border Background="{ThemeResource SystemFillColorCriticalBrush}"
+                                                CornerRadius="4"
+                                                Visibility="{x:Bind IsExcluded, Mode=OneWay}"/>
+                                        <TextBlock Text="{x:Bind StateSymbol, Mode=OneWay}"
+                                                   Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}"
+                                                   FontWeight="Bold"
+                                                   FontSize="12"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"/>
+                                    </Grid>
 
-                                            <TextBlock Grid.Column="1"
-                                                       Text="{x:Bind Name}"
-                                                       TextTrimming="CharacterEllipsis"
-                                                       VerticalAlignment="Center"/>
+                                    <TextBlock Grid.Column="1"
+                                               Text="{x:Bind Name}"
+                                               TextTrimming="CharacterEllipsis"
+                                               VerticalAlignment="Center"/>
 
-                                            <TextBlock Grid.Column="2"
-                                                       Text="{x:Bind ItemCount, Mode=OneWay}"
-                                                       Style="{StaticResource CaptionTextBlockStyle}"
-                                                       Foreground="{ThemeResource TextFillColorTertiaryBrush}"
-                                                       VerticalAlignment="Center"/>
-                                        </Grid>
-                                    </Button>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </ScrollViewer>
+                                    <TextBlock Grid.Column="2"
+                                               Text="{x:Bind ItemCount, Mode=OneWay}"
+                                               Style="{StaticResource CaptionTextBlockStyle}"
+                                               Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                               VerticalAlignment="Center"/>
+                                </Grid>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
                 </StackPanel>
             </Flyout>
         </DropDownButton.Flyout>
