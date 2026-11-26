@@ -51,6 +51,21 @@
             "problemMatcher": "$msCompile"
         },
         {
+            "label": "watch:no-hot-reload",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "watch",
+                "--project",
+                "${workspaceFolder}\\Japlayer.WinUI\\Japlayer.csproj",
+                "--no-hot-reload",
+                "run",
+                "/property:GenerateFullPaths=true",
+                "/consoleloggerparameters:NoSummary"
+            ],
+            "problemMatcher": "$msCompile"
+        },
+        {
             "label": "run",
             "command": "dotnet",
             "type": "process",
