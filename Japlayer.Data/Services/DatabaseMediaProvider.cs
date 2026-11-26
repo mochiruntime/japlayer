@@ -16,19 +16,25 @@ namespace Japlayer.Data.Services
             return await _context.Media
                 .AsNoTracking()
                 .Where(m => m.MediaLocations.Any())
-                .Select(m => new LibraryItem
+                .Select(media => new LibraryItem
                 {
-                    MediaId = m.MediaId,
+                    MediaId = media.MediaId,
                     // We take the title and cover from the first metadata entry
-                    Title = m.MediaMetadata.Select(md => md.Title).FirstOrDefault(),
-                    ReleaseDate = m.MediaMetadata.Select(md => md.ReleaseDate).FirstOrDefault(),
-                    CoverImagePath = m.MediaMetadata.Select(md => md.Cover).FirstOrDefault(),
-                    UserTags = m.UserTags.Select(ut => ut.Name).ToList(),
-                    Genres = m.Genres.Select(g => g.Name).ToList(),
-                    CreatedAt = m.MediaLocations.Select(ml => (DateTime?)ml.CreatedAt).Min(),
-                    HighlightCount = m.MediaHighlights.Count
+                    Title = media.MediaMetadata.Select(metadata => metadata.Title).FirstOrDefault(),
+                    ReleaseDate = media.MediaMetadata.Select(metadata => metadata.ReleaseDate).FirstOrDefault(),
+                    CoverImagePath = media.MediaMetadata.Select(metadata => metadata.Cover).FirstOrDefault(),
+                    RuntimeMinutes = media.MediaMetadata.Select(metadata => metadata.RuntimeMinutes).FirstOrDefault(),
+                    UserTags = media.UserTags.Select(userTag => userTag.Name).ToList(),
+                    Genres = media.Genres.Select(genre => genre.Name).ToList(),
+                    Cast = media.People.Select(person => person.Name).ToList(),
+                    Studios = media.Studios.Select(studio => studio.Name).ToList(),
+                    Series = media.Series.Select(series => series.Name).ToList(),
+                    CreatedAt = media.MediaLocations.Select(mediaLocation => (DateTime?)mediaLocation.CreatedAt).Min(),
+                    HighlightCount = media.MediaHighlights.Count,
+                    SceneCount = media.MediaLocations.Select(mediaLocation => mediaLocation.Scene).Distinct().Count(),
+                    Rating = media.UserMediaData != null ? media.UserMediaData.Rating ?? 0 : 0
                 })
-                .OrderBy(m => m.MediaId)
+                .OrderBy(media => media.MediaId)
                 .ToListAsync();
         }
 
@@ -36,7 +42,7 @@ namespace Japlayer.Data.Services
         {
             return await _context.UserTags
                 .AsNoTracking()
-                .Select(ut => ut.Name)
+                .Select(userTag => userTag.Name)
                 .Distinct()
                 .OrderBy(name => name)
                 .ToListAsync();
@@ -46,7 +52,43 @@ namespace Japlayer.Data.Services
         {
             return await _context.MediaGenres
                 .AsNoTracking()
-                .Select(g => g.Name)
+                .Select(genre => genre.Name)
+                .Distinct()
+                .OrderBy(name => name)
+                .ToListAsync();
+        }
+
+        public async Task<IEnumerable<string>> GetCastAsync()
+        {
+            return await _context.Media
+                .AsNoTracking()
+                .Where(media => media.MediaLocations.Any())
+                .SelectMany(media => media.People)
+                .Select(person => person.Name)
+                .Distinct()
+                .OrderBy(name => name)
+                .ToListAsync();
+        }
+
+        public async Task<IEnumerable<string>> GetStudiosAsync()
+        {
+            return await _context.Media
+                .AsNoTracking()
+                .Where(media => media.MediaLocations.Any())
+                .SelectMany(media => media.Studios)
+                .Select(studio => studio.Name)
+                .Distinct()
+                .OrderBy(name => name)
+                .ToListAsync();
+        }
+
+        public async Task<IEnumerable<string>> GetSeriesAsync()
+        {
+            return await _context.Media
+                .AsNoTracking()
+                .Where(media => media.MediaLocations.Any())
+                .SelectMany(media => media.Series)
+                .Select(series => series.Name)
                 .Distinct()
                 .OrderBy(name => name)
                 .ToListAsync();

@@ -34,6 +34,9 @@ namespace Japlayer.UnitTests.ViewModels
             public Task<IEnumerable<LibraryItem>> GetLibraryItemsAsync() => Task.FromResult<IEnumerable<LibraryItem>>([]);
             public Task<IEnumerable<string>> GetUserTagsAsync() => Task.FromResult<IEnumerable<string>>([]);
             public Task<IEnumerable<string>> GetGenresAsync() => Task.FromResult<IEnumerable<string>>([]);
+            public Task<IEnumerable<string>> GetCastAsync() => Task.FromResult<IEnumerable<string>>([]);
+            public Task<IEnumerable<string>> GetStudiosAsync() => Task.FromResult<IEnumerable<string>>([]);
+            public Task<IEnumerable<string>> GetSeriesAsync() => Task.FromResult<IEnumerable<string>>([]);
 
             public Task<MediaItem> GetMediaItemAsync(string mediaId)
             {

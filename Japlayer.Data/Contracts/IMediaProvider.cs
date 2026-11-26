@@ -12,6 +12,12 @@ namespace Japlayer.Data.Contracts
 
         public Task<IEnumerable<string>> GetGenresAsync();
 
+        public Task<IEnumerable<string>> GetCastAsync();
+
+        public Task<IEnumerable<string>> GetStudiosAsync();
+
+        public Task<IEnumerable<string>> GetSeriesAsync();
+
         public Task AddUserTagAsync(string mediaId, string tagName);
 
         public Task RemoveUserTagAsync(string mediaId, string tagName);
