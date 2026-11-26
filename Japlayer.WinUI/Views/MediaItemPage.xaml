@@ -243,11 +243,13 @@
                                                    FontSize="12" VerticalAlignment="Center"/>
                                         <StackPanel Grid.Row="4" Grid.Column="1" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
                                             <RatingControl x:Name="ItemRatingControl"
+                                                           AutomationProperties.AutomationId="ItemRatingControl"
                                                            Value="{x:Bind ViewModel.Rating, Mode=TwoWay}"
                                                            IsClearEnabled="True"
                                                            MaxRating="5"
                                                            VerticalAlignment="Center"/>
-                                            <TextBlock Text="{x:Bind ViewModel.RatingDisplayText, Mode=OneWay}"
+                                            <TextBlock AutomationProperties.AutomationId="RatingDisplayText"
+                                                       Text="{x:Bind ViewModel.RatingDisplayText, Mode=OneWay}"
                                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                                        FontSize="12"
                                                        VerticalAlignment="Center"/>
@@ -273,7 +275,8 @@
                                                                 Padding="8,2">
                                                             <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
                                                                 <TextBlock Text="{x:Bind}" FontSize="12" VerticalAlignment="Center"/>
-                                                                <Button Content="×"
+                                                                <Button AutomationProperties.AutomationId="RemoveTagButton"
+                                                                        Content="×"
                                                                         Tag="{x:Bind}"
                                                                         Click="RemoveTag_Click"
                                                                         Padding="2,0"
@@ -289,6 +292,7 @@
                                             </ItemsControl>
 
                                             <AutoSuggestBox x:Name="TagAutoSuggestBox"
+                                                            AutomationProperties.AutomationId="TagAutoSuggestBox"
                                                             PlaceholderText="+ Add tag..."
                                                             Width="180"
                                                             Height="26"
@@ -352,7 +356,8 @@
                                         </ItemsControl.ItemsPanel>
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate x:DataType="x:String">
-                                                <Button Click="GalleryImage_Click"
+                                                <Button AutomationProperties.AutomationId="GalleryImageButton"
+                                                        Click="GalleryImage_Click"
                                                         Tag="{x:Bind}"
                                                         Padding="0"
                                                         BorderThickness="1"
@@ -401,11 +406,13 @@
                                 Padding="2">
                             <StackPanel Orientation="Horizontal" Spacing="2">
                                 <Button x:Name="FocusViewButton"
+                                        AutomationProperties.AutomationId="FocusViewButton"
                                         Content="Focus Player"
                                         Click="FocusViewButton_Click"
                                         Padding="12,5"
                                         FontSize="12"/>
                                 <Button x:Name="GridViewButton"
+                                        AutomationProperties.AutomationId="GridViewButton"
                                         Content="Multi-Scene Grid"
                                         Click="GridViewButton_Click"
                                         Padding="12,5"
@@ -442,7 +449,8 @@
                                 <Grid Grid.Row="0" Padding="14,8" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="0,0,0,1">
                                     <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
                                         <Border Background="{ThemeResource AccentFillColorDefaultBrush}" CornerRadius="4" Padding="8,2">
-                                            <TextBlock Text="{x:Bind ViewModel.SelectedScene.SceneDisplayTitle, Mode=OneWay}"
+                                            <TextBlock AutomationProperties.AutomationId="SelectedSceneTitle"
+                                                       Text="{x:Bind ViewModel.SelectedScene.SceneDisplayTitle, Mode=OneWay}"
                                                        Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}"
                                                        FontWeight="SemiBold"
                                                        FontSize="12"/>
@@ -497,7 +505,8 @@
                                           AutomationProperties.AutomationId="PlayOverlay"
                                           Visibility="{x:Bind ViewModel.SelectedScene.PlayOverlayVisibility, Mode=OneWay}"
                                           Background="Black">
-                                        <Button Click="PlayOverlay_Click"
+                                        <Button AutomationProperties.AutomationId="PlayOverlayButton"
+                                                Click="PlayOverlay_Click"
                                                 PointerEntered="Button_PointerEntered"
                                                 PointerExited="Button_PointerExited"
                                                 HorizontalAlignment="Stretch"
@@ -699,7 +708,8 @@
                                                 </MediaPlayerElement>
 
                                                 <Grid Visibility="{x:Bind PlayOverlayVisibility, Mode=OneWay}" Background="Black">
-                                                    <Button Click="PlayOverlay_Click"
+                                                    <Button AutomationProperties.AutomationId="PlayOverlayButton"
+                                                Click="PlayOverlay_Click"
                                                             PointerEntered="Button_PointerEntered"
                                                             PointerExited="Button_PointerExited"
                                                             HorizontalAlignment="Stretch"
@@ -791,7 +801,8 @@
                            Stretch="Uniform"/>
                 </Border>
                 <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Center">
-                    <Button Content="◀ Previous"
+                    <Button AutomationProperties.AutomationId="LightboxPreviousButton"
+                            Content="◀ Previous"
                             Click="LightboxPrevious_Click"
                             Foreground="White"
                             Background="#26FFFFFF"
@@ -800,11 +811,13 @@
                             CornerRadius="4"
                             Padding="14,7"/>
                     <TextBlock x:Name="LightboxCounterText"
+                               AutomationProperties.AutomationId="LightboxCounterText"
                                Text="1 / 1"
                                VerticalAlignment="Center"
                                Foreground="#CCFFFFFF"
                                Margin="4,0"/>
-                    <Button Content="Next ▶"
+                    <Button AutomationProperties.AutomationId="LightboxNextButton"
+                            Content="Next ▶"
                             Click="LightboxNext_Click"
                             Foreground="White"
                             Background="#26FFFFFF"
@@ -812,7 +825,8 @@
                             BorderThickness="1"
                             CornerRadius="4"
                             Padding="14,7"/>
-                    <Button Content="Close (Esc)"
+                    <Button AutomationProperties.AutomationId="LightboxCloseButton"
+                            Content="Close (Esc)"
                             Click="LightboxClose_Click"
                             Foreground="White"
                             Background="#33FFFFFF"

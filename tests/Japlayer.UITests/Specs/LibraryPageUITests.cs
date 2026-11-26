@@ -1,4 +1,3 @@
-using FlaUI.Core.Tools;
 using Japlayer.UITests.Fixtures;
 using Japlayer.UITests.PageObjects;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -23,6 +22,13 @@ namespace Japlayer.UITests.Specs
         [TestCleanup]
         public void Teardown() => _fixture?.Dispose();
 
+        private void WaitForInitialLoad()
+        {
+            Assert.IsNotNull(_libraryPage);
+            Assert.IsNotNull(_libraryPage.WaitForCard("TEST-001"), "Initial card TEST-001 should be present.");
+            Assert.IsTrue(_libraryPage.WaitForCardCount(3), "All 3 seeded cards should be visible initially.");
+        }
+
         [TestMethod]
         public void MainWindow_TitleAndBasicProperties_AreCorrect()
         {
@@ -30,7 +36,6 @@ namespace Japlayer.UITests.Specs
             Assert.IsTrue(_fixture.MainWindow.BoundingRectangle.Width >= 600);
             Assert.IsTrue(_fixture.MainWindow.BoundingRectangle.Height >= 400);
 
-            // In WinUI 3 with custom title bars, the title is hosted in AppTitleTextBlock
             var appTitle = _fixture.MainWindow.FindFirstDescendant(conditionFactory => conditionFactory.ByAutomationId("AppTitleTextBlock"));
             Assert.IsNotNull(appTitle, "AppTitleTextBlock should be present in the custom title bar.");
             Assert.AreEqual("Japlayer", appTitle.Name);
@@ -39,81 +44,155 @@ namespace Japlayer.UITests.Specs
         [TestMethod]
         public void SearchFiltering_WithDebounce_FiltersAndRestoresCards()
         {
-            Assert.IsNotNull(_libraryPage);
+            WaitForInitialLoad();
 
-            // Wait for initial cards to appear
-            var initialCard = Retry.WhileNull(
-                () => _libraryPage.FindCard("TEST-001"),
-                TimeSpan.FromSeconds(5),
-                TimeSpan.FromMilliseconds(250)).Result;
-            Assert.IsNotNull(initialCard, "Initial card TEST-001 should be present.");
+            _libraryPage!.Search("Deep Ocean");
+            Assert.IsTrue(_libraryPage.WaitForCardCount(1), "Only TEST-002 should match 'Deep Ocean'.");
+            Assert.IsTrue(_libraryPage.WaitForItemCountText("1 of 3"), "ItemCountTextBlock should show '1 of 3'.");
+            Assert.IsNotNull(_libraryPage.FindCard("TEST-002"));
+            Assert.IsNull(_libraryPage.FindCard("TEST-001"));
 
-            // Perform search
-            _libraryPage.Search("Beta");
-            Thread.Sleep(500);
-
-            var betaCard = _libraryPage.FindCard("TEST-002");
-            Assert.IsNotNull(betaCard, "Card TEST-002 should be visible when searching 'Beta'.");
-
-            // Verify TEST-001 is not visible
-            var alphaCard = _libraryPage.FindCard("TEST-001");
-            Assert.IsNull(alphaCard, "Card TEST-001 should be filtered out when searching 'Beta'.");
-
-            // Clear search
             _libraryPage.ClearSearch();
-            Thread.Sleep(500);
-
-            var restoredCard = Retry.WhileNull(
-                () => _libraryPage.FindCard("TEST-001"),
-                TimeSpan.FromSeconds(5),
-                TimeSpan.FromMilliseconds(250)).Result;
-            Assert.IsNotNull(restoredCard, "Card TEST-001 should be restored after clearing search.");
+            Assert.IsTrue(_libraryPage.WaitForCardCount(3), "All 3 cards should be restored after clearing search.");
+            Assert.IsTrue(_libraryPage.WaitForItemCountText("3 items"), "ItemCountTextBlock should show '3 items'.");
         }
 
         [TestMethod]
-        public void SortComboBox_CanSelectOptions()
+        public void FacetFlyout_TriStateIncludeExcludeAndPerFlyoutClear_FiltersCorrectly()
         {
-            Assert.IsNotNull(_libraryPage);
+            WaitForInitialLoad();
 
-            var comboBox = _libraryPage.SortComboBox;
-            Assert.IsNotNull(comboBox, "Sort ComboBox should be present.");
+            // 1. Open Tags flyout, filter for "VR", click once to Include (+)
+            _libraryPage!.OpenFacetFlyout("Tags");
+            _libraryPage.FilterInOpenFlyout("VR");
+            _libraryPage.ClickFacetItem("VR");
+            _libraryPage.CloseFlyout();
 
-            _libraryPage.SelectSortOption("ID");
-            Thread.Sleep(300);
-
+            Assert.IsTrue(_libraryPage.WaitForCardCount(2), "TEST-001 and TEST-002 should match VR tag.");
             Assert.IsNotNull(_libraryPage.FindCard("TEST-001"));
+            Assert.IsNotNull(_libraryPage.FindCard("TEST-002"));
+            Assert.IsNull(_libraryPage.FindCard("TEST-003"));
+
+            // 2. Click VR again to Exclude (−) -> only TEST-003 remains
+            _libraryPage.OpenFacetFlyout("Tags");
+            _libraryPage.ClickFacetItem("VR");
+            _libraryPage.CloseFlyout();
+
+            Assert.IsTrue(_libraryPage.WaitForCardCount(1), "Only TEST-003 should remain when VR is excluded.");
+            Assert.IsNotNull(_libraryPage.FindCard("TEST-003"));
+
+            // 3. Use per-flyout Clear link to restore all 3 cards
+            _libraryPage.OpenFacetFlyout("Tags");
+            _libraryPage.ClickFacetClear();
+            _libraryPage.CloseFlyout();
+
+            Assert.IsTrue(_libraryPage.WaitForCardCount(3), "All 3 cards should be restored after per-flyout Clear.");
+        }
+
+        [TestMethod]
+        public void CastStudiosSeriesFacets_AndClearAllChips_WorkEndToEnd()
+        {
+            WaitForInitialLoad();
+
+            // Include Actor Alpha (TEST-001, TEST-002)
+            _libraryPage!.OpenFacetFlyout("Cast");
+            _libraryPage.ClickFacetItem("Actor Alpha");
+            _libraryPage.CloseFlyout();
+
+            Assert.IsTrue(_libraryPage.WaitForCardCount(2), "TEST-001 and TEST-002 have Actor Alpha.");
+            Assert.IsNotNull(_libraryPage.FindCard("TEST-001"));
+            Assert.IsNotNull(_libraryPage.FindCard("TEST-002"));
+
+            // Also include Studio Alpha -> narrows to TEST-001 only
+            _libraryPage.OpenFacetFlyout("Studios");
+            _libraryPage.ClickFacetItem("Studio Alpha");
+            _libraryPage.CloseFlyout();
+
+            Assert.IsTrue(_libraryPage.WaitForCardCount(1), "Only TEST-001 matches both Actor Alpha and Studio Alpha.");
+            Assert.IsNotNull(_libraryPage.FindCard("TEST-001"));
+
+            // Remove the first active chip (Actor Alpha) -> widens to TEST-001 + TEST-003 (both Studio Alpha)
+            _libraryPage.RemoveFirstFilterChip();
+            Assert.IsTrue(_libraryPage.WaitForCardCount(2), "Removing Actor Alpha chip should leave 2 Studio Alpha items.");
+
+            // Clear remaining chip via Clear all
+            _libraryPage.ClickClearAllFilters();
+            Assert.IsTrue(_libraryPage.WaitForCardCount(3), "All 3 cards should be restored after Clear all.");
+        }
+
+        [TestMethod]
+        public void RangeFilters_RatingAndRuntime_FilterCards()
+        {
+            WaitForInitialLoad();
+
+            // Click Rating track at ~40% from left (closer to min thumb -> Rating >= 2, excludes TEST-003 at rating 1)
+            _libraryPage!.AdjustRangeSlider(_libraryPage.RatingFilterButton, "RatingRangeText", minDeltaFraction: 0.4, maxDeltaFraction: 0);
+
+            Assert.IsTrue(_libraryPage.WaitForCardRemoved("TEST-003"), "TEST-003 (rating 1) should be filtered out.");
+            Assert.IsNotNull(_libraryPage.FindCard("TEST-001"));
+
+            // Reset Rating via the Reset link inside the Rating flyout
+            _libraryPage.ResetRangeFilter(_libraryPage.RatingFilterButton, "ResetRatingButton");
+            Assert.IsTrue(_libraryPage.WaitForCardCount(3), "ResetRatingButton should restore all 3 cards.");
+
+            // Click Runtime track at ~45% left of max thumb (~95m -> snaps <= 90m, excludes TEST-003 at 110m)
+            _libraryPage.AdjustRangeSlider(_libraryPage.RuntimeFilterButton, "RuntimeRangeText", minDeltaFraction: 0, maxDeltaFraction: -0.45);
+
+            Assert.IsTrue(_libraryPage.WaitForCardRemoved("TEST-003"), "TEST-003 (110m) should be filtered out.");
+
+            _libraryPage.ResetRangeFilter(_libraryPage.RuntimeFilterButton, "ResetRuntimeButton");
+            Assert.IsTrue(_libraryPage.WaitForCardCount(3), "ResetRuntimeButton should restore all 3 cards.");
+        }
+
+        [TestMethod]
+        public void SortDropDownAndDirection_SortsAndHidesDirectionOnRandom()
+        {
+            WaitForInitialLoad();
+
+            Assert.IsNotNull(_libraryPage!.SortDropDownButton, "SortDropDownButton should be present.");
+            Assert.IsNotNull(_libraryPage.SortDirectionButton, "SortDirectionButton should be visible for non-Random sort.");
+
+            // Default is AddedDateDescending (TEST-001, TEST-002, TEST-003).
+            // Selecting Title with descending still active sorts Z-A (TEST-003 first).
+            _libraryPage.SelectSortField("Title");
+            Assert.IsTrue(_libraryPage.WaitForFirstCardId("TEST-003"), "Title descending should place TEST-003 first.");
+
+            // Toggling direction sorts A-Z (TEST-001 first).
+            _libraryPage.ToggleSortDirection();
+            Assert.IsTrue(_libraryPage.WaitForFirstCardId("TEST-001"), "Title ascending should place TEST-001 first.");
+
+            // Selecting Random (via ShuffleButton) hides SortDirectionButton
+            _libraryPage.ClickShuffle();
+            Assert.IsTrue(_libraryPage.WaitUntilHidden(() => _libraryPage.SortDirectionButton), "SortDirectionButton should be hidden when Random sort is active.");
+        }
+
+        [TestMethod]
+        public void EmptyState_WhenNoMatches_ShowsResetButtonAndRestoresCards()
+        {
+            WaitForInitialLoad();
+
+            _libraryPage!.Search("NONEXISTENT_QUERY_XYZ");
+            Assert.IsTrue(_libraryPage.WaitForCardCount(0), "No cards should match nonexistent query.");
+            Assert.IsNotNull(_libraryPage.WaitForElement(() => _libraryPage.ResetAllFiltersButton), "ResetAllFiltersButton should appear in empty state.");
+
+            _libraryPage.ClickResetAllFilters();
+            Assert.IsTrue(_libraryPage.WaitForCardCount(3), "All 3 cards should be restored after Reset all filters.");
         }
 
         [TestMethod]
         public void Navigation_ClickCardNavigatesToMediaItemPage_AndBackButtonReturns()
         {
-            Assert.IsNotNull(_libraryPage);
-            Assert.IsNotNull(_fixture?.MainWindow);
+            WaitForInitialLoad();
 
-            var card = Retry.WhileNull(
-                () => _libraryPage.FindCard("TEST-001"),
-                TimeSpan.FromSeconds(5),
-                TimeSpan.FromMilliseconds(250)).Result;
-            Assert.IsNotNull(card);
+            _libraryPage!.ClickCard("TEST-001");
 
-            _libraryPage.ClickCard("TEST-001");
-            Thread.Sleep(500);
-
-            var mediaItemPage = new MediaItemPageObject(_fixture.MainWindow);
-            var backButton = Retry.WhileNull(
-                () => mediaItemPage.BackButton,
-                TimeSpan.FromSeconds(5),
-                TimeSpan.FromMilliseconds(250)).Result;
-
+            var mediaItemPage = new MediaItemPageObject(_fixture!.MainWindow!);
+            var backButton = _libraryPage.WaitForElement(() => mediaItemPage.BackButton);
             Assert.IsNotNull(backButton, "BackButton should appear on MediaItemPage.");
 
             mediaItemPage.ClickBack();
-            Thread.Sleep(500);
 
-            var searchBox = Retry.WhileNull(
-                () => _libraryPage.SearchBox,
-                TimeSpan.FromSeconds(5),
-                TimeSpan.FromMilliseconds(250)).Result;
+            var searchBox = _libraryPage.WaitForElement(() => _libraryPage.SearchBox);
             Assert.IsNotNull(searchBox, "SearchBox should be visible after navigating back to LibraryPage.");
         }
     }

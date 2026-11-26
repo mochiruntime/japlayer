@@ -1,11 +1,15 @@
 using FlaUI.Core.AutomationElements;
+using FlaUI.Core.Definitions;
 using FlaUI.Core.Input;
 using FlaUI.Core.Tools;
+using FlaUI.Core.WindowsAPI;
 
 namespace Japlayer.UITests.PageObjects
 {
     public class MediaItemPageObject(Window window)
     {
+        private static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(5);
+        private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(100);
         private readonly Window _window = window;
 
         public Button? BackButton =>
@@ -14,29 +18,49 @@ namespace Japlayer.UITests.PageObjects
         public AutomationElement? TitleText =>
             _window.FindFirstDescendant(conditionFactory => conditionFactory.ByAutomationId("MediaItemTitle"));
 
-        public AutomationElement? ReleaseDateText =>
-            _window.FindFirstDescendant(conditionFactory => conditionFactory.ByAutomationId("MediaItemReleaseDate"));
+        public AutomationElement? FactsSummaryText =>
+            _window.FindFirstDescendant(conditionFactory => conditionFactory.ByAutomationId("MediaItemFactsSummary"));
 
-        public AutomationElement? RuntimeText =>
-            _window.FindFirstDescendant(conditionFactory => conditionFactory.ByAutomationId("MediaItemRuntime"));
+        public AutomationElement? RatingControl =>
+            _window.FindFirstDescendant(conditionFactory => conditionFactory.ByAutomationId("ItemRatingControl"));
 
-        public AutomationElement? ContentIdText =>
-            _window.FindFirstDescendant(conditionFactory => conditionFactory.ByAutomationId("MediaItemContentId"));
+        public AutomationElement? RatingDisplayText =>
+            _window.FindFirstDescendant(conditionFactory => conditionFactory.ByAutomationId("RatingDisplayText"));
 
-        public Button? GalleryScrollLeftButton =>
-            _window.FindFirstDescendant(conditionFactory => conditionFactory.ByAutomationId("GalleryScrollLeftButton"))?.AsButton();
+        public TextBox? TagSearchBox =>
+            _window.FindFirstDescendant(conditionFactory => conditionFactory.ByAutomationId("TagAutoSuggestBox"))
+                   ?.FindFirstDescendant(conditionFactory => conditionFactory.ByControlType(ControlType.Edit))?.AsTextBox()
+            ?? _window.FindFirstDescendant(conditionFactory => conditionFactory.ByAutomationId("TagAutoSuggestBox"))?.AsTextBox();
 
-        public Button? GalleryScrollRightButton =>
-            _window.FindFirstDescendant(conditionFactory => conditionFactory.ByAutomationId("GalleryScrollRightButton"))?.AsButton();
+        public Button? GalleryImageButton =>
+            _window.FindFirstDescendant(conditionFactory => conditionFactory.ByAutomationId("GalleryImageButton"))?.AsButton();
+
+        public AutomationElement? LightboxCounterText =>
+            _window.FindFirstDescendant(conditionFactory => conditionFactory.ByAutomationId("LightboxCounterText"));
+
+        public Button? LightboxPreviousButton =>
+            _window.FindFirstDescendant(conditionFactory => conditionFactory.ByAutomationId("LightboxPreviousButton"))?.AsButton();
+
+        public Button? LightboxNextButton =>
+            _window.FindFirstDescendant(conditionFactory => conditionFactory.ByAutomationId("LightboxNextButton"))?.AsButton();
+
+        public Button? LightboxCloseButton =>
+            _window.FindFirstDescendant(conditionFactory => conditionFactory.ByAutomationId("LightboxCloseButton"))?.AsButton();
+
+        public Button? FocusViewButton =>
+            _window.FindFirstDescendant(conditionFactory => conditionFactory.ByAutomationId("FocusViewButton"))?.AsButton();
+
+        public Button? GridViewButton =>
+            _window.FindFirstDescendant(conditionFactory => conditionFactory.ByAutomationId("GridViewButton"))?.AsButton();
+
+        public AutomationElement? SelectedSceneTitle =>
+            _window.FindFirstDescendant(conditionFactory => conditionFactory.ByAutomationId("SelectedSceneTitle"));
 
         public Button? SceneOpenInButton =>
             _window.FindFirstDescendant(conditionFactory => conditionFactory.ByAutomationId("SceneOpenInButton"))?.AsButton();
 
         public Button? PlayOverlayButton =>
-            Retry.WhileNull(
-                () => _window.FindFirstDescendant(conditionFactory => conditionFactory.ByAutomationId("PlayOverlay"))?.AsButton(),
-                TimeSpan.FromSeconds(5),
-                TimeSpan.FromMilliseconds(200)).Result;
+            _window.FindFirstDescendant(conditionFactory => conditionFactory.ByAutomationId("PlayOverlayButton"))?.AsButton();
 
         public AutomationElement? PlayerElement =>
             _window.FindFirstDescendant(conditionFactory => conditionFactory.ByAutomationId("Player"));
@@ -62,43 +86,126 @@ namespace Japlayer.UITests.PageObjects
         public Button? FullWindowButton =>
             _window.FindFirstDescendant(conditionFactory => conditionFactory.ByAutomationId("FullWindowButton"))?.AsButton();
 
-        public AutomationElement? HighlightsCanvas =>
-            _window.FindFirstDescendant(conditionFactory => conditionFactory.ByAutomationId("HighlightsCanvas"));
+        public T? WaitForElement<T>(Func<T?> selector, TimeSpan? timeout = null) where T : class =>
+            Retry.WhileNull(selector, timeout ?? DefaultTimeout, PollInterval).Result;
+
+        public bool WaitUntilHidden(Func<AutomationElement?> selector, TimeSpan? timeout = null) =>
+            Retry.WhileTrue(() => selector() != null, timeout ?? DefaultTimeout, PollInterval).Success;
+
+        public void SetRating(int stars)
+        {
+            var rating = RequireElement(WaitForElement(() => RatingControl), nameof(RatingControl));
+            if (rating.Patterns.RangeValue.IsSupported)
+            {
+                rating.Patterns.RangeValue.Pattern.SetValue(stars);
+                Wait.UntilInputIsProcessed();
+            }
+            else
+            {
+                throw new InvalidOperationException("RatingControl does not support RangeValue pattern.");
+            }
+        }
+
+        public void AddTag(string tagName)
+        {
+            _window.SetForeground();
+            var box = RequireElement(WaitForElement(() => TagSearchBox), nameof(TagSearchBox));
+            box.Focus();
+            box.Text = tagName;
+            Wait.UntilInputIsProcessed();
+            Keyboard.Type(VirtualKeyShort.RETURN);
+            Wait.UntilInputIsProcessed();
+        }
+
+        public bool HasTagText(string tagName) =>
+            _window.FindAllDescendants(conditionFactory => conditionFactory.ByControlType(ControlType.Text))
+                .Any(textElement => string.Equals(textElement.Properties.Name.ValueOrDefault, tagName, StringComparison.OrdinalIgnoreCase));
+
+        public void RemoveFirstTag()
+        {
+            var removeButton = RequireElement(
+                WaitForElement(() => _window.FindFirstDescendant(conditionFactory => conditionFactory.ByAutomationId("RemoveTagButton"))?.AsButton()),
+                "RemoveTagButton");
+            ActivateElement(removeButton);
+            Wait.UntilInputIsProcessed();
+        }
+
+        public void OpenGalleryLightbox()
+        {
+            var imageButton = RequireElement(WaitForElement(() => GalleryImageButton), nameof(GalleryImageButton));
+            ActivateElement(imageButton);
+            Wait.UntilInputIsProcessed();
+        }
+
+        public void ClickLightboxNext()
+        {
+            var nextButton = RequireElement(WaitForElement(() => LightboxNextButton), nameof(LightboxNextButton));
+            ActivateElement(nextButton);
+            Wait.UntilInputIsProcessed();
+        }
+
+        public void ClickLightboxPrevious()
+        {
+            var prevButton = RequireElement(WaitForElement(() => LightboxPreviousButton), nameof(LightboxPreviousButton));
+            ActivateElement(prevButton);
+            Wait.UntilInputIsProcessed();
+        }
+
+        public void SwitchToGridView()
+        {
+            var gridButton = RequireElement(WaitForElement(() => GridViewButton), nameof(GridViewButton));
+            ActivateElement(gridButton);
+            Wait.UntilInputIsProcessed();
+        }
+
+        public void SwitchToFocusView()
+        {
+            var focusButton = RequireElement(WaitForElement(() => FocusViewButton), nameof(FocusViewButton));
+            ActivateElement(focusButton);
+            Wait.UntilInputIsProcessed();
+        }
+
+        public void ToggleFullscreen()
+        {
+            var fullWindow = RequireElement(WaitForElement(() => FullWindowButton), nameof(FullWindowButton));
+            ActivateElement(fullWindow);
+            Wait.UntilInputIsProcessed();
+        }
+
+        public void CloseGalleryLightbox()
+        {
+            var closeButton = RequireElement(WaitForElement(() => LightboxCloseButton), nameof(LightboxCloseButton));
+            ActivateElement(closeButton);
+            Wait.UntilInputIsProcessed();
+        }
 
         public void ClickPlayOverlay()
         {
-            var overlay = PlayOverlayButton;
-            if (overlay != null)
-            {
-                if (overlay.Patterns.Invoke.IsSupported)
-                {
-                    overlay.Patterns.Invoke.Pattern.Invoke();
-                }
-                else
-                {
-                    overlay.Click();
-                }
-                Wait.UntilInputIsProcessed();
-                Thread.Sleep(800);
-            }
+            var overlay = RequireElement(WaitForElement(() => PlayOverlayButton), nameof(PlayOverlayButton));
+            ActivateElement(overlay);
+            Wait.UntilInputIsProcessed();
         }
 
         public void ClickBack()
         {
-            var back = BackButton;
-            if (back != null)
+            var back = RequireElement(WaitForElement(() => BackButton), nameof(BackButton));
+            ActivateElement(back);
+            Wait.UntilInputIsProcessed();
+        }
+
+        private static void ActivateElement(AutomationElement element)
+        {
+            if (element.Patterns.Invoke.IsSupported)
             {
-                if (back.Patterns.Invoke.IsSupported)
-                {
-                    back.Patterns.Invoke.Pattern.Invoke();
-                }
-                else
-                {
-                    back.Click();
-                }
-                Wait.UntilInputIsProcessed();
-                Thread.Sleep(500);
+                element.Patterns.Invoke.Pattern.Invoke();
+            }
+            else
+            {
+                element.Click();
             }
         }
+
+        private static T RequireElement<T>(T? element, string description) where T : class =>
+            element ?? throw new InvalidOperationException($"Expected UI element '{description}' was not found.");
     }
 }

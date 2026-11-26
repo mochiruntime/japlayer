@@ -56,26 +56,33 @@ namespace Japlayer.UITests.Fixtures
                 .Options;
 
             using var context = new DatabaseContext(options);
-            context.Database.EnsureCreated();
+            context.Database.Migrate();
 
             // Create solid 1x1 test image files
             var cover1Path = Path.Combine(ImageDirectory, "test001_cover.jpg");
             var thumb1Path = Path.Combine(ImageDirectory, "test001_t10.jpg");
             var thumb2Path = Path.Combine(ImageDirectory, "test001_t30.jpg");
             var gallery1Path = Path.Combine(ImageDirectory, "test001_gallery1.jpg");
+            var gallery2Path = Path.Combine(ImageDirectory, "test001_gallery2.jpg");
 
             File.WriteAllBytes(cover1Path, CreateMinimalJpegBytes());
             File.WriteAllBytes(thumb1Path, CreateMinimalJpegBytes());
             File.WriteAllBytes(thumb2Path, CreateMinimalJpegBytes());
             File.WriteAllBytes(gallery1Path, CreateMinimalJpegBytes());
+            File.WriteAllBytes(gallery2Path, CreateMinimalJpegBytes());
 
-            // Shared tags and genres (to satisfy unique constraint)
+            // Shared tags, genres, cast, studios, and series (to satisfy unique constraint)
             var vrTag = new UserTag { Name = "VR" };
             var favoritesTag = new UserTag { Name = "Favorites" };
             var twoDTag = new UserTag { Name = "2D" };
             var actionGenre = new MediaGenre { Name = "Action" };
             var sciFiGenre = new MediaGenre { Name = "Sci-Fi" };
             var documentaryGenre = new MediaGenre { Name = "Documentary" };
+            var actorAlpha = new MediaPerson { Name = "Actor Alpha" };
+            var actorBeta = new MediaPerson { Name = "Actor Beta" };
+            var studioAlpha = new MediaStudio { Name = "Studio Alpha" };
+            var studioBeta = new MediaStudio { Name = "Studio Beta" };
+            var seriesOne = new MediaSeries { Name = "Series One" };
 
             // 1. TEST-001
             var media1 = new Media { MediaId = "TEST-001" };
@@ -87,7 +94,16 @@ namespace Japlayer.UITests.Fixtures
                 Path = DummyVideoPath,
                 CreatedAt = new DateTime(2024, 1, 1, 10, 0, 0, DateTimeKind.Utc)
             });
+            media1.MediaLocations.Add(new MediaLocation
+            {
+                MediaId = "TEST-001",
+                Scene = 2,
+                Hostname = "localhost",
+                Path = DummyVideoPath,
+                CreatedAt = new DateTime(2024, 1, 1, 10, 5, 0, DateTimeKind.Utc)
+            });
             media1.MediaImages.Add(new MediaImage { MediaId = "TEST-001", Filepath = "test001_cover.jpg", Url = "https://example.com/cover1" });
+            media1.MediaImages.Add(new MediaImage { MediaId = "TEST-001", Filepath = "test001_gallery2.jpg", Url = "https://example.com/gallery2" });
             media1.MediaMetadata.Add(new MediaMetadata
             {
                 MediaId = "TEST-001",
@@ -102,6 +118,10 @@ namespace Japlayer.UITests.Fixtures
             media1.UserTags.Add(favoritesTag);
             media1.Genres.Add(sciFiGenre);
             media1.Genres.Add(actionGenre);
+            media1.People.Add(actorAlpha);
+            media1.Studios.Add(studioAlpha);
+            media1.Series.Add(seriesOne);
+            media1.UserMediaData = new UserMediaData { MediaId = "TEST-001", Rating = 5 };
             media1.MediaThumbnails.Add(new MediaThumbnail { MediaId = "TEST-001", Scene = 1, Timestamp = 10, Path = "test001_t10.jpg", OriginalHostname = "localhost", OriginalPath = "/tmp/t10.jpg" });
             media1.MediaThumbnails.Add(new MediaThumbnail { MediaId = "TEST-001", Scene = 1, Timestamp = 30, Path = "test001_t30.jpg", OriginalHostname = "localhost", OriginalPath = "/tmp/t30.jpg" });
             media1.MediaHighlights.Add(new MediaHighlight { MediaId = "TEST-001", Scene = 1, Timestamp = 10 });
@@ -128,6 +148,10 @@ namespace Japlayer.UITests.Fixtures
             });
             media2.UserTags.Add(vrTag);
             media2.Genres.Add(documentaryGenre);
+            media2.People.Add(actorAlpha);
+            media2.People.Add(actorBeta);
+            media2.Studios.Add(studioBeta);
+            media2.UserMediaData = new UserMediaData { MediaId = "TEST-002", Rating = 3 };
 
             // 3. TEST-003
             var media3 = new Media { MediaId = "TEST-003" };
@@ -150,6 +174,10 @@ namespace Japlayer.UITests.Fixtures
             });
             media3.UserTags.Add(twoDTag);
             media3.Genres.Add(actionGenre);
+            media3.People.Add(actorBeta);
+            media3.Studios.Add(studioAlpha);
+            media3.Series.Add(seriesOne);
+            media3.UserMediaData = new UserMediaData { MediaId = "TEST-003", Rating = 1 };
             media3.MediaHighlights.Add(new MediaHighlight { MediaId = "TEST-003", Scene = 1, Timestamp = 25 });
 
             context.Media.AddRange(media1, media2, media3);
