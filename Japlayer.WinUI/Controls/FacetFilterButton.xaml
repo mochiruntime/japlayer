@@ -80,7 +80,7 @@
                                                        VerticalAlignment="Center"/>
 
                                             <TextBlock Grid.Column="2"
-                                                       Text="{x:Bind ItemCount}"
+                                                       Text="{x:Bind ItemCount, Mode=OneWay}"
                                                        Style="{StaticResource CaptionTextBlockStyle}"
                                                        Foreground="{ThemeResource TextFillColorTertiaryBrush}"
                                                        VerticalAlignment="Center"/>

@@ -5,13 +5,14 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Japlayer.Data.Services
 {
-    public class DatabaseMediaHighlightProvider(DatabaseContext context) : IMediaHighlightProvider
+    public class DatabaseMediaHighlightProvider(IDbContextFactory<DatabaseContext> contextFactory) : IMediaHighlightProvider
     {
-        private readonly DatabaseContext _context = context;
+        private readonly IDbContextFactory<DatabaseContext> _contextFactory = contextFactory;
 
         public async Task<IEnumerable<MediaHighlight>> GetHighlightsAsync(string mediaId)
         {
-            return await _context.MediaHighlights
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            return await context.MediaHighlights
                 .AsNoTracking()
                 .Where(highlight => highlight.MediaId == mediaId)
                 .OrderBy(highlight => highlight.Scene)
@@ -21,7 +22,8 @@ namespace Japlayer.Data.Services
 
         public async Task AddHighlightAsync(string mediaId, int scene, int timestamp)
         {
-            var exists = await _context.MediaHighlights
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            var exists = await context.MediaHighlights
                 .AnyAsync(highlight => highlight.MediaId == mediaId && highlight.Scene == scene && highlight.Timestamp == timestamp);
 
             if (!exists)
@@ -32,20 +34,21 @@ namespace Japlayer.Data.Services
                     Scene = scene,
                     Timestamp = timestamp
                 };
-                _context.MediaHighlights.Add(newHighlight);
-                await _context.SaveChangesAsync();
+                context.MediaHighlights.Add(newHighlight);
+                await context.SaveChangesAsync();
             }
         }
 
         public async Task RemoveHighlightAsync(string mediaId, int scene, int timestamp)
         {
-            var existingHighlight = await _context.MediaHighlights
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            var existingHighlight = await context.MediaHighlights
                 .FirstOrDefaultAsync(highlight => highlight.MediaId == mediaId && highlight.Scene == scene && highlight.Timestamp == timestamp);
 
             if (existingHighlight != null)
             {
-                _context.MediaHighlights.Remove(existingHighlight);
-                await _context.SaveChangesAsync();
+                context.MediaHighlights.Remove(existingHighlight);
+                await context.SaveChangesAsync();
             }
         }
     }

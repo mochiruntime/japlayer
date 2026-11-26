@@ -221,5 +221,51 @@ namespace Japlayer.UITests.Specs
             var searchBox = _libraryPage.WaitForElement(() => _libraryPage.SearchBox);
             Assert.IsNotNull(searchBox, "SearchBox should be visible after navigating back to LibraryPage.");
         }
+
+        [TestMethod]
+        public void ExternalDatabaseInsert_AutoReloadsWhilePreservingActiveFilter()
+        {
+            WaitForInitialLoad();
+
+            // Filter by Studio Alpha -> 2 cards (TEST-001, TEST-003)
+            _libraryPage!.OpenFacetFlyout("Studios");
+            _libraryPage.ClickFacetItem("Studio Alpha");
+            _libraryPage.CloseFlyout();
+            Assert.IsTrue(_libraryPage.WaitForCardCount(2), "Only TEST-001 and TEST-003 have Studio Alpha initially.");
+
+            // Insert TEST-004 with Studio Alpha directly into SQLite while app is open
+            var options = Microsoft.EntityFrameworkCore.SqliteDbContextOptionsBuilderExtensions
+                .UseSqlite(new Microsoft.EntityFrameworkCore.DbContextOptionsBuilder<Data.Context.DatabaseContext>(), $"Data Source={_fixture!.DatabasePath}")
+                .AddInterceptors(new Data.Context.SqlitePragmaInterceptor())
+                .Options;
+
+            using (var context = new Data.Context.DatabaseContext(options))
+            {
+                var studioAlpha = context.MediaStudios.First(studio => studio.Name == "Studio Alpha");
+                var newMedia = new Data.Entities.Media { MediaId = "TEST-004" };
+                newMedia.MediaLocations.Add(new Data.Entities.MediaLocation
+                {
+                    MediaId = "TEST-004",
+                    Scene = 1,
+                    Hostname = "localhost",
+                    Path = _fixture.DummyVideoPath
+                });
+                newMedia.MediaMetadata.Add(new Data.Entities.MediaMetadata
+                {
+                    MediaId = "TEST-004",
+                    MetadataUrl = "https://example.com/meta4",
+                    Title = "External Watch Reloaded Movie"
+                });
+                newMedia.Studios.Add(studioAlpha);
+                context.Media.Add(newMedia);
+                context.SaveChanges();
+            }
+
+            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+
+            // DatabaseChangeMonitor should detect external DB/WAL write and reload without clearing Studio Alpha filter
+            Assert.IsNotNull(_libraryPage.WaitForCard("TEST-004", TimeSpan.FromSeconds(8)), "External insert TEST-004 should auto-reload into LibraryPage.");
+            Assert.IsTrue(_libraryPage.WaitForCardCount(3), "Studio Alpha filter should remain active and show 3 matching cards.");
+        }
     }
 }

@@ -7,6 +7,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Japlayer.Data.Models;
+using Japlayer.Services;
 using Microsoft.UI.Xaml;
 
 namespace Japlayer.ViewModels
@@ -24,6 +25,7 @@ namespace Japlayer.ViewModels
     {
         private readonly MediaScene _scene;
         private readonly string _imageRootPath;
+        private readonly IDatabaseChangeMonitor? _databaseChangeMonitor;
         private readonly Microsoft.UI.Dispatching.DispatcherQueue? _dispatcherQueue = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
 
         public MediaSceneViewModel(
@@ -32,10 +34,12 @@ namespace Japlayer.ViewModels
             IEnumerable<int> highlights,
             IEnumerable<Data.Entities.MediaThumbnail> thumbnails,
             Data.Contracts.IMediaHighlightProvider highlightProvider,
-            string imageRootPath = "")
+            string imageRootPath = "",
+            IDatabaseChangeMonitor? databaseChangeMonitor = null)
         {
             _scene = scene;
             _imageRootPath = imageRootPath;
+            _databaseChangeMonitor = databaseChangeMonitor;
             PosterPath = posterPath;
             HighlightProvider = highlightProvider;
             Highlights = new ObservableCollection<int>(highlights.OrderBy(timestamp => timestamp));
@@ -109,7 +113,10 @@ namespace Japlayer.ViewModels
 
             try
             {
-                await HighlightProvider.AddHighlightAsync(MediaId, SceneNumber ?? 1, timestampSeconds);
+                using (_databaseChangeMonitor?.BeginInternalWrite())
+                {
+                    await HighlightProvider.AddHighlightAsync(MediaId, SceneNumber ?? 1, timestampSeconds);
+                }
             }
             catch (Exception exception)
             {
@@ -139,7 +146,10 @@ namespace Japlayer.ViewModels
 
             try
             {
-                await HighlightProvider.RemoveHighlightAsync(MediaId, SceneNumber ?? 1, timestampSeconds);
+                using (_databaseChangeMonitor?.BeginInternalWrite())
+                {
+                    await HighlightProvider.RemoveHighlightAsync(MediaId, SceneNumber ?? 1, timestampSeconds);
+                }
             }
             catch (Exception exception)
             {

@@ -1,6 +1,5 @@
 #nullable enable
 using System;
-using System.ComponentModel;
 using System.Linq;
 using Japlayer.Helpers;
 using Japlayer.ViewModels;
@@ -28,31 +27,37 @@ namespace Japlayer.Views
         {
             base.OnNavigatedTo(e);
 
-            // Only load data if this is a new navigation or data hasn't been loaded yet.
-            // When navigating back, NavigationCacheMode="Required" preserves the state.
+            ViewModel.SortOrderApplied += ViewModel_SortOrderApplied;
+
             if (e.NavigationMode == NavigationMode.New || !ViewModel.IsDataLoaded)
             {
                 await ViewModel.LoadDataAsync();
             }
 
-            ViewModel.PropertyChanged += ViewModel_PropertyChanged;
+            await ViewModel.SetPageActiveAsync(true);
         }
 
         protected override void OnNavigatedFrom(NavigationEventArgs e)
         {
             base.OnNavigatedFrom(e);
-            ViewModel.PropertyChanged -= ViewModel_PropertyChanged;
+            ViewModel.SortOrderApplied -= ViewModel_SortOrderApplied;
+            _ = ViewModel.SetPageActiveAsync(false);
         }
 
-        private void ViewModel_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+        private void ViewModel_SortOrderApplied(object? sender, EventArgs e)
         {
-            if (e.PropertyName == nameof(ViewModel.MediaItems))
+            if (MediaGrid.Items.Count > 0)
             {
-                if (MediaGrid.Items.Count > 0)
-                {
-                    MediaGrid.ScrollIntoView(MediaGrid.Items[0]);
-                }
+                MediaGrid.ScrollIntoView(MediaGrid.Items[0]);
             }
+        }
+
+        private async void RefreshLibraryAccelerator_Invoked(
+            Microsoft.UI.Xaml.Input.KeyboardAccelerator sender,
+            Microsoft.UI.Xaml.Input.KeyboardAcceleratorInvokedEventArgs args)
+        {
+            args.Handled = true;
+            await ViewModel.ReloadLibraryCommand.ExecuteAsync(null);
         }
 
         private void MediaGrid_ItemClick(object sender, ItemClickEventArgs e)

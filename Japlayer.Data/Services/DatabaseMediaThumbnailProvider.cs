@@ -5,13 +5,14 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Japlayer.Data.Services
 {
-    public class DatabaseMediaThumbnailProvider(DatabaseContext context) : IMediaThumbnailProvider
+    public class DatabaseMediaThumbnailProvider(IDbContextFactory<DatabaseContext> contextFactory) : IMediaThumbnailProvider
     {
-        private readonly DatabaseContext _context = context;
+        private readonly IDbContextFactory<DatabaseContext> _contextFactory = contextFactory;
 
         public async Task<IEnumerable<MediaThumbnail>> GetThumbnailsAsync(string mediaId)
         {
-            return await _context.MediaThumbnails
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            return await context.MediaThumbnails
                 .AsNoTracking()
                 .Where(t => t.MediaId == mediaId)
                 .OrderBy(t => t.Scene)

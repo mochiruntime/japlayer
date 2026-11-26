@@ -5,13 +5,14 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Japlayer.Data.Services
 {
-    public class DatabaseMediaSceneProvider(DatabaseContext context) : IMediaSceneProvider
+    public class DatabaseMediaSceneProvider(IDbContextFactory<DatabaseContext> contextFactory) : IMediaSceneProvider
     {
-        private readonly DatabaseContext _context = context;
+        private readonly IDbContextFactory<DatabaseContext> _contextFactory = contextFactory;
 
         public async Task<IEnumerable<MediaScene>> GetMediaScenesAsync(string mediaId)
         {
-            var scenes = await _context.MediaLocations
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            var scenes = await context.MediaLocations
                 .AsNoTracking()
                 .Where(ml => ml.MediaId == mediaId)
                 .GroupBy(ml => ml.Scene)

@@ -1,19 +1,22 @@
 using Japlayer.Data.Context;
 using Japlayer.Data.Contracts;
+using Japlayer.Data.Helpers;
 using Japlayer.Data.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace Japlayer.Data.Services
 {
-    public class DatabaseMediaProvider(DatabaseContext context) : IMediaProvider
+    public class DatabaseMediaProvider(IDbContextFactory<DatabaseContext> contextFactory) : IMediaProvider
     {
-        private readonly DatabaseContext _context = context;
+        private readonly IDbContextFactory<DatabaseContext> _contextFactory = contextFactory;
 
         public async Task<IEnumerable<LibraryItem>> GetLibraryItemsAsync()
         {
+            await using var context = await _contextFactory.CreateDbContextAsync();
+
             // Use projection to fetch exactly what we need in one query.
             // We start from Media and only include those that have associated locations (files).
-            return await _context.Media
+            var items = await context.Media
                 .AsNoTracking()
                 .Where(m => m.MediaLocations.Any())
                 .Select(media => new LibraryItem
@@ -36,11 +39,53 @@ namespace Japlayer.Data.Services
                 })
                 .OrderBy(media => media.MediaId)
                 .ToListAsync();
+
+            // Batch-load fallback thumbnail paths for coverless items instead of N+1 per-card queries.
+            var coverlessIds = items
+                .Where(item => string.IsNullOrEmpty(item.CoverImagePath))
+                .Select(item => item.MediaId)
+                .ToList();
+
+            if (coverlessIds.Count > 0)
+            {
+                const int batchSize = 500;
+                var coverlessThumbnails = new List<(string MediaId, int Scene, int Timestamp, string Path)>();
+
+                foreach (var batch in coverlessIds.Chunk(batchSize))
+                {
+                    var batchIds = batch.ToArray();
+                    var batchThumbnails = await context.MediaThumbnails
+                        .AsNoTracking()
+                        .Where(thumbnail => batchIds.Contains(thumbnail.MediaId))
+                        .Select(thumbnail => new { thumbnail.MediaId, thumbnail.Scene, thumbnail.Timestamp, thumbnail.Path })
+                        .ToListAsync();
+
+                    coverlessThumbnails.AddRange(batchThumbnails.Select(entry => (entry.MediaId, entry.Scene, entry.Timestamp, entry.Path)));
+                }
+
+                var thumbnailsByMediaId = coverlessThumbnails
+                    .OrderBy(entry => entry.Scene)
+                    .ThenBy(entry => entry.Timestamp)
+                    .GroupBy(entry => entry.MediaId, StringComparer.OrdinalIgnoreCase)
+                    .ToDictionary(group => group.Key, group => group.Select(entry => entry.Path).ToList(), StringComparer.OrdinalIgnoreCase);
+
+                foreach (var item in items)
+                {
+                    if (string.IsNullOrEmpty(item.CoverImagePath) &&
+                        thumbnailsByMediaId.TryGetValue(item.MediaId, out var paths))
+                    {
+                        item.FallbackThumbnailPath = ThumbnailFallbackSelector.SelectFallbackItem(paths);
+                    }
+                }
+            }
+
+            return items;
         }
 
         public async Task<IEnumerable<string>> GetUserTagsAsync()
         {
-            return await _context.UserTags
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            return await context.UserTags
                 .AsNoTracking()
                 .Select(userTag => userTag.Name)
                 .Distinct()
@@ -50,7 +95,8 @@ namespace Japlayer.Data.Services
 
         public async Task<IEnumerable<string>> GetGenresAsync()
         {
-            return await _context.MediaGenres
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            return await context.MediaGenres
                 .AsNoTracking()
                 .Select(genre => genre.Name)
                 .Distinct()
@@ -60,7 +106,8 @@ namespace Japlayer.Data.Services
 
         public async Task<IEnumerable<string>> GetCastAsync()
         {
-            return await _context.Media
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            return await context.Media
                 .AsNoTracking()
                 .Where(media => media.MediaLocations.Any())
                 .SelectMany(media => media.People)
@@ -72,7 +119,8 @@ namespace Japlayer.Data.Services
 
         public async Task<IEnumerable<string>> GetStudiosAsync()
         {
-            return await _context.Media
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            return await context.Media
                 .AsNoTracking()
                 .Where(media => media.MediaLocations.Any())
                 .SelectMany(media => media.Studios)
@@ -84,7 +132,8 @@ namespace Japlayer.Data.Services
 
         public async Task<IEnumerable<string>> GetSeriesAsync()
         {
-            return await _context.Media
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            return await context.Media
                 .AsNoTracking()
                 .Where(media => media.MediaLocations.Any())
                 .SelectMany(media => media.Series)
@@ -96,8 +145,10 @@ namespace Japlayer.Data.Services
 
         public async Task<MediaItem> GetMediaItemAsync(string mediaId)
         {
+            await using var context = await _contextFactory.CreateDbContextAsync();
+
             // Fetch everything in one single query using navigation properties
-            var media = await _context.Media
+            var media = await context.Media
                 .AsNoTracking()
                 .Include(m => m.MediaMetadata)
                 .Include(m => m.Series)
@@ -143,7 +194,8 @@ namespace Japlayer.Data.Services
                 return;
             }
 
-            var media = await _context.Media
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            var media = await context.Media
                 .Include(m => m.UserTags)
                 .FirstOrDefaultAsync(m => m.MediaId == mediaId);
 
@@ -157,22 +209,23 @@ namespace Japlayer.Data.Services
                 return;
             }
 
-            var existingTag = await _context.UserTags
+            var existingTag = await context.UserTags
                 .FirstOrDefaultAsync(userTag => userTag.Name.ToLower() == trimmedTagName.ToLower());
 
             if (existingTag == null)
             {
                 existingTag = new Entities.UserTag { Name = trimmedTagName };
-                _context.UserTags.Add(existingTag);
+                context.UserTags.Add(existingTag);
             }
 
             media.UserTags.Add(existingTag);
-            await _context.SaveChangesAsync();
+            await context.SaveChangesAsync();
         }
 
         public async Task RemoveUserTagAsync(string mediaId, string tagName)
         {
-            var media = await _context.Media
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            var media = await context.Media
                 .Include(m => m.UserTags)
                 .FirstOrDefaultAsync(m => m.MediaId == mediaId);
 
@@ -187,14 +240,15 @@ namespace Japlayer.Data.Services
             if (existingTag != null)
             {
                 media.UserTags.Remove(existingTag);
-                await _context.SaveChangesAsync();
+                await context.SaveChangesAsync();
             }
         }
 
         public async Task SetRatingAsync(string mediaId, int rating)
         {
             var clampedRating = Math.Clamp(rating, 0, 5);
-            var existingUserData = await _context.UserMediaData
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            var existingUserData = await context.UserMediaData
                 .FirstOrDefaultAsync(userData => userData.MediaId == mediaId);
 
             if (existingUserData == null)
@@ -204,7 +258,7 @@ namespace Japlayer.Data.Services
                     return;
                 }
 
-                _context.UserMediaData.Add(new Entities.UserMediaData
+                context.UserMediaData.Add(new Entities.UserMediaData
                 {
                     MediaId = mediaId,
                     Rating = clampedRating
@@ -215,7 +269,7 @@ namespace Japlayer.Data.Services
                 existingUserData.Rating = clampedRating == 0 ? null : clampedRating;
             }
 
-            await _context.SaveChangesAsync();
+            await context.SaveChangesAsync();
         }
     }
 }

@@ -1,8 +1,11 @@
+using CommunityToolkit.Mvvm.Messaging;
 using Japlayer.Contracts;
 using Japlayer.Data.Contracts;
 using Japlayer.Data.Entities;
 using Japlayer.Data.Models;
+using Japlayer.Messages;
 using Japlayer.Models;
+using Japlayer.Services;
 using Japlayer.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -373,6 +376,199 @@ namespace Japlayer.UnitTests.ViewModels
 
             Assert.AreEqual("Zeta", viewModel.TagsFacet.FilteredItems[0].Name);
             Assert.AreEqual("Alpha", viewModel.TagsFacet.FilteredItems[1].Name);
+        }
+
+        [TestMethod]
+        public async Task MutationMessages_SynchronizeRatingTagsAndFacetCounts()
+        {
+            var mediaProvider = new StubMediaProvider
+            {
+                LibraryItemsToReturn =
+                [
+                    new() { MediaId = "M1", Title = "First", Rating = 2, UserTags = ["Existing"] },
+                    new() { MediaId = "M2", Title = "Second", Rating = 5, UserTags = [] }
+                ],
+                UserTagsToReturn = ["Existing"]
+            };
+
+            var messenger = new WeakReferenceMessenger();
+            var viewModel = new LibraryViewModel(mediaProvider, new StubMediaSceneProvider(), CreateServiceProvider(), messenger: messenger);
+            await viewModel.LoadDataAsync();
+
+            // Simulate navigating away to MediaItemPage
+            await viewModel.SetPageActiveAsync(false);
+
+            // Rating filter active -> rating update should mark pending refresh and apply on return
+            viewModel.RatingMin = 4;
+            viewModel.RatingMax = 5;
+            viewModel.ApplyFilterDirect();
+            Assert.AreEqual(1, viewModel.MediaItems.Count);
+
+            messenger.Send(new MediaRatingChangedMessage("M1", 5));
+            messenger.Send(new MediaUserTagAddedMessage("M1", "BrandNewTag"));
+            messenger.Send(new MediaHighlightCountChangedMessage("M1", 7));
+
+            // New tag should immediately appear in TagsFacet with count 1
+            var newTagFilter = viewModel.TagsFacet.FilteredItems.FirstOrDefault(item => item.Name == "BrandNewTag");
+            Assert.IsNotNull(newTagFilter);
+            Assert.AreEqual(1, newTagFilter.ItemCount);
+
+            // Returning to LibraryPage applies pending filter refresh so M1 now matches 4..5 rating filter
+            await viewModel.SetPageActiveAsync(true);
+            Assert.AreEqual(2, viewModel.MediaItems.Count);
+            var updatedM1 = viewModel.MediaItems.First(item => item.Id == "M1");
+            Assert.AreEqual(5, updatedM1.Rating);
+            Assert.AreEqual(7, updatedM1.HighlightCount);
+            CollectionAssert.Contains(updatedM1.LibraryItem.UserTags.ToList(), "BrandNewTag");
+
+            // Removing the tag decrements its count to 0
+            messenger.Send(new MediaUserTagRemovedMessage("M1", "BrandNewTag"));
+            Assert.AreEqual(0, newTagFilter.ItemCount);
+        }
+
+        private sealed class FakeDatabaseChangeMonitor : IDatabaseChangeMonitor
+        {
+            public event EventHandler? DatabaseChangedExternally;
+            public void Start() { }
+            public IDisposable BeginInternalWrite() => new NoOpDisposable();
+            public void RaiseExternalChange() => DatabaseChangedExternally?.Invoke(this, EventArgs.Empty);
+            public void Dispose() { }
+
+            private sealed class NoOpDisposable : IDisposable
+            {
+                public void Dispose() { }
+            }
+        }
+
+        [TestMethod]
+        public async Task ExternalReload_PreservesActiveFiltersSortAndExistingItemInstances()
+        {
+            var mediaProvider = new StubMediaProvider
+            {
+                LibraryItemsToReturn =
+                [
+                    new() { MediaId = "M1", Title = "Alpha", Rating = 4, RuntimeMinutes = 60, UserTags = ["VR"] },
+                    new() { MediaId = "M2", Title = "Beta", Rating = 3, RuntimeMinutes = 75, UserTags = ["2D"] }
+                ],
+                UserTagsToReturn = ["2D", "VR"]
+            };
+
+            var monitor = new FakeDatabaseChangeMonitor();
+            var viewModel = new LibraryViewModel(mediaProvider, new StubMediaSceneProvider(), CreateServiceProvider(), monitor, new WeakReferenceMessenger());
+            await viewModel.LoadDataAsync();
+
+            var originalM1 = viewModel.MediaItems.First(item => item.Id == "M1");
+
+            // Apply Include + Exclude facet filters, constrained runtime, and custom sort
+            viewModel.TagsFacet.FilteredItems.First(item => item.Name == "VR").IsSelected = true;
+            viewModel.TagsFacet.FilteredItems.First(item => item.Name == "2D").IsSelected = null;
+            viewModel.RuntimeMin = 30;
+            viewModel.RuntimeMax = 120;
+            viewModel.SelectedSortField = viewModel.SortFieldOptions.First(option => option.Field == LibrarySortField.Rating);
+            viewModel.ApplyFilterDirect();
+            Assert.AreEqual(1, viewModel.MediaItems.Count);
+
+            // External DB adds M3 (VR, 90m), removes M2, and updates M1 rating while page is inactive
+            await viewModel.SetPageActiveAsync(false);
+            mediaProvider.LibraryItemsToReturn =
+            [
+                new() { MediaId = "M1", Title = "Alpha Updated", Rating = 5, RuntimeMinutes = 60, UserTags = ["VR"] },
+                new() { MediaId = "M3", Title = "Gamma", Rating = 4, RuntimeMinutes = 90, UserTags = ["VR"] },
+                new() { MediaId = "M4", Title = "Long Unmatched", Rating = 4, RuntimeMinutes = 240, UserTags = ["2D", "VR"] }
+            ];
+            monitor.RaiseExternalChange();
+
+            // Returning triggers deferred reload
+            await viewModel.SetPageActiveAsync(true);
+
+            // M2 removed, M4 excluded by -2D and runtime > 120, M1 and M3 kept
+            Assert.AreEqual(2, viewModel.MediaItems.Count);
+            Assert.AreEqual("M1", viewModel.MediaItems[0].Id);
+            Assert.AreEqual("M3", viewModel.MediaItems[1].Id);
+            Assert.AreSame(originalM1, viewModel.MediaItems[0]);
+            Assert.AreEqual(5, originalM1.Rating);
+            Assert.AreEqual(LibrarySortField.Rating, viewModel.SelectedSortField.Field);
+            Assert.IsTrue(viewModel.TagsFacet.RequiredValues.Contains("VR"));
+            Assert.IsTrue(viewModel.TagsFacet.ExcludedValues.Contains("2D"));
+            Assert.AreEqual(240, viewModel.RuntimeMaxBound);
+            Assert.AreEqual(120, viewModel.RuntimeMax);
+        }
+
+        private sealed class BlockingMediaProvider : IMediaProvider
+        {
+            public TaskCompletionSource? FirstCallStarted { get; set; }
+            public TaskCompletionSource? ReleaseFirstCall { get; set; }
+            public int CallCount { get; private set; }
+            public List<LibraryItem> SecondPassItems { get; set; } = [];
+
+            public async Task<IEnumerable<LibraryItem>> GetLibraryItemsAsync()
+            {
+                CallCount++;
+                if (CallCount == 1 && FirstCallStarted != null && ReleaseFirstCall != null)
+                {
+                    FirstCallStarted.TrySetResult();
+                    await ReleaseFirstCall.Task;
+                    return [new LibraryItem { MediaId = "M1", Title = "Pass 1" }];
+                }
+
+                return SecondPassItems;
+            }
+
+            public Task<IEnumerable<string>> GetUserTagsAsync() => Task.FromResult<IEnumerable<string>>([]);
+            public Task<IEnumerable<string>> GetGenresAsync() => Task.FromResult<IEnumerable<string>>([]);
+            public Task<IEnumerable<string>> GetCastAsync() => Task.FromResult<IEnumerable<string>>([]);
+            public Task<IEnumerable<string>> GetStudiosAsync() => Task.FromResult<IEnumerable<string>>([]);
+            public Task<IEnumerable<string>> GetSeriesAsync() => Task.FromResult<IEnumerable<string>>([]);
+            public Task<MediaItem> GetMediaItemAsync(string mediaId) => Task.FromResult(new MediaItem { MediaId = mediaId });
+            public Task AddUserTagAsync(string mediaId, string tagName) => Task.CompletedTask;
+            public Task RemoveUserTagAsync(string mediaId, string tagName) => Task.CompletedTask;
+            public Task SetRatingAsync(string mediaId, int rating) => Task.CompletedTask;
+        }
+
+        [TestMethod]
+        public async Task ReloadLibraryAsync_CoalescesConcurrentTriggers_AndSortOrderAppliedFiresOnlyOnSort()
+        {
+            var provider = new BlockingMediaProvider
+            {
+                FirstCallStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously),
+                ReleaseFirstCall = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously),
+                SecondPassItems =
+                [
+                    new LibraryItem { MediaId = "M1", Title = "Pass 2" },
+                    new LibraryItem { MediaId = "M2", Title = "Added During Reload" }
+                ]
+            };
+
+            var viewModel = new LibraryViewModel(provider, new StubMediaSceneProvider(), CreateServiceProvider(), messenger: new WeakReferenceMessenger());
+            var sortAppliedCount = 0;
+            viewModel.SortOrderApplied += (_, _) => sortAppliedCount++;
+
+            var firstReload = viewModel.ReloadLibraryAsync();
+            await provider.FirstCallStarted.Task;
+
+            // Overlapping reload calls coalesce into a single follow-up pass
+            var secondReload = viewModel.ReloadLibraryAsync();
+            var thirdReload = viewModel.ReloadLibraryAsync();
+            Assert.IsTrue(secondReload.IsCompleted);
+            Assert.IsTrue(thirdReload.IsCompleted);
+
+            provider.ReleaseFirstCall.TrySetResult();
+            await firstReload;
+
+            Assert.AreEqual(2, provider.CallCount);
+            Assert.AreEqual(2, viewModel.MediaItems.Count);
+            Assert.AreEqual(1, sortAppliedCount);
+
+            // Filtering only must not trigger SortOrderApplied
+            viewModel.SearchText = "Added";
+            viewModel.ApplyFilterDirect();
+            Assert.AreEqual(1, viewModel.MediaItems.Count);
+            Assert.AreEqual(1, sortAppliedCount);
+
+            // Changing sort field triggers SortOrderApplied
+            viewModel.SelectedSortField = viewModel.SortFieldOptions.First(option => option.Field == LibrarySortField.Title);
+            viewModel.ApplyFilterDirect();
+            Assert.AreEqual(2, sortAppliedCount);
         }
     }
 }

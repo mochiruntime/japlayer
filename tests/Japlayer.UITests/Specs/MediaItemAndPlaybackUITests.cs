@@ -92,6 +92,38 @@ namespace Japlayer.UITests.Specs
         }
 
         [TestMethod]
+        public void RatingChangeOnMediaItemPage_SynchronizesBackToLibraryCard()
+        {
+            Assert.IsNotNull(_mediaItemPage);
+            Assert.IsNotNull(_libraryPage);
+
+            _mediaItemPage.SetRating(2);
+            var updatedRating = _mediaItemPage.WaitForElement(() =>
+            {
+                var element = _mediaItemPage.RatingDisplayText;
+                return element != null && element.Name.Contains("2", StringComparison.Ordinal) ? element : null;
+            });
+            Assert.IsNotNull(updatedRating, "RatingDisplayText should reflect updated rating of 2.");
+
+            _mediaItemPage.ClickBack();
+            Assert.IsNotNull(_libraryPage.WaitForCard("TEST-001"), "Should navigate back to LibraryPage.");
+
+            var cardUpdated = FlaUI.Core.Tools.Retry.WhileFalse(() =>
+            {
+                var card = _libraryPage.FindCard("TEST-001");
+                if (card == null)
+                {
+                    return false;
+                }
+
+                var texts = card.FindAllDescendants(cf => cf.ByControlType(FlaUI.Core.Definitions.ControlType.Text));
+                return texts.Any(text => text.Properties.Name.ValueOrDefault == "2");
+            }, TimeSpan.FromSeconds(5), TimeSpan.FromMilliseconds(100)).Success;
+
+            Assert.IsTrue(cardUpdated, "Library card rating badge for TEST-001 should update to 2 after returning from MediaItemPage.");
+        }
+
+        [TestMethod]
         public void PlaybackControls_AreAccessibleWhenPlayOverlayClicked()
         {
             Assert.IsNotNull(_mediaItemPage);

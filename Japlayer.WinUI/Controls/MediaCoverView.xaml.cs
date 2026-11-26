@@ -16,7 +16,9 @@ namespace Japlayer.Controls
     public sealed partial class MediaCoverView : UserControl
     {
         private const int ThumbnailCacheCapacity = 512;
+        private const int CoverCacheCapacity = 512;
         private static readonly BoundedLruCache<string, BitmapImage> ThumbnailCache = new(ThumbnailCacheCapacity, StringComparer.OrdinalIgnoreCase);
+        private static readonly BoundedLruCache<string, BitmapImage> CoverCache = new(CoverCacheCapacity, StringComparer.OrdinalIgnoreCase);
 
         public static readonly DependencyProperty SourceProperty =
             DependencyProperty.Register("Source", typeof(object), typeof(MediaCoverView), new PropertyMetadata(null, OnSourceChanged));
@@ -164,25 +166,30 @@ namespace Japlayer.Controls
 
         private void OnImageOpened(object sender, RoutedEventArgs e)
         {
-            if (sender is Image image && image == _inactiveImage && _activeImage != null)
+            if (sender is not Image image || image.Source is not BitmapImage openedBitmap)
             {
-                if (image.Tag is string openedPath)
+                return;
+            }
+
+            if (image == _activeImage && image.Tag is string coverCacheKey && !ThumbnailDecodeCoordinator.IsThumbnailPath(coverCacheKey))
+            {
+                CoverCache.Set(coverCacheKey, openedBitmap);
+                return;
+            }
+
+            if (image == _inactiveImage && _activeImage != null && image.Tag is string openedPath)
+            {
+                ThumbnailCache.Set(openedPath, openedBitmap);
+
+                // Show any decoded thumbnail as long as the control is still in thumbnail-scrubbing mode
+                // (do not drop intermediate frames while the pointer is moving fast).
+                if (Source is string currentSource && ThumbnailDecodeCoordinator.IsThumbnailPath(currentSource))
                 {
-                    if (image.Source is BitmapImage openedBitmap)
-                    {
-                        ThumbnailCache.Set(openedPath, openedBitmap);
-                    }
+                    _inactiveImage.Opacity = 1;
+                    Canvas.SetZIndex(_inactiveImage, 1);
+                    Canvas.SetZIndex(_activeImage, 0);
 
-                    // Show any decoded thumbnail as long as the control is still in thumbnail-scrubbing mode
-                    // (do not drop intermediate frames while the pointer is moving fast).
-                    if (Source is string currentSource && ThumbnailDecodeCoordinator.IsThumbnailPath(currentSource))
-                    {
-                        _inactiveImage.Opacity = 1;
-                        Canvas.SetZIndex(_inactiveImage, 1);
-                        Canvas.SetZIndex(_activeImage, 0);
-
-                        (_inactiveImage, _activeImage) = (_activeImage, _inactiveImage);
-                    }
+                    (_inactiveImage, _activeImage) = (_activeImage, _inactiveImage);
                 }
             }
         }
@@ -279,9 +286,27 @@ namespace Japlayer.Controls
                             _inactiveImage.Opacity = 1;
                         }
 
-                        var bitmap = new BitmapImage(uri);
-                        _activeImage.Source = bitmap;
-                        _activeImage.Tag = null;
+                        var targetWidth = ActualWidth > 0 ? ActualWidth : (double.IsNaN(Width) ? 0 : Width);
+                        var decodePixelWidth = ThumbnailDecodeCoordinator.CalculateDecodePixelWidth(targetWidth);
+                        var coverCacheKey = $"{pathString}|{decodePixelWidth}";
+
+                        if (CoverCache.TryGetValue(coverCacheKey, out var cachedCover))
+                        {
+                            _activeImage.Source = cachedCover;
+                            _activeImage.Tag = coverCacheKey;
+                        }
+                        else
+                        {
+                            var bitmap = new BitmapImage
+                            {
+                                DecodePixelWidth = decodePixelWidth,
+                                DecodePixelType = DecodePixelType.Logical,
+                                UriSource = uri
+                            };
+                            _activeImage.Tag = coverCacheKey;
+                            _activeImage.Source = bitmap;
+                        }
+
                         _activeImage.Opacity = 1;
                         Canvas.SetZIndex(_activeImage, 1);
                         Canvas.SetZIndex(_inactiveImage, 0);

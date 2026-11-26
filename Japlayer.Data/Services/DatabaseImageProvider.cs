@@ -4,13 +4,14 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Japlayer.Data.Services
 {
-    public class DatabaseImageProvider(DatabaseContext context) : IImageProvider
+    public class DatabaseImageProvider(IDbContextFactory<DatabaseContext> contextFactory) : IImageProvider
     {
-        private readonly DatabaseContext _context = context;
+        private readonly IDbContextFactory<DatabaseContext> _contextFactory = contextFactory;
 
         public async Task<IEnumerable<string>> GetGalleryPathsAsync(string mediaId)
         {
-            return await _context.MediaImages
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            return await context.MediaImages
                 .AsNoTracking()
                 .Where(img => img.MediaId == mediaId)
                 .Select(img => img.Filepath)

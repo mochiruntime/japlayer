@@ -7,13 +7,14 @@ using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Japlayer.Contracts;
 using Japlayer.Data.Contracts;
+using Japlayer.Data.Helpers;
 using Japlayer.Data.Models;
 
 namespace Japlayer.ViewModels
 {
     public partial class LibraryItemViewModel : ObservableObject
     {
-        private readonly LibraryItem _libraryItem;
+        private LibraryItem _libraryItem;
         private readonly ISettingsService _settingsService;
         private readonly IMediaThumbnailProvider _thumbnailProvider;
 
@@ -27,10 +28,19 @@ namespace Japlayer.ViewModels
             _settingsService = settingsService;
             _thumbnailProvider = thumbnailProvider;
             HighlightCount = libraryItem.HighlightCount;
+            Rating = libraryItem.Rating;
+            NormalizedId = NormalizeSearchText(libraryItem.MediaId);
 
             if (string.IsNullOrEmpty(_libraryItem.CoverImagePath))
             {
-                _ = LoadFallbackThumbnailAsync();
+                if (!string.IsNullOrEmpty(_libraryItem.FallbackThumbnailPath))
+                {
+                    _fallbackThumbnailPath = Path.Combine(_settingsService.ImagePath, _libraryItem.FallbackThumbnailPath);
+                }
+                else
+                {
+                    _ = LoadFallbackThumbnailAsync();
+                }
             }
         }
 
@@ -46,9 +56,11 @@ namespace Japlayer.ViewModels
                     _thumbnails = [.. sortedThumbnails.Select(thumbnail => Path.Combine(_settingsService.ImagePath, thumbnail.Path))];
                     _areThumbnailsLoaded = true;
 
-                    var index = Math.Clamp((int)Math.Round((sortedThumbnails.Count - 1) * 0.75), 0, sortedThumbnails.Count - 1);
-                    var fallbackThumbnail = sortedThumbnails[index];
-                    _fallbackThumbnailPath = Path.Combine(_settingsService.ImagePath, fallbackThumbnail.Path);
+                    var fallbackThumbnail = ThumbnailFallbackSelector.SelectFallbackItem(sortedThumbnails);
+                    if (fallbackThumbnail != null)
+                    {
+                        _fallbackThumbnailPath = Path.Combine(_settingsService.ImagePath, fallbackThumbnail.Path);
+                    }
 
                     OnPropertyChanged(nameof(DisplayCover));
                     OnPropertyChanged(nameof(DisplayImageSource));
@@ -66,14 +78,77 @@ namespace Japlayer.ViewModels
 
         public bool HasHighlights => HighlightCount > 0;
 
-        public int Rating => _libraryItem.Rating;
-        public bool HasRating => _libraryItem.Rating > 0;
-        public string RatingDisplay => _libraryItem.Rating.ToString();
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(HasRating), nameof(RatingDisplay))]
+        public partial int Rating { get; set; }
+
+        partial void OnRatingChanged(int value) => _libraryItem.Rating = value;
+
+        public bool HasRating => Rating > 0;
+        public string RatingDisplay => Rating.ToString();
 
         public int SceneCount => _libraryItem.SceneCount;
         public bool HasScenes => _libraryItem.SceneCount > 0;
 
         public int? RuntimeMinutes => _libraryItem.RuntimeMinutes;
+        public string NormalizedId { get; private set; }
+
+        public void AddUserTag(string tagName)
+        {
+            if (string.IsNullOrWhiteSpace(tagName) ||
+                _libraryItem.UserTags.Any(tag => string.Equals(tag, tagName, StringComparison.OrdinalIgnoreCase)))
+            {
+                return;
+            }
+
+            _libraryItem.UserTags = [.. _libraryItem.UserTags, tagName];
+        }
+
+        public void RemoveUserTag(string tagName)
+        {
+            if (!_libraryItem.UserTags.Any(tag => string.Equals(tag, tagName, StringComparison.OrdinalIgnoreCase)))
+            {
+                return;
+            }
+
+            _libraryItem.UserTags = [.. _libraryItem.UserTags.Where(tag => !string.Equals(tag, tagName, StringComparison.OrdinalIgnoreCase))];
+        }
+
+        /// <summary>
+        /// Refreshes metadata and persisted state from a reloaded LibraryItem while preserving cached hover thumbnails.
+        /// </summary>
+        public void UpdateFrom(LibraryItem updatedItem)
+        {
+            _libraryItem = updatedItem;
+            NormalizedId = NormalizeSearchText(updatedItem.MediaId);
+            Rating = updatedItem.Rating;
+            HighlightCount = updatedItem.HighlightCount;
+
+            if (string.IsNullOrEmpty(updatedItem.CoverImagePath) && !string.IsNullOrEmpty(updatedItem.FallbackThumbnailPath))
+            {
+                _fallbackThumbnailPath = Path.Combine(_settingsService.ImagePath, updatedItem.FallbackThumbnailPath);
+            }
+
+            OnPropertyChanged(nameof(Title));
+            OnPropertyChanged(nameof(OriginalTitle));
+            OnPropertyChanged(nameof(ReleaseDate));
+            OnPropertyChanged(nameof(FormattedReleaseDate));
+            OnPropertyChanged(nameof(SceneCount));
+            OnPropertyChanged(nameof(HasScenes));
+            OnPropertyChanged(nameof(RuntimeMinutes));
+            OnPropertyChanged(nameof(DisplayCover));
+            OnPropertyChanged(nameof(DisplayImageSource));
+        }
+
+        private static string NormalizeSearchText(string input)
+        {
+            if (string.IsNullOrEmpty(input))
+            {
+                return string.Empty;
+            }
+
+            return new string([.. input.Where(char.IsLetterOrDigit)]).ToLowerInvariant();
+        }
 
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(DisplayImageSource))]

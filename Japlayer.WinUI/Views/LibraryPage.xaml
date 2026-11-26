@@ -10,7 +10,12 @@
     xmlns:toolkit="using:CommunityToolkit.WinUI.Controls"
     mc:Ignorable="d"
     Background="Transparent"
-    NavigationCacheMode="Required">
+    NavigationCacheMode="Required"
+    KeyboardAcceleratorPlacementMode="Hidden">
+
+    <Page.KeyboardAccelerators>
+        <KeyboardAccelerator Key="F5" Invoked="RefreshLibraryAccelerator_Invoked"/>
+    </Page.KeyboardAccelerators>
 
     <Page.Resources>
         <!-- Active Filter Chip Template -->
@@ -284,6 +289,12 @@
 
         <!-- Row 2: Scrollable Media GridView + Empty State -->
         <Grid Grid.Row="2">
+            <ProgressBar IsIndeterminate="True"
+                         Visibility="{x:Bind ViewModel.IsLoading, Mode=OneWay}"
+                         VerticalAlignment="Top"
+                         IsHitTestVisible="False"
+                         Canvas.ZIndex="10"/>
+
             <GridView x:Name="MediaGrid"
                       AutomationProperties.AutomationId="MediaGrid"
                       ItemsSource="{x:Bind ViewModel.MediaItems, Mode=OneWay}"

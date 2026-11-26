@@ -6,9 +6,12 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Messaging;
 using Japlayer.Contracts;
 using Japlayer.Data.Contracts;
 using Japlayer.Data.Models;
+using Japlayer.Messages;
+using Japlayer.Services;
 
 namespace Japlayer.ViewModels
 {
@@ -25,7 +28,9 @@ namespace Japlayer.ViewModels
         IMediaProvider mediaProvider,
         ISettingsService settingsService,
         IMediaThumbnailProvider thumbnailProvider,
-        IMediaHighlightProvider highlightProvider) : ObservableObject
+        IMediaHighlightProvider highlightProvider,
+        IDatabaseChangeMonitor? databaseChangeMonitor = null,
+        IMessenger? messenger = null) : ObservableObject
     {
         private int _genreCollapseLimit = 6;
 
@@ -36,6 +41,8 @@ namespace Japlayer.ViewModels
         private readonly ISettingsService _settingsService = settingsService;
         private readonly IMediaThumbnailProvider _thumbnailProvider = thumbnailProvider;
         private readonly IMediaHighlightProvider _highlightProvider = highlightProvider;
+        private readonly IDatabaseChangeMonitor? _databaseChangeMonitor = databaseChangeMonitor;
+        private readonly IMessenger _messenger = messenger ?? WeakReferenceMessenger.Default;
         private bool _isInitializingRating;
 
         [ObservableProperty]
@@ -105,7 +112,12 @@ namespace Japlayer.ViewModels
         {
             try
             {
-                await _mediaProvider.SetRatingAsync(Id, rating);
+                using (_databaseChangeMonitor?.BeginInternalWrite())
+                {
+                    await _mediaProvider.SetRatingAsync(Id, rating);
+                }
+
+                _messenger.Send(new MediaRatingChangedMessage(Id, rating));
             }
             catch (Exception exception)
             {
@@ -262,7 +274,11 @@ namespace Japlayer.ViewModels
                 return;
             }
 
-            await _mediaProvider.AddUserTagAsync(Id, trimmedTagName);
+            using (_databaseChangeMonitor?.BeginInternalWrite())
+            {
+                await _mediaProvider.AddUserTagAsync(Id, trimmedTagName);
+            }
+
             UserTags.Add(trimmedTagName);
 
             if (!AllAvailableTags.Any(tag => string.Equals(tag, trimmedTagName, StringComparison.OrdinalIgnoreCase)))
@@ -270,6 +286,8 @@ namespace Japlayer.ViewModels
                 AllAvailableTags.Add(trimmedTagName);
                 AllAvailableTags.Sort(StringComparer.OrdinalIgnoreCase);
             }
+
+            _messenger.Send(new MediaUserTagAddedMessage(Id, trimmedTagName));
         }
 
         public async Task RemoveUserTagAsync(string tagName)
@@ -280,8 +298,13 @@ namespace Japlayer.ViewModels
                 return;
             }
 
-            await _mediaProvider.RemoveUserTagAsync(Id, existing);
+            using (_databaseChangeMonitor?.BeginInternalWrite())
+            {
+                await _mediaProvider.RemoveUserTagAsync(Id, existing);
+            }
+
             UserTags.Remove(existing);
+            _messenger.Send(new MediaUserTagRemovedMessage(Id, existing));
         }
 
         public async Task LoadDetailsAsync()
@@ -368,7 +391,8 @@ namespace Japlayer.ViewModels
                     sceneHighlights ?? [],
                     sceneThumbnails ?? [],
                     _highlightProvider,
-                    _settingsService.ImagePath);
+                    _settingsService.ImagePath,
+                    _databaseChangeMonitor);
                 sceneViewModel.InitializeDimensions();
                 return sceneViewModel;
             }).ToList();
@@ -390,9 +414,12 @@ namespace Japlayer.ViewModels
 
         private void UpdateHighlightCount()
         {
-            if (LibraryItemViewModel != null && Scenes != null)
+            if (Scenes != null)
             {
-                LibraryItemViewModel.HighlightCount = Scenes.Sum(scene => scene.Highlights.Count);
+                var totalHighlights = Scenes.Sum(scene => scene.Highlights.Count);
+                LibraryItemViewModel?.HighlightCount = totalHighlights;
+
+                _messenger.Send(new MediaHighlightCountChangedMessage(Id, totalHighlights));
             }
 
             OnPropertyChanged(nameof(ScenesSummaryText));

@@ -29,7 +29,7 @@ namespace Japlayer.UnitTests.Data
             _databaseContext.Media.Add(new Media { MediaId = "TEST-001" });
             _databaseContext.SaveChanges();
 
-            _highlightProvider = new DatabaseMediaHighlightProvider(_databaseContext);
+            _highlightProvider = new DatabaseMediaHighlightProvider(new TestDbContextFactory(options));
         }
 
         public void Dispose()

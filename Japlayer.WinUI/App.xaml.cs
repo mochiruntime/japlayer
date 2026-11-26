@@ -3,6 +3,7 @@ using System;
 using System.IO;
 using System.Runtime.ExceptionServices;
 using System.Threading.Tasks;
+using CommunityToolkit.Mvvm.Messaging;
 using Japlayer.Contracts;
 using Japlayer.Data.Context;
 using Japlayer.Data.Services;
@@ -59,7 +60,7 @@ namespace Japlayer
             services.AddSingleton<ISettingsService>(settingsService);
 
             var sqlitePragmaInterceptor = new SqlitePragmaInterceptor();
-            services.AddDbContext<DatabaseContext>((serviceProvider, options) =>
+            services.AddDbContextFactory<DatabaseContext>((serviceProvider, options) =>
             {
                 var settings = serviceProvider.GetRequiredService<ISettingsService>();
                 options.UseSqlite($"Data Source={settings.SqliteDatabasePath}")
@@ -71,6 +72,8 @@ namespace Japlayer
             services.AddSingleton<Data.Contracts.IMediaSceneProvider, DatabaseMediaSceneProvider>();
             services.AddSingleton<Data.Contracts.IMediaThumbnailProvider, DatabaseMediaThumbnailProvider>();
             services.AddSingleton<Data.Contracts.IMediaHighlightProvider, DatabaseMediaHighlightProvider>();
+            services.AddSingleton<IDatabaseChangeMonitor, DatabaseChangeMonitor>();
+            services.AddSingleton<IMessenger>(WeakReferenceMessenger.Default);
 
             // ViewModels
             services.AddTransient<LibraryViewModel>();
@@ -153,8 +156,8 @@ namespace Japlayer
 
         private void EnsureDatabaseCreated()
         {
-            using var scope = Services.CreateScope();
-            var context = scope.ServiceProvider.GetRequiredService<DatabaseContext>();
+            var contextFactory = Services.GetRequiredService<IDbContextFactory<DatabaseContext>>();
+            using var context = contextFactory.CreateDbContext();
             context.Database.Migrate();
         }
     }

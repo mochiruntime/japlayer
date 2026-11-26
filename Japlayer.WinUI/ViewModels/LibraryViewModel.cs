@@ -6,31 +6,53 @@ using System.Linq;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using CommunityToolkit.Mvvm.Messaging;
+using Japlayer.Collections;
 using Japlayer.Data.Contracts;
 using Japlayer.Data.Models;
+using Japlayer.Messages;
 using Japlayer.Models;
+using Japlayer.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Xaml;
 
 namespace Japlayer.ViewModels
 {
-    public partial class LibraryViewModel : ObservableObject
+    public partial class LibraryViewModel :
+        ObservableObject,
+        IRecipient<MediaRatingChangedMessage>,
+        IRecipient<MediaUserTagAddedMessage>,
+        IRecipient<MediaUserTagRemovedMessage>,
+        IRecipient<MediaHighlightCountChangedMessage>
     {
         private readonly IMediaProvider _mediaProvider;
         private readonly IMediaSceneProvider _sceneProvider;
         private readonly IServiceProvider _serviceProvider;
+        private readonly IDatabaseChangeMonitor? _databaseChangeMonitor;
+        private readonly IMessenger _messenger;
         private List<LibraryItemViewModel> _allMediaItems = [];
         private DispatcherTimer? _filterDebounceTimer;
-        // Flag to track if the sort order changed. Used to choose between
-        // fast collection replacement (for sorting) and smooth collection reconciliation (for filtering).
+        // Flag to track if the sort order changed so the grid only scrolls to top on explicit sort changes.
         private bool _isSortOrderChanging = true;
         private bool _isSyncingSort;
+        private bool _isPageActive = true;
+        private bool _hasPendingFilterRefresh;
+        private bool _hasPendingExternalReload;
+        private bool _isReloading;
+        private bool _reloadAgainRequested;
 
-        public LibraryViewModel(IMediaProvider mediaProvider, IMediaSceneProvider sceneProvider, IServiceProvider serviceProvider)
+        public LibraryViewModel(
+            IMediaProvider mediaProvider,
+            IMediaSceneProvider sceneProvider,
+            IServiceProvider serviceProvider,
+            IDatabaseChangeMonitor? databaseChangeMonitor = null,
+            IMessenger? messenger = null)
         {
             _mediaProvider = mediaProvider;
             _sceneProvider = sceneProvider;
             _serviceProvider = serviceProvider;
+            _databaseChangeMonitor = databaseChangeMonitor;
+            _messenger = messenger ?? WeakReferenceMessenger.Default;
 
             TagsFacet = new FacetFilterGroup("Tags", "Tag", QueueApplyFilter);
             GenresFacet = new FacetFilterGroup("Genres", "Genre", QueueApplyFilter);
@@ -40,7 +62,16 @@ namespace Japlayer.ViewModels
 
             AllFacets = [TagsFacet, GenresFacet, CastFacet, StudiosFacet, SeriesFacet];
             SelectedSortField = SortFieldOptions.First(option => option.Field == LibrarySortField.AddedDate);
+
+            _messenger.RegisterAll(this);
+
+            if (_databaseChangeMonitor != null)
+            {
+                _databaseChangeMonitor.DatabaseChangedExternally += OnDatabaseChangedExternally;
+            }
         }
+
+        public event EventHandler? SortOrderApplied;
 
         public FacetFilterGroup TagsFacet { get; }
         public FacetFilterGroup GenresFacet { get; }
@@ -50,8 +81,8 @@ namespace Japlayer.ViewModels
         public IReadOnlyList<FacetFilterGroup> AllFacets { get; }
 
         // Compatibility accessors for existing tests and bindings
-        public ObservableCollection<FilterItem> TagFilterItems => TagsFacet.FilteredItems;
-        public ObservableCollection<FilterItem> GenreFilterItems => GenresFacet.FilteredItems;
+        public BatchObservableCollection<FilterItem> TagFilterItems => TagsFacet.FilteredItems;
+        public BatchObservableCollection<FilterItem> GenreFilterItems => GenresFacet.FilteredItems;
 
         public string TagSearchText
         {
@@ -65,8 +96,7 @@ namespace Japlayer.ViewModels
             set => GenresFacet.SearchText = value;
         }
 
-        [ObservableProperty]
-        public partial ObservableCollection<LibraryItemViewModel> MediaItems { get; set; } = [];
+        public BatchObservableCollection<LibraryItemViewModel> MediaItems { get; } = [];
 
         public ObservableCollection<ActiveFilterChip> ActiveFilterChips { get; } = [];
 
@@ -77,6 +107,9 @@ namespace Japlayer.ViewModels
 
         [ObservableProperty]
         public partial bool IsDataLoaded { get; set; }
+
+        [ObservableProperty]
+        public partial bool IsLoading { get; set; }
 
         [ObservableProperty]
         public partial string SearchText { get; set; } = string.Empty;
@@ -162,8 +195,6 @@ namespace Japlayer.ViewModels
             _isSyncingSort = true;
             SortOrder = ComposeSortOption(value.Field, IsSortDescending);
             _isSyncingSort = false;
-            _isSortOrderChanging = true;
-            QueueApplyFilter();
         }
 
         partial void OnIsSortDescendingChanged(bool value)
@@ -177,8 +208,6 @@ namespace Japlayer.ViewModels
             _isSyncingSort = true;
             SortOrder = ComposeSortOption(SelectedSortField.Field, value);
             _isSyncingSort = false;
-            _isSortOrderChanging = true;
-            QueueApplyFilter();
         }
 
         [RelayCommand]
@@ -233,6 +262,65 @@ namespace Japlayer.ViewModels
 
         public async Task LoadDataAsync()
         {
+            _databaseChangeMonitor?.Start();
+            await ReloadLibraryAsync();
+        }
+
+        public async Task SetPageActiveAsync(bool isActive)
+        {
+            _isPageActive = isActive;
+            if (!isActive || !IsDataLoaded)
+            {
+                return;
+            }
+
+            if (_hasPendingExternalReload)
+            {
+                await ReloadLibraryAsync();
+            }
+            else if (_hasPendingFilterRefresh)
+            {
+                _hasPendingFilterRefresh = false;
+                ApplyFilter();
+            }
+        }
+
+        [RelayCommand]
+        public async Task ReloadLibraryAsync()
+        {
+            if (_isReloading)
+            {
+                _reloadAgainRequested = true;
+                return;
+            }
+
+            _isReloading = true;
+            IsLoading = true;
+            try
+            {
+                do
+                {
+                    _reloadAgainRequested = false;
+                    await ReloadCoreAsync();
+                }
+                while (_reloadAgainRequested);
+            }
+            finally
+            {
+                _isReloading = false;
+                IsLoading = false;
+            }
+        }
+
+        private async Task ReloadCoreAsync()
+        {
+            var isInitialLoad = !IsDataLoaded;
+            var wasRuntimeUnbounded = isInitialLoad || !IsRuntimeFilterActive || RuntimeMax >= RuntimeMaxBound;
+
+            var savedFacetSelections = AllFacets.ToDictionary(
+                facet => facet,
+                facet => (Required: (IReadOnlyCollection<string>)facet.RequiredValues, Excluded: (IReadOnlyCollection<string>)facet.ExcludedValues));
+
             var itemsTask = _mediaProvider.GetLibraryItemsAsync();
             var tagsTask = _mediaProvider.GetUserTagsAsync();
             var genresTask = _mediaProvider.GetGenresAsync();
@@ -243,7 +331,23 @@ namespace Japlayer.ViewModels
             await Task.WhenAll(itemsTask, tagsTask, genresTask, castTask, studiosTask, seriesTask);
 
             var items = await itemsTask;
-            _allMediaItems = [.. items.Select(item => ActivatorUtilities.CreateInstance<LibraryItemViewModel>(_serviceProvider, item))];
+            var existingById = _allMediaItems.ToDictionary(item => item.Id, StringComparer.OrdinalIgnoreCase);
+            var reconciledItems = new List<LibraryItemViewModel>();
+
+            foreach (var item in items)
+            {
+                if (existingById.TryGetValue(item.MediaId, out var existingViewModel))
+                {
+                    existingViewModel.UpdateFrom(item);
+                    reconciledItems.Add(existingViewModel);
+                }
+                else
+                {
+                    reconciledItems.Add(ActivatorUtilities.CreateInstance<LibraryItemViewModel>(_serviceProvider, item));
+                }
+            }
+
+            _allMediaItems = reconciledItems;
 
             var maxRuntime = _allMediaItems
                 .Where(item => item.RuntimeMinutes.HasValue)
@@ -252,18 +356,130 @@ namespace Japlayer.ViewModels
                 .Max();
             var roundedMaxRuntime = Math.Max(180, ((maxRuntime + 14) / 15) * 15);
             RuntimeMaxBound = roundedMaxRuntime;
-            RuntimeMax = roundedMaxRuntime;
 
-            TagsFacet.Populate(await tagsTask, name => _allMediaItems.Count(item => item.LibraryItem.UserTags.Contains(name)));
+            if (wasRuntimeUnbounded)
+            {
+                RuntimeMax = roundedMaxRuntime;
+            }
+            else
+            {
+                RuntimeMax = Math.Min(RuntimeMax, roundedMaxRuntime);
+                RuntimeMin = Math.Min(RuntimeMin, RuntimeMax);
+            }
+
+            TagsFacet.Populate(await tagsTask, name => _allMediaItems.Count(item => item.LibraryItem.UserTags.Contains(name, StringComparer.OrdinalIgnoreCase)));
             GenresFacet.Populate(await genresTask, name => _allMediaItems.Count(item => item.LibraryItem.Genres.Contains(name)));
             CastFacet.Populate(await castTask, name => _allMediaItems.Count(item => item.LibraryItem.Cast.Contains(name)));
             StudiosFacet.Populate(await studiosTask, name => _allMediaItems.Count(item => item.LibraryItem.Studios.Contains(name)));
             SeriesFacet.Populate(await seriesTask, name => _allMediaItems.Count(item => item.LibraryItem.Series.Contains(name)));
 
+            if (!isInitialLoad)
+            {
+                foreach (var facet in AllFacets)
+                {
+                    var (required, excluded) = savedFacetSelections[facet];
+                    facet.RestoreSelectionsSilently(required, excluded);
+                }
+            }
+
+            _hasPendingExternalReload = false;
+            _hasPendingFilterRefresh = false;
+
             ApplyFilter();
             IsDataLoaded = true;
             OnPropertyChanged(nameof(ItemCountText));
             OnPropertyChanged(nameof(IsEmptyResult));
+        }
+
+        private async void OnDatabaseChangedExternally(object? sender, EventArgs eventArgs)
+        {
+            if (!_isPageActive)
+            {
+                _hasPendingExternalReload = true;
+                return;
+            }
+
+            try
+            {
+                await ReloadLibraryAsync();
+            }
+            catch (Exception exception)
+            {
+                System.Diagnostics.Debug.WriteLine($"External library reload failed: {exception.Message}");
+            }
+        }
+
+        public void Receive(MediaRatingChangedMessage message)
+        {
+            var item = FindMediaItem(message.MediaId);
+            if (item == null)
+            {
+                return;
+            }
+
+            item.Rating = message.Rating;
+            if (IsRatingFilterActive || SelectedSortField.Field == LibrarySortField.Rating)
+            {
+                ScheduleOrApplyRefresh();
+            }
+        }
+
+        public void Receive(MediaUserTagAddedMessage message)
+        {
+            var item = FindMediaItem(message.MediaId);
+            item?.AddUserTag(message.TagName);
+
+            var count = _allMediaItems.Count(media => media.LibraryItem.UserTags.Contains(message.TagName, StringComparer.OrdinalIgnoreCase));
+            TagsFacet.SyncItemCount(message.TagName, count, insertIfMissing: true);
+
+            if (TagsFacet.HasActiveFilters || !string.IsNullOrWhiteSpace(SearchText))
+            {
+                ScheduleOrApplyRefresh();
+            }
+        }
+
+        public void Receive(MediaUserTagRemovedMessage message)
+        {
+            var item = FindMediaItem(message.MediaId);
+            item?.RemoveUserTag(message.TagName);
+
+            var count = _allMediaItems.Count(media => media.LibraryItem.UserTags.Contains(message.TagName, StringComparer.OrdinalIgnoreCase));
+            TagsFacet.SyncItemCount(message.TagName, count, insertIfMissing: false);
+
+            if (TagsFacet.HasActiveFilters || !string.IsNullOrWhiteSpace(SearchText))
+            {
+                ScheduleOrApplyRefresh();
+            }
+        }
+
+        public void Receive(MediaHighlightCountChangedMessage message)
+        {
+            var item = FindMediaItem(message.MediaId);
+            if (item == null)
+            {
+                return;
+            }
+
+            item.HighlightCount = message.HighlightCount;
+            if (SelectedSortField.Field == LibrarySortField.Highlights)
+            {
+                ScheduleOrApplyRefresh();
+            }
+        }
+
+        private LibraryItemViewModel? FindMediaItem(string mediaId) =>
+            _allMediaItems.FirstOrDefault(item => string.Equals(item.Id, mediaId, StringComparison.OrdinalIgnoreCase));
+
+        private void ScheduleOrApplyRefresh()
+        {
+            if (_isPageActive)
+            {
+                ApplyFilter();
+            }
+            else
+            {
+                _hasPendingFilterRefresh = true;
+            }
         }
 
         public void ApplyFilterDirect() => ApplyFilter();
@@ -311,7 +527,7 @@ namespace Japlayer.ViewModels
                 {
                     var normalizedTerm = NormalizeForSearch(term);
                     filteredItems = filteredItems.Where(item =>
-                        NormalizeForSearch(item.Id).Contains(normalizedTerm) ||
+                        item.NormalizedId.Contains(normalizedTerm, StringComparison.Ordinal) ||
                         (item.OriginalTitle != null && item.OriginalTitle.Contains(term, StringComparison.OrdinalIgnoreCase)) ||
                         item.LibraryItem.UserTags.Any(tag => tag.Contains(term, StringComparison.OrdinalIgnoreCase)) ||
                         item.LibraryItem.Genres.Any(genre => genre.Contains(term, StringComparison.OrdinalIgnoreCase)) ||
@@ -364,49 +580,14 @@ namespace Japlayer.ViewModels
             };
 
             var targetList = filteredItems.ToList();
+            var sortChanged = _isSortOrderChanging;
+            _isSortOrderChanging = false;
 
-            if (_isSortOrderChanging)
+            MediaItems.ReplaceAll(targetList);
+
+            if (sortChanged)
             {
-                _isSortOrderChanging = false;
-                MediaItems = new ObservableCollection<LibraryItemViewModel>(targetList);
-            }
-            else
-            {
-                var targetSet = new HashSet<LibraryItemViewModel>(targetList);
-
-                for (var index = MediaItems.Count - 1; index >= 0; index--)
-                {
-                    if (!targetSet.Contains(MediaItems[index]))
-                    {
-                        MediaItems.RemoveAt(index);
-                    }
-                }
-
-                for (var index = 0; index < targetList.Count; index++)
-                {
-                    var targetItem = targetList[index];
-                    if (index >= MediaItems.Count)
-                    {
-                        MediaItems.Add(targetItem);
-                    }
-                    else if (MediaItems[index] != targetItem)
-                    {
-                        var oldIndex = MediaItems.IndexOf(targetItem);
-                        if (oldIndex >= 0)
-                        {
-                            MediaItems.Move(oldIndex, index);
-                        }
-                        else
-                        {
-                            MediaItems.Insert(index, targetItem);
-                        }
-                    }
-                }
-            }
-
-            foreach (var facet in AllFacets)
-            {
-                facet.RefreshFilteredItems();
+                SortOrderApplied?.Invoke(this, EventArgs.Empty);
             }
 
             RebuildActiveFilterChips();
@@ -573,7 +754,7 @@ namespace Japlayer.ViewModels
 
         public string Label { get; } = label;
         public string CategoryPrefix { get; } = categoryPrefix;
-        public ObservableCollection<FilterItem> FilteredItems { get; } = [];
+        public BatchObservableCollection<FilterItem> FilteredItems { get; } = [];
 
         [ObservableProperty]
         public partial string SearchText { get; set; } = string.Empty;
@@ -627,6 +808,58 @@ namespace Japlayer.ViewModels
             NotifyActiveStateChanged();
         }
 
+        public void RestoreSelectionsSilently(IReadOnlyCollection<string> requiredValues, IReadOnlyCollection<string> excludedValues)
+        {
+            var requiredSet = new HashSet<string>(requiredValues, StringComparer.OrdinalIgnoreCase);
+            var excludedSet = new HashSet<string>(excludedValues, StringComparer.OrdinalIgnoreCase);
+
+            _suppressCallbacks = true;
+            foreach (var item in _allItems)
+            {
+                if (requiredSet.Contains(item.Name))
+                {
+                    item.IsSelected = true;
+                }
+                else if (excludedSet.Contains(item.Name))
+                {
+                    item.IsSelected = null;
+                }
+                else
+                {
+                    item.IsSelected = false;
+                }
+            }
+            _suppressCallbacks = false;
+
+            RefreshFilteredItems();
+            NotifyActiveStateChanged();
+        }
+
+        public void SyncItemCount(string name, int count, bool insertIfMissing)
+        {
+            var existing = _allItems.FirstOrDefault(item => string.Equals(item.Name, name, StringComparison.OrdinalIgnoreCase));
+            if (existing != null)
+            {
+                existing.ItemCount = count;
+                return;
+            }
+
+            if (!insertIfMissing)
+            {
+                return;
+            }
+
+            _allItems.Add(new FilterItem(name, count, HandleItemChanged));
+            if (!_isFlyoutOpen)
+            {
+                CommitDisplayOrder();
+            }
+            else
+            {
+                RebuildFilteredItemsFromCurrentOrder();
+            }
+        }
+
         public void RefreshFilteredItems()
         {
             if (_isFlyoutOpen)
@@ -652,14 +885,10 @@ namespace Japlayer.ViewModels
 
         private void RebuildFilteredItemsFromCurrentOrder()
         {
-            FilteredItems.Clear();
             var matchingItems = _allItems
                 .Where(item => string.IsNullOrEmpty(SearchText) || item.Name.Contains(SearchText, StringComparison.OrdinalIgnoreCase));
 
-            foreach (var item in matchingItems)
-            {
-                FilteredItems.Add(item);
-            }
+            FilteredItems.ReplaceAll(matchingItems);
         }
 
         private void HandleItemChanged()
@@ -692,7 +921,9 @@ namespace Japlayer.ViewModels
         public partial bool? IsSelected { get; set; } = false;
 
         public string Name { get; } = name;
-        public int ItemCount { get; } = itemCount;
+
+        [ObservableProperty]
+        public partial int ItemCount { get; set; } = itemCount;
         public bool IsIncluded => IsSelected == true;
         public bool IsExcluded => IsSelected == null;
         public string StateSymbol => IsSelected switch

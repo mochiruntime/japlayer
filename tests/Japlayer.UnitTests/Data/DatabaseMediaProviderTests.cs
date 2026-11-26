@@ -11,6 +11,7 @@ namespace Japlayer.UnitTests.Data
     public class DatabaseMediaProviderTests : IDisposable
     {
         private readonly SqliteConnection _sqliteConnection;
+        private readonly DbContextOptions<DatabaseContext> _options;
         private readonly DatabaseContext _databaseContext;
         private readonly DatabaseMediaProvider _mediaProvider;
 
@@ -19,14 +20,14 @@ namespace Japlayer.UnitTests.Data
             _sqliteConnection = new SqliteConnection("Data Source=:memory:");
             _sqliteConnection.Open();
 
-            var options = new DbContextOptionsBuilder<DatabaseContext>()
+            _options = new DbContextOptionsBuilder<DatabaseContext>()
                 .UseSqlite(_sqliteConnection)
                 .Options;
 
-            _databaseContext = new DatabaseContext(options);
+            _databaseContext = new DatabaseContext(_options);
             _databaseContext.Database.EnsureCreated();
 
-            _mediaProvider = new DatabaseMediaProvider(_databaseContext);
+            _mediaProvider = new DatabaseMediaProvider(new TestDbContextFactory(_options));
         }
 
         public void Dispose()
@@ -128,6 +129,56 @@ namespace Japlayer.UnitTests.Data
             Assert.AreEqual("Major Studio", mediaItem.Studios.Single());
             Assert.AreEqual("Epic Series", mediaItem.Series.Single());
             Assert.AreEqual("Sci-Fi", mediaItem.Genres.Single());
+        }
+
+        [TestMethod]
+        public async Task GetLibraryItemsAsync_SeesExternalContextInserts_AndPopulatesFallbackThumbnail()
+        {
+            // Arrange: insert via a separate context after provider construction
+            await using (var externalContext = new DatabaseContext(_options))
+            {
+                var media = new Media { MediaId = "EXT-001" };
+                media.MediaLocations.Add(new MediaLocation
+                {
+                    MediaId = "EXT-001",
+                    Scene = 1,
+                    Hostname = "localhost",
+                    Path = @"C:\ext.mp4"
+                });
+                media.MediaMetadata.Add(new MediaMetadata
+                {
+                    MetadataUrl = "https://example.com/ext-001",
+                    MediaId = "EXT-001",
+                    Title = "External Insert",
+                    Cover = null
+                });
+                media.MediaThumbnails =
+                [
+                    new MediaThumbnail { MediaId = "EXT-001", Scene = 1, Timestamp = 0, Path = "thumbs/t0.jpg", OriginalHostname = "localhost", OriginalPath = @"C:\ext.mp4" },
+                    new MediaThumbnail { MediaId = "EXT-001", Scene = 1, Timestamp = 50, Path = "thumbs/t50.jpg", OriginalHostname = "localhost", OriginalPath = @"C:\ext.mp4" },
+                    new MediaThumbnail { MediaId = "EXT-001", Scene = 1, Timestamp = 100, Path = "thumbs/t100.jpg", OriginalHostname = "localhost", OriginalPath = @"C:\ext.mp4" },
+                    new MediaThumbnail { MediaId = "EXT-001", Scene = 1, Timestamp = 150, Path = "thumbs/t150.jpg", OriginalHostname = "localhost", OriginalPath = @"C:\ext.mp4" }
+                ];
+
+                externalContext.Media.Add(media);
+                await externalContext.SaveChangesAsync();
+            }
+
+            // Act: run concurrent facet + library queries via IDbContextFactory
+            var itemsTask = _mediaProvider.GetLibraryItemsAsync();
+            var tagsTask = _mediaProvider.GetUserTagsAsync();
+            var genresTask = _mediaProvider.GetGenresAsync();
+            var castTask = _mediaProvider.GetCastAsync();
+            var studiosTask = _mediaProvider.GetStudiosAsync();
+            var seriesTask = _mediaProvider.GetSeriesAsync();
+
+            await Task.WhenAll(itemsTask, tagsTask, genresTask, castTask, studiosTask, seriesTask);
+            var items = (await itemsTask).ToList();
+
+            // Assert
+            Assert.AreEqual(1, items.Count);
+            Assert.AreEqual("EXT-001", items[0].MediaId);
+            Assert.AreEqual("thumbs/t100.jpg", items[0].FallbackThumbnailPath);
         }
     }
 }
