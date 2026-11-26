@@ -267,5 +267,42 @@ namespace Japlayer.UITests.Specs
             Assert.IsNotNull(_libraryPage.WaitForCard("TEST-004", TimeSpan.FromSeconds(8)), "External insert TEST-004 should auto-reload into LibraryPage.");
             Assert.IsTrue(_libraryPage.WaitForCardCount(3), "Studio Alpha filter should remain active and show 3 matching cards.");
         }
+
+        [TestMethod]
+        public void Presets_OneClickSaveClearAndApply_WorkEndToEnd()
+        {
+            WaitForInitialLoad();
+
+            // 1. Apply Studio Alpha filter + Rating sort
+            _libraryPage!.OpenFacetFlyout("Studios");
+            _libraryPage.ClickFacetItem("Studio Alpha");
+            _libraryPage.CloseFlyout();
+            _libraryPage.SelectSortField("Rating");
+            Assert.IsTrue(_libraryPage.WaitForCardCount(2), "Only TEST-001 and TEST-003 match Studio Alpha.");
+
+            // 2. Click Save preset (one-click, no dialog)
+            var saveButton = _libraryPage.WaitForElement(() => _libraryPage.SavePresetButton);
+            Assert.IsNotNull(saveButton, "SavePresetButton should appear when filters are active.");
+            saveButton.Invoke();
+
+            var savedState = FlaUI.Core.Tools.Retry.WhileFalse(
+                () => string.Equals(_libraryPage.SavePresetButton?.Name, "Saved", StringComparison.Ordinal),
+                TimeSpan.FromSeconds(3),
+                TimeSpan.FromMilliseconds(100)).Success;
+            Assert.IsTrue(savedState, "SavePresetButton should update to 'Saved' after one-click save.");
+
+            // 3. Clear all -> all 3 cards return and preset pill appears in the bar
+            _libraryPage.ClickClearAllFilters();
+            Assert.IsTrue(_libraryPage.WaitForCardCount(3), "All 3 cards should return after Clear all.");
+
+            var presetPill = _libraryPage.WaitForElement(() => _libraryPage.FindPresetPill("+Studio Alpha"));
+            Assert.IsNotNull(presetPill, "Auto-named preset pill '+Studio Alpha' should appear when filters are cleared.");
+
+            // 4. Invoke preset pill -> restores Studio Alpha filter (2 cards) and Rating sort
+            presetPill.Invoke();
+            Assert.IsTrue(_libraryPage.WaitForCardCount(2), "Applying saved preset pill should restore the 2 Studio Alpha cards.");
+            Assert.IsNotNull(_libraryPage.FindCard("TEST-001"));
+            Assert.IsNotNull(_libraryPage.FindCard("TEST-003"));
+        }
     }
 }

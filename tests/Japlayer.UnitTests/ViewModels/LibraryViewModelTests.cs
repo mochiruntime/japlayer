@@ -570,5 +570,179 @@ namespace Japlayer.UnitTests.ViewModels
             viewModel.ApplyFilterDirect();
             Assert.AreEqual(2, sortAppliedCount);
         }
+
+        private sealed class StubLibraryPresetProvider : ILibraryPresetProvider
+        {
+            private int _nextId = 1;
+            public List<LibraryPresetModel> Presets { get; } = [];
+
+            public Task<IReadOnlyList<LibraryPresetModel>> GetPresetsAsync()
+                => Task.FromResult<IReadOnlyList<LibraryPresetModel>>([.. Presets.Select(Clone)]);
+
+            public Task<LibraryPresetModel> CreatePresetAsync(LibraryPresetModel preset)
+            {
+                preset.Id = _nextId++;
+                Presets.Add(Clone(preset));
+                return Task.FromResult(Clone(preset));
+            }
+
+            public Task UpdatePresetAsync(LibraryPresetModel preset)
+            {
+                var index = Presets.FindIndex(entry => entry.Id == preset.Id);
+                if (index >= 0)
+                {
+                    Presets[index] = Clone(preset);
+                }
+
+                return Task.CompletedTask;
+            }
+
+            public Task DeletePresetAsync(int presetId)
+            {
+                Presets.RemoveAll(entry => entry.Id == presetId);
+                return Task.CompletedTask;
+            }
+
+            private static LibraryPresetModel Clone(LibraryPresetModel source) => new()
+            {
+                Id = source.Id,
+                Name = source.Name,
+                IsCustomName = source.IsCustomName,
+                SearchText = source.SearchText,
+                SortField = source.SortField,
+                IsSortDescending = source.IsSortDescending,
+                RatingMin = source.RatingMin,
+                RatingMax = source.RatingMax,
+                RuntimeMin = source.RuntimeMin,
+                RuntimeMax = source.RuntimeMax,
+                CreatedAt = source.CreatedAt,
+                Tags = new LibraryPresetFacetSelection { Included = [.. source.Tags.Included], Excluded = [.. source.Tags.Excluded] },
+                Genres = new LibraryPresetFacetSelection { Included = [.. source.Genres.Included], Excluded = [.. source.Genres.Excluded] },
+                Cast = new LibraryPresetFacetSelection { Included = [.. source.Cast.Included], Excluded = [.. source.Cast.Excluded] },
+                Studios = new LibraryPresetFacetSelection { Included = [.. source.Studios.Included], Excluded = [.. source.Studios.Excluded] },
+                Series = new LibraryPresetFacetSelection { Included = [.. source.Series.Included], Excluded = [.. source.Series.Excluded] }
+            };
+        }
+
+        [TestMethod]
+        public async Task Presets_OneClickSaveApplyRenameUpdateDelete_AndOrdinalIgnoreCaseConsistency()
+        {
+            var mediaProvider = new StubMediaProvider
+            {
+                LibraryItemsToReturn =
+                [
+                    new() { MediaId = "M1", Title = "Alpha", Rating = 5, RuntimeMinutes = 60, UserTags = ["VR"], Genres = ["Sci-Fi"] },
+                    new() { MediaId = "M2", Title = "Beta", Rating = 3, RuntimeMinutes = 90, UserTags = ["2D"], Genres = ["Drama"] }
+                ],
+                UserTagsToReturn = ["2D", "VR"],
+                GenresToReturn = ["Drama", "Sci-Fi"]
+            };
+
+            var presetProvider = new StubLibraryPresetProvider();
+            var monitor = new FakeDatabaseChangeMonitor();
+            var viewModel = new LibraryViewModel(
+                mediaProvider,
+                new StubMediaSceneProvider(),
+                CreateServiceProvider(),
+                monitor,
+                new WeakReferenceMessenger(),
+                presetProvider);
+
+            await viewModel.LoadDataAsync();
+
+            Assert.IsFalse(viewModel.ShowPresetsBar);
+            Assert.IsFalse(viewModel.ShowFilterOrPresetsBar);
+
+            // Apply Include + Exclude + Rating + Search + Sort
+            viewModel.SearchText = "Alpha";
+            viewModel.TagsFacet.FilteredItems.First(item => item.Name == "VR").IsSelected = true;
+            viewModel.TagsFacet.FilteredItems.First(item => item.Name == "2D").IsSelected = null;
+            viewModel.RatingMin = 4;
+            viewModel.SelectedSortField = viewModel.SortFieldOptions.First(option => option.Field == LibrarySortField.Rating);
+            viewModel.ApplyFilterDirect();
+
+            Assert.AreEqual(1, viewModel.MediaItems.Count);
+            Assert.IsTrue(viewModel.HasActiveFilters);
+            Assert.IsTrue(viewModel.CanSaveCurrentPreset);
+            Assert.AreEqual("Save preset", viewModel.SavePresetButtonText);
+
+            // One-click save
+            await viewModel.SaveCurrentAsPresetCommand.ExecuteAsync(null);
+            Assert.AreEqual(1, viewModel.Presets.Count);
+            Assert.IsTrue(viewModel.IsCurrentFilterSavedAsPreset);
+            Assert.IsFalse(viewModel.CanSaveCurrentPreset);
+            Assert.AreEqual("Saved", viewModel.SavePresetButtonText);
+            Assert.IsFalse(viewModel.ShowPresetsBar);
+
+            // Clear filters reveals Presets bar
+            viewModel.ClearAllFiltersCommand.Execute(null);
+            Assert.IsFalse(viewModel.HasActiveFilters);
+            Assert.IsTrue(viewModel.ShowPresetsBar);
+            Assert.IsTrue(viewModel.ShowFilterOrPresetsBar);
+            Assert.AreEqual(2, viewModel.MediaItems.Count);
+
+            // Apply preset restores everything in a single pass
+            var savedPreset = viewModel.Presets[0];
+            viewModel.ApplyPresetCommand.Execute(savedPreset);
+            Assert.AreEqual(1, viewModel.MediaItems.Count);
+            Assert.AreEqual("M1", viewModel.MediaItems[0].Id);
+            Assert.AreEqual("Alpha", viewModel.SearchText);
+            Assert.AreEqual(4, viewModel.RatingMin);
+            Assert.AreEqual(LibrarySortField.Rating, viewModel.SelectedSortField.Field);
+            Assert.IsTrue(viewModel.TagsFacet.RequiredValues.Contains("VR"));
+            Assert.IsTrue(viewModel.TagsFacet.ExcludedValues.Contains("2D"));
+            Assert.IsTrue(savedPreset.IsActive);
+
+            // Modifying a filter resets saved state and allows saving collision "(2)"
+            viewModel.SearchText = string.Empty;
+            viewModel.ApplyFilterDirect();
+            Assert.IsFalse(viewModel.IsCurrentFilterSavedAsPreset);
+            await viewModel.SaveCurrentAsPresetCommand.ExecuteAsync(null);
+            Assert.AreEqual(2, viewModel.Presets.Count);
+
+            // Rename preset + duplicate validation
+            Assert.IsFalse(viewModel.TryValidatePresetName("   ", savedPreset.Id, out _));
+            Assert.IsTrue(await viewModel.RenamePresetAsync(savedPreset, "Favorites"));
+            Assert.AreEqual("Favorites", savedPreset.DisplayName);
+            Assert.IsTrue(savedPreset.Model.IsCustomName);
+            Assert.IsFalse(viewModel.TryValidatePresetName("favorites", viewModel.Presets[1].Id, out _));
+
+            // External reload updates auto-named preset display name if facet value renamed, keeps custom name
+            presetProvider.Presets[1].Tags = new LibraryPresetFacetSelection { Included = ["Virtual Reality"] };
+            await viewModel.ReloadLibraryAsync();
+            Assert.AreEqual("Favorites", viewModel.Presets[0].DisplayName);
+            StringAssert.Contains(viewModel.Presets[1].DisplayName, "+Virtual Reality");
+
+            // Delete presets
+            await viewModel.DeletePresetCommand.ExecuteAsync(viewModel.Presets[1]);
+            await viewModel.DeletePresetCommand.ExecuteAsync(viewModel.Presets[0]);
+            Assert.AreEqual(0, viewModel.Presets.Count);
+            Assert.IsFalse(viewModel.ShowPresetsBar);
+        }
+
+        [TestMethod]
+        public async Task FacetFilter_MatchesCaseInsensitively()
+        {
+            var mediaProvider = new StubMediaProvider
+            {
+                LibraryItemsToReturn =
+                [
+                    new() { MediaId = "M1", Genres = ["Sci-Fi"] },
+                    new() { MediaId = "M2", Genres = ["Drama"] }
+                ],
+                GenresToReturn = ["sci-fi", "drama"]
+            };
+
+            var viewModel = new LibraryViewModel(mediaProvider, new StubMediaSceneProvider(), CreateServiceProvider(), messenger: new WeakReferenceMessenger());
+            await viewModel.LoadDataAsync();
+
+            var sciFiFilter = viewModel.GenresFacet.FilteredItems.First(item => item.Name == "sci-fi");
+            Assert.AreEqual(1, sciFiFilter.ItemCount);
+            sciFiFilter.IsSelected = true;
+            viewModel.ApplyFilterDirect();
+
+            Assert.AreEqual(1, viewModel.MediaItems.Count);
+            Assert.AreEqual("M1", viewModel.MediaItems[0].Id);
+        }
     }
 }

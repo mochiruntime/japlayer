@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using Japlayer.Data.Entities;
 using Microsoft.EntityFrameworkCore;
 
@@ -37,6 +38,18 @@ public partial class DatabaseContext : DbContext
     public virtual DbSet<MediaHighlight> MediaHighlights { get; set; }
 
     public virtual DbSet<UserMediaData> UserMediaData { get; set; }
+
+    public virtual DbSet<LibraryPreset> LibraryPresets { get; set; }
+
+    public virtual DbSet<LibraryPresetTag> LibraryPresetTags { get; set; }
+
+    public virtual DbSet<LibraryPresetGenre> LibraryPresetGenres { get; set; }
+
+    public virtual DbSet<LibraryPresetPerson> LibraryPresetPeople { get; set; }
+
+    public virtual DbSet<LibraryPresetStudio> LibraryPresetStudios { get; set; }
+
+    public virtual DbSet<LibraryPresetSeries> LibraryPresetSeries { get; set; }
 
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -343,11 +356,117 @@ public partial class DatabaseContext : DbContext
 
         modelBuilder.Entity<UserTag>(entity =>
         {
+            entity.HasIndex(e => e.Name, "UserTags_name").IsUnique();
+
             entity.Property(e => e.Id).HasColumnName("id");
-            entity.Property(e => e.Name).HasColumnName("name");
+            entity.Property(e => e.Name)
+                .UseCollation("NOCASE")
+                .HasColumnName("name");
         });
 
+        modelBuilder.Entity<LibraryPreset>(entity =>
+        {
+            entity.HasIndex(e => e.Name, "LibraryPresets_name").IsUnique();
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.Name)
+                .UseCollation("NOCASE")
+                .HasColumnName("name");
+            entity.Property(e => e.IsCustomName).HasColumnName("isCustomName");
+            entity.Property(e => e.SearchText).HasColumnName("searchText");
+            entity.Property(e => e.SortField).HasColumnName("sortField");
+            entity.Property(e => e.IsSortDescending).HasColumnName("isSortDescending");
+            entity.Property(e => e.RatingMin).HasColumnName("ratingMin");
+            entity.Property(e => e.RatingMax).HasColumnName("ratingMax");
+            entity.Property(e => e.RuntimeMin).HasColumnName("runtimeMin");
+            entity.Property(e => e.RuntimeMax).HasColumnName("runtimeMax");
+            entity.Property(e => e.CreatedAt).HasColumnName("createdAt");
+        });
+
+        ConfigurePresetJoin(
+            modelBuilder,
+            "LibraryPresetTags",
+            "userTagId",
+            preset => preset.Tags,
+            join => join.LibraryPreset,
+            join => join.UserTag,
+            join => new { join.LibraryPresetId, join.UserTagId },
+            join => join.UserTagId);
+
+        ConfigurePresetJoin(
+            modelBuilder,
+            "LibraryPresetGenres",
+            "genreId",
+            preset => preset.Genres,
+            join => join.LibraryPreset,
+            join => join.Genre,
+            join => new { join.LibraryPresetId, join.GenreId },
+            join => join.GenreId);
+
+        ConfigurePresetJoin(
+            modelBuilder,
+            "LibraryPresetPeople",
+            "personId",
+            preset => preset.People,
+            join => join.LibraryPreset,
+            join => join.Person,
+            join => new { join.LibraryPresetId, join.PersonId },
+            join => join.PersonId);
+
+        ConfigurePresetJoin(
+            modelBuilder,
+            "LibraryPresetStudios",
+            "studioId",
+            preset => preset.Studios,
+            join => join.LibraryPreset,
+            join => join.Studio,
+            join => new { join.LibraryPresetId, join.StudioId },
+            join => join.StudioId);
+
+        ConfigurePresetJoin(
+            modelBuilder,
+            "LibraryPresetSeries",
+            "seriesId",
+            preset => preset.Series,
+            join => join.LibraryPreset,
+            join => join.Series,
+            join => new { join.LibraryPresetId, join.SeriesId },
+            join => join.SeriesId);
+
         OnModelCreatingPartial(modelBuilder);
+    }
+
+    private static void ConfigurePresetJoin<TJoin, TTarget>(
+        ModelBuilder modelBuilder,
+        string tableName,
+        string targetColumnName,
+        Expression<Func<LibraryPreset, IEnumerable<TJoin>?>> presetNavigation,
+        Expression<Func<TJoin, LibraryPreset?>> joinToPreset,
+        Expression<Func<TJoin, TTarget?>> joinToTarget,
+        Expression<Func<TJoin, object?>> keyExpression,
+        Expression<Func<TJoin, int>> targetIdProperty)
+        where TJoin : class
+        where TTarget : class
+    {
+        modelBuilder.Entity<TJoin>(entity =>
+        {
+            entity.ToTable(tableName);
+            entity.HasKey(keyExpression);
+
+            entity.Property<int>("LibraryPresetId").HasColumnName("libraryPresetId");
+            entity.Property(targetIdProperty).HasColumnName(targetColumnName);
+            entity.Property<bool>("IsIncluded").HasColumnName("isIncluded");
+
+            entity.HasOne(joinToPreset)
+                .WithMany(presetNavigation)
+                .HasForeignKey("LibraryPresetId")
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(joinToTarget)
+                .WithMany()
+                .HasForeignKey(((MemberExpression)targetIdProperty.Body).Member.Name)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
     }
 
     partial void OnModelCreatingPartial(ModelBuilder modelBuilder);

@@ -1,6 +1,6 @@
 ﻿namespace Japlayer.Data.Entities;
 
-public partial class UserTag
+public partial class UserTag : INamedEntity
 {
     public int Id { get; set; }
 

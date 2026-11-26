@@ -35,6 +35,22 @@ namespace Japlayer.UITests.PageObjects
         public AutomationElement? ClearAllFiltersButton =>
             _window.FindFirstDescendant(conditionFactory => conditionFactory.ByAutomationId("ClearAllFiltersButton"));
 
+        public Button? SavePresetButton =>
+            _window.FindFirstDescendant(conditionFactory => conditionFactory.ByAutomationId("SavePresetButton"))?.AsButton();
+
+        public AutomationElement? LibraryPresetsList =>
+            _window.FindFirstDescendant(conditionFactory => conditionFactory.ByAutomationId("LibraryPresetsList"));
+
+        public Button? FindPresetPill(string partialName)
+        {
+            var container = LibraryPresetsList ?? (AutomationElement)_window;
+            return container.FindAllDescendants(conditionFactory => conditionFactory.ByControlType(ControlType.Button))
+                .FirstOrDefault(button =>
+                    button.Properties.Name.ValueOrDefault?.Contains(partialName, StringComparison.OrdinalIgnoreCase) == true ||
+                    button.Properties.AutomationId.ValueOrDefault?.Contains(partialName, StringComparison.OrdinalIgnoreCase) == true)
+                ?.AsButton();
+        }
+
         public AutomationElement? EmptyStatePanel =>
             _window.FindFirstDescendant(conditionFactory => conditionFactory.ByAutomationId("EmptyStatePanel"));
 

@@ -53,6 +53,170 @@ namespace Japlayer.Data.Migrations
                     b.ToTable("GenresRelationship", (string)null);
                 });
 
+            modelBuilder.Entity("Japlayer.Data.Entities.LibraryPreset", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("createdAt");
+
+                    b.Property<bool>("IsCustomName")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("isCustomName");
+
+                    b.Property<bool>("IsSortDescending")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("isSortDescending");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("name")
+                        .UseCollation("NOCASE");
+
+                    b.Property<double>("RatingMax")
+                        .HasColumnType("REAL")
+                        .HasColumnName("ratingMax");
+
+                    b.Property<double>("RatingMin")
+                        .HasColumnType("REAL")
+                        .HasColumnName("ratingMin");
+
+                    b.Property<double?>("RuntimeMax")
+                        .HasColumnType("REAL")
+                        .HasColumnName("runtimeMax");
+
+                    b.Property<double>("RuntimeMin")
+                        .HasColumnType("REAL")
+                        .HasColumnName("runtimeMin");
+
+                    b.Property<string>("SearchText")
+                        .IsRequired()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("searchText");
+
+                    b.Property<string>("SortField")
+                        .IsRequired()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("sortField");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex(new[] { "Name" }, "LibraryPresets_name")
+                        .IsUnique();
+
+                    b.ToTable("LibraryPresets");
+                });
+
+            modelBuilder.Entity("Japlayer.Data.Entities.LibraryPresetGenre", b =>
+                {
+                    b.Property<int>("LibraryPresetId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("libraryPresetId");
+
+                    b.Property<int>("GenreId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("genreId");
+
+                    b.Property<bool>("IsIncluded")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("isIncluded");
+
+                    b.HasKey("LibraryPresetId", "GenreId");
+
+                    b.HasIndex("GenreId");
+
+                    b.ToTable("LibraryPresetGenres", (string)null);
+                });
+
+            modelBuilder.Entity("Japlayer.Data.Entities.LibraryPresetPerson", b =>
+                {
+                    b.Property<int>("LibraryPresetId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("libraryPresetId");
+
+                    b.Property<int>("PersonId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("personId");
+
+                    b.Property<bool>("IsIncluded")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("isIncluded");
+
+                    b.HasKey("LibraryPresetId", "PersonId");
+
+                    b.HasIndex("PersonId");
+
+                    b.ToTable("LibraryPresetPeople", (string)null);
+                });
+
+            modelBuilder.Entity("Japlayer.Data.Entities.LibraryPresetSeries", b =>
+                {
+                    b.Property<int>("LibraryPresetId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("libraryPresetId");
+
+                    b.Property<int>("SeriesId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("seriesId");
+
+                    b.Property<bool>("IsIncluded")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("isIncluded");
+
+                    b.HasKey("LibraryPresetId", "SeriesId");
+
+                    b.HasIndex("SeriesId");
+
+                    b.ToTable("LibraryPresetSeries", (string)null);
+                });
+
+            modelBuilder.Entity("Japlayer.Data.Entities.LibraryPresetStudio", b =>
+                {
+                    b.Property<int>("LibraryPresetId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("libraryPresetId");
+
+                    b.Property<int>("StudioId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("studioId");
+
+                    b.Property<bool>("IsIncluded")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("isIncluded");
+
+                    b.HasKey("LibraryPresetId", "StudioId");
+
+                    b.HasIndex("StudioId");
+
+                    b.ToTable("LibraryPresetStudios", (string)null);
+                });
+
+            modelBuilder.Entity("Japlayer.Data.Entities.LibraryPresetTag", b =>
+                {
+                    b.Property<int>("LibraryPresetId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("libraryPresetId");
+
+                    b.Property<int>("UserTagId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("userTagId");
+
+                    b.Property<bool>("IsIncluded")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("isIncluded");
+
+                    b.HasKey("LibraryPresetId", "UserTagId");
+
+                    b.HasIndex("UserTagId");
+
+                    b.ToTable("LibraryPresetTags", (string)null);
+                });
+
             modelBuilder.Entity("Japlayer.Data.Entities.Media", b =>
                 {
                     b.Property<string>("MediaId")
@@ -344,9 +508,13 @@ namespace Japlayer.Data.Migrations
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("TEXT")
-                        .HasColumnName("name");
+                        .HasColumnName("name")
+                        .UseCollation("NOCASE");
 
                     b.HasKey("Id");
+
+                    b.HasIndex(new[] { "Name" }, "UserTags_name")
+                        .IsUnique();
 
                     b.ToTable("UserTags");
                 });
@@ -451,6 +619,101 @@ namespace Japlayer.Data.Migrations
                         .HasForeignKey("MediaId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("Japlayer.Data.Entities.LibraryPresetGenre", b =>
+                {
+                    b.HasOne("Japlayer.Data.Entities.MediaGenre", "Genre")
+                        .WithMany()
+                        .HasForeignKey("GenreId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Japlayer.Data.Entities.LibraryPreset", "LibraryPreset")
+                        .WithMany("Genres")
+                        .HasForeignKey("LibraryPresetId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Genre");
+
+                    b.Navigation("LibraryPreset");
+                });
+
+            modelBuilder.Entity("Japlayer.Data.Entities.LibraryPresetPerson", b =>
+                {
+                    b.HasOne("Japlayer.Data.Entities.LibraryPreset", "LibraryPreset")
+                        .WithMany("People")
+                        .HasForeignKey("LibraryPresetId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Japlayer.Data.Entities.MediaPerson", "Person")
+                        .WithMany()
+                        .HasForeignKey("PersonId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("LibraryPreset");
+
+                    b.Navigation("Person");
+                });
+
+            modelBuilder.Entity("Japlayer.Data.Entities.LibraryPresetSeries", b =>
+                {
+                    b.HasOne("Japlayer.Data.Entities.LibraryPreset", "LibraryPreset")
+                        .WithMany("Series")
+                        .HasForeignKey("LibraryPresetId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Japlayer.Data.Entities.MediaSeries", "Series")
+                        .WithMany()
+                        .HasForeignKey("SeriesId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("LibraryPreset");
+
+                    b.Navigation("Series");
+                });
+
+            modelBuilder.Entity("Japlayer.Data.Entities.LibraryPresetStudio", b =>
+                {
+                    b.HasOne("Japlayer.Data.Entities.LibraryPreset", "LibraryPreset")
+                        .WithMany("Studios")
+                        .HasForeignKey("LibraryPresetId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Japlayer.Data.Entities.MediaStudio", "Studio")
+                        .WithMany()
+                        .HasForeignKey("StudioId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("LibraryPreset");
+
+                    b.Navigation("Studio");
+                });
+
+            modelBuilder.Entity("Japlayer.Data.Entities.LibraryPresetTag", b =>
+                {
+                    b.HasOne("Japlayer.Data.Entities.LibraryPreset", "LibraryPreset")
+                        .WithMany("Tags")
+                        .HasForeignKey("LibraryPresetId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Japlayer.Data.Entities.UserTag", "UserTag")
+                        .WithMany()
+                        .HasForeignKey("UserTagId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("LibraryPreset");
+
+                    b.Navigation("UserTag");
                 });
 
             modelBuilder.Entity("Japlayer.Data.Entities.MediaHighlight", b =>
@@ -591,6 +854,19 @@ namespace Japlayer.Data.Migrations
                         .HasForeignKey("UserTagId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("Japlayer.Data.Entities.LibraryPreset", b =>
+                {
+                    b.Navigation("Genres");
+
+                    b.Navigation("People");
+
+                    b.Navigation("Series");
+
+                    b.Navigation("Studios");
+
+                    b.Navigation("Tags");
                 });
 
             modelBuilder.Entity("Japlayer.Data.Entities.Media", b =>

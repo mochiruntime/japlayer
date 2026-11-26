@@ -1,6 +1,6 @@
 ﻿namespace Japlayer.Data.Entities;
 
-public partial class MediaGenre
+public partial class MediaGenre : INamedEntity
 {
     public int Id { get; set; }
 

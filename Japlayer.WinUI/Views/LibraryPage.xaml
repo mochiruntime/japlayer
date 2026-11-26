@@ -57,6 +57,72 @@
                 </StackPanel>
             </Grid>
         </DataTemplate>
+
+        <!-- Saved Preset Pill Template -->
+        <DataTemplate x:Key="LibraryPresetPillTemplate" x:DataType="vm:LibraryPresetViewModel">
+            <Button AutomationProperties.AutomationId="{x:Bind DisplayName, Mode=OneWay}"
+                    AutomationProperties.Name="{x:Bind DisplayName, Mode=OneWay}"
+                    Tag="{x:Bind}"
+                    Click="PresetPill_Click"
+                    Height="26"
+                    CornerRadius="13"
+                    Padding="10,0"
+                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
+                    BorderThickness="1"
+                    ToolTipService.ToolTip="{x:Bind DescriptionTooltip, Mode=OneWay}">
+                <Button.ContextFlyout>
+                    <MenuFlyout>
+                        <MenuFlyoutItem Text="Apply"
+                                        Tag="{x:Bind}"
+                                        Click="PresetApply_Click">
+                            <MenuFlyoutItem.Icon>
+                                <FontIcon Glyph="&#xE768;"/>
+                            </MenuFlyoutItem.Icon>
+                        </MenuFlyoutItem>
+                        <MenuFlyoutItem Text="Rename..."
+                                        Tag="{x:Bind}"
+                                        Click="PresetRename_Click">
+                            <MenuFlyoutItem.Icon>
+                                <FontIcon Glyph="&#xE8AC;"/>
+                            </MenuFlyoutItem.Icon>
+                        </MenuFlyoutItem>
+                        <MenuFlyoutItem Text="Update with current filters &amp; sort"
+                                        Tag="{x:Bind}"
+                                        Click="PresetUpdate_Click">
+                            <MenuFlyoutItem.Icon>
+                                <FontIcon Glyph="&#xE777;"/>
+                            </MenuFlyoutItem.Icon>
+                        </MenuFlyoutItem>
+                        <MenuFlyoutSeparator/>
+                        <MenuFlyoutItem Text="Delete"
+                                        Tag="{x:Bind}"
+                                        Click="PresetDelete_Click">
+                            <MenuFlyoutItem.Icon>
+                                <FontIcon Glyph="&#xE74D;"/>
+                            </MenuFlyoutItem.Icon>
+                        </MenuFlyoutItem>
+                    </MenuFlyout>
+                </Button.ContextFlyout>
+                <Grid>
+                    <Border CornerRadius="13"
+                            Margin="-10,0,-10,0"
+                            Background="{ThemeResource SystemFillColorAttentionBackgroundBrush}"
+                            BorderBrush="{ThemeResource AccentFillColorDefaultBrush}"
+                            BorderThickness="1"
+                            Visibility="{x:Bind IsActive, Mode=OneWay}"/>
+                    <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                        <FontIcon Glyph="&#xE8A4;"
+                                  FontSize="11"
+                                  Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                        <TextBlock Text="{x:Bind DisplayName, Mode=OneWay}"
+                                   Style="{StaticResource CaptionTextBlockStyle}"
+                                   FontWeight="SemiBold"
+                                   VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Grid>
+            </Button>
+        </DataTemplate>
     </Page.Resources>
 
     <Grid>
@@ -255,35 +321,61 @@
             </Grid>
         </Grid>
 
-        <!-- Row 1: Active Filter Chips Bar -->
+        <!-- Row 1: Active Filter Chips Bar / Saved Presets Bar -->
         <Border Grid.Row="1"
-                Visibility="{x:Bind ViewModel.HasActiveFilters, Mode=OneWay}"
+                Visibility="{x:Bind ViewModel.ShowFilterOrPresetsBar, Mode=OneWay}"
                 Padding="24,8,24,10"
                 BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
                 BorderThickness="0,0,0,1">
-            <Grid HorizontalAlignment="Left">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
+            <Grid>
+                <!-- Active Filters View -->
+                <Grid HorizontalAlignment="Left"
+                      Visibility="{x:Bind ViewModel.HasActiveFilters, Mode=OneWay}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
 
-                <ItemsControl Grid.Column="0"
-                              ItemsSource="{x:Bind ViewModel.ActiveFilterChips}"
-                              ItemTemplate="{StaticResource ActiveFilterChipTemplate}">
+                    <ItemsControl Grid.Column="0"
+                                  ItemsSource="{x:Bind ViewModel.ActiveFilterChips}"
+                                  ItemTemplate="{StaticResource ActiveFilterChipTemplate}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <controls:WrapPanel HorizontalSpacing="6" VerticalSpacing="6"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                    </ItemsControl>
+
+                    <HyperlinkButton Grid.Column="1"
+                                     AutomationProperties.AutomationId="ClearAllFiltersButton"
+                                     Content="Clear all"
+                                     Command="{x:Bind ViewModel.ClearAllFiltersCommand}"
+                                     Padding="6,2"
+                                     Margin="8,0,0,0"
+                                     VerticalAlignment="Top"/>
+
+                    <HyperlinkButton Grid.Column="2"
+                                     AutomationProperties.AutomationId="SavePresetButton"
+                                     Content="{x:Bind ViewModel.SavePresetButtonText, Mode=OneWay}"
+                                     Command="{x:Bind ViewModel.SaveCurrentAsPresetCommand}"
+                                     IsEnabled="{x:Bind ViewModel.CanSaveCurrentPreset, Mode=OneWay}"
+                                     Padding="6,2"
+                                     Margin="4,0,0,0"
+                                     VerticalAlignment="Top"/>
+                </Grid>
+
+                <!-- Saved Presets View (shown when no filters are active) -->
+                <ItemsControl AutomationProperties.AutomationId="LibraryPresetsList"
+                              Visibility="{x:Bind ViewModel.ShowPresetsBar, Mode=OneWay}"
+                              ItemsSource="{x:Bind ViewModel.Presets}"
+                              ItemTemplate="{StaticResource LibraryPresetPillTemplate}">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
                             <controls:WrapPanel HorizontalSpacing="6" VerticalSpacing="6"/>
                         </ItemsPanelTemplate>
                     </ItemsControl.ItemsPanel>
                 </ItemsControl>
-
-                <HyperlinkButton Grid.Column="1"
-                                 AutomationProperties.AutomationId="ClearAllFiltersButton"
-                                 Content="Clear all"
-                                 Command="{x:Bind ViewModel.ClearAllFiltersCommand}"
-                                 Padding="6,2"
-                                 Margin="8,0,0,0"
-                                 VerticalAlignment="Top"/>
             </Grid>
         </Border>
 

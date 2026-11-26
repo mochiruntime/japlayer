@@ -76,12 +76,13 @@ namespace Japlayer.UnitTests.Data
         public async Task GetUserTagsAsync_ReturnsDistinctOrderedTags()
         {
             // Arrange
+            var vrTag = new UserTag { Name = "VR" };
             var media = new Media { MediaId = "M1" };
-            media.UserTags.Add(new UserTag { Name = "VR" });
+            media.UserTags.Add(vrTag);
             media.UserTags.Add(new UserTag { Name = "Action" });
 
             var media2 = new Media { MediaId = "M2" };
-            media2.UserTags.Add(new UserTag { Name = "VR" }); // Duplicate
+            media2.UserTags.Add(vrTag); // Shared tag entity
             media2.UserTags.Add(new UserTag { Name = "Comedy" });
 
             _databaseContext.Media.AddRange(media, media2);

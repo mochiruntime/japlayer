@@ -225,7 +225,7 @@ namespace Japlayer.Data.Services
             }
 
             var existingTag = await context.UserTags
-                .FirstOrDefaultAsync(userTag => userTag.Name.ToLower() == trimmedTagName.ToLower());
+                .FirstOrDefaultAsync(userTag => userTag.Name == trimmedTagName);
 
             if (existingTag == null)
             {

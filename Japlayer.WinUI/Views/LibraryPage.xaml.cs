@@ -60,6 +60,115 @@ namespace Japlayer.Views
             await ViewModel.ReloadLibraryCommand.ExecuteAsync(null);
         }
 
+        private void PresetPill_Click(object sender, RoutedEventArgs e)
+        {
+            if (TryGetPresetFromSender(sender, out var preset))
+            {
+                ViewModel.ApplyPreset(preset);
+            }
+        }
+
+        private void PresetApply_Click(object sender, RoutedEventArgs e)
+        {
+            if (TryGetPresetFromSender(sender, out var preset))
+            {
+                ViewModel.ApplyPreset(preset);
+            }
+        }
+
+        private async void PresetRename_Click(object sender, RoutedEventArgs e)
+        {
+            if (!TryGetPresetFromSender(sender, out var preset))
+            {
+                return;
+            }
+
+            var nameBox = new TextBox
+            {
+                Text = preset.DisplayName,
+                PlaceholderText = "Preset name"
+            };
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(nameBox, "RenamePresetTextBox");
+
+            var validationText = new TextBlock
+            {
+                Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["SystemFillColorCriticalBrush"],
+                Visibility = Visibility.Collapsed,
+                TextWrapping = TextWrapping.Wrap
+            };
+
+            var dialog = new ContentDialog
+            {
+                Title = "Rename preset",
+                PrimaryButtonText = "Save",
+                CloseButtonText = "Cancel",
+                DefaultButton = ContentDialogButton.Primary,
+                XamlRoot = XamlRoot,
+                Content = new StackPanel
+                {
+                    Spacing = 8,
+                    MinWidth = 300,
+                    Children = { nameBox, validationText }
+                }
+            };
+
+            nameBox.TextChanged += (_, _) =>
+            {
+                var isValid = ViewModel.TryValidatePresetName(nameBox.Text, preset.Id, out var errorMessage);
+                dialog.IsPrimaryButtonEnabled = isValid;
+                validationText.Text = errorMessage ?? string.Empty;
+                validationText.Visibility = isValid ? Visibility.Collapsed : Visibility.Visible;
+            };
+
+            nameBox.Loaded += (_, _) =>
+            {
+                nameBox.SelectAll();
+                nameBox.Focus(FocusState.Programmatic);
+            };
+
+            if (await dialog.ShowAsync() == ContentDialogResult.Primary)
+            {
+                await ViewModel.RenamePresetAsync(preset, nameBox.Text);
+            }
+        }
+
+        private async void PresetUpdate_Click(object sender, RoutedEventArgs e)
+        {
+            if (TryGetPresetFromSender(sender, out var preset))
+            {
+                await ViewModel.UpdatePresetFromCurrentAsync(preset);
+            }
+        }
+
+        private async void PresetDelete_Click(object sender, RoutedEventArgs e)
+        {
+            if (TryGetPresetFromSender(sender, out var preset))
+            {
+                await ViewModel.DeletePresetAsync(preset);
+            }
+        }
+
+        private static bool TryGetPresetFromSender(object sender, out LibraryPresetViewModel preset)
+        {
+            if (sender is FrameworkElement element)
+            {
+                if (element.Tag is LibraryPresetViewModel taggedPreset)
+                {
+                    preset = taggedPreset;
+                    return true;
+                }
+
+                if (element.DataContext is LibraryPresetViewModel contextPreset)
+                {
+                    preset = contextPreset;
+                    return true;
+                }
+            }
+
+            preset = null!;
+            return false;
+        }
+
         private void MediaGrid_ItemClick(object sender, ItemClickEventArgs e)
         {
             if (e.ClickedItem is LibraryItemViewModel item)

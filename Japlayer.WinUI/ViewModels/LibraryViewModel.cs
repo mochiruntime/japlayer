@@ -30,29 +30,35 @@ namespace Japlayer.ViewModels
         private readonly IServiceProvider _serviceProvider;
         private readonly IDatabaseChangeMonitor? _databaseChangeMonitor;
         private readonly IMessenger _messenger;
+        private readonly ILibraryPresetProvider? _presetProvider;
+        private readonly IReadOnlyList<FacetPresetBinding> _presetFacetBindings;
         private List<LibraryItemViewModel> _allMediaItems = [];
         private DispatcherTimer? _filterDebounceTimer;
         // Flag to track if the sort order changed so the grid only scrolls to top on explicit sort changes.
         private bool _isSortOrderChanging = true;
         private bool _isSyncingSort;
+        private bool _isApplyingBatchChanges;
         private bool _isPageActive = true;
         private bool _hasPendingFilterRefresh;
         private bool _hasPendingExternalReload;
         private bool _isReloading;
         private bool _reloadAgainRequested;
+        private int? _activePresetId;
 
         public LibraryViewModel(
             IMediaProvider mediaProvider,
             IMediaSceneProvider sceneProvider,
             IServiceProvider serviceProvider,
             IDatabaseChangeMonitor? databaseChangeMonitor = null,
-            IMessenger? messenger = null)
+            IMessenger? messenger = null,
+            ILibraryPresetProvider? presetProvider = null)
         {
             _mediaProvider = mediaProvider;
             _sceneProvider = sceneProvider;
             _serviceProvider = serviceProvider;
             _databaseChangeMonitor = databaseChangeMonitor;
             _messenger = messenger ?? WeakReferenceMessenger.Default;
+            _presetProvider = presetProvider;
 
             TagsFacet = new FacetFilterGroup("Tags", "Tag", QueueApplyFilter);
             GenresFacet = new FacetFilterGroup("Genres", "Genre", QueueApplyFilter);
@@ -61,6 +67,14 @@ namespace Japlayer.ViewModels
             SeriesFacet = new FacetFilterGroup("Series", "Series", QueueApplyFilter);
 
             AllFacets = [TagsFacet, GenresFacet, CastFacet, StudiosFacet, SeriesFacet];
+            _presetFacetBindings =
+            [
+                new(TagsFacet, model => model.Tags, (model, selection) => model.Tags = selection),
+                new(GenresFacet, model => model.Genres, (model, selection) => model.Genres = selection),
+                new(CastFacet, model => model.Cast, (model, selection) => model.Cast = selection),
+                new(StudiosFacet, model => model.Studios, (model, selection) => model.Studios = selection),
+                new(SeriesFacet, model => model.Series, (model, selection) => model.Series = selection)
+            ];
             SelectedSortField = SortFieldOptions.First(option => option.Field == LibrarySortField.AddedDate);
 
             _messenger.RegisterAll(this);
@@ -99,6 +113,8 @@ namespace Japlayer.ViewModels
         public BatchObservableCollection<LibraryItemViewModel> MediaItems { get; } = [];
 
         public ObservableCollection<ActiveFilterChip> ActiveFilterChips { get; } = [];
+
+        public BatchObservableCollection<LibraryPresetViewModel> Presets { get; } = [];
 
         public IReadOnlyList<LibrarySortOption> SortOptions { get; } = LibrarySortOption.All;
         public IReadOnlyList<LibrarySortFieldOption> SortFieldOptions { get; } = LibrarySortOption.FieldOptions;
@@ -159,7 +175,17 @@ namespace Japlayer.ViewModels
             : $"{MediaItems.Count} of {_allMediaItems.Count}";
 
         public bool HasActiveFilters => ActiveFilterChips.Count > 0;
+        public bool HasPresets => Presets.Count > 0;
+        public bool ShowPresetsBar => !HasActiveFilters && HasPresets;
+        public bool ShowFilterOrPresetsBar => HasActiveFilters || HasPresets;
         public bool IsEmptyResult => IsDataLoaded && MediaItems.Count == 0;
+
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(SavePresetButtonText), nameof(CanSaveCurrentPreset))]
+        public partial bool IsCurrentFilterSavedAsPreset { get; set; }
+
+        public string SavePresetButtonText => IsCurrentFilterSavedAsPreset ? "Saved" : "Save preset";
+        public bool CanSaveCurrentPreset => HasActiveFilters && !IsCurrentFilterSavedAsPreset && _presetProvider != null;
 
         partial void OnSearchTextChanged(string value) => QueueApplyFilter();
         partial void OnRatingMinChanged(double value) => QueueApplyFilter();
@@ -247,18 +273,202 @@ namespace Japlayer.ViewModels
         [RelayCommand]
         private void ClearAllFilters()
         {
-            SearchText = string.Empty;
-            foreach (var facet in AllFacets)
+            _isApplyingBatchChanges = true;
+            try
             {
-                facet.ResetSelectionsSilently();
+                SearchText = string.Empty;
+                foreach (var facet in AllFacets)
+                {
+                    facet.ResetSelectionsSilently();
+                }
+
+                RatingMin = 0;
+                RatingMax = 5;
+                RuntimeMin = 0;
+                RuntimeMax = RuntimeMaxBound;
+            }
+            finally
+            {
+                _isApplyingBatchChanges = false;
             }
 
-            RatingMin = 0;
-            RatingMax = 5;
-            RuntimeMin = 0;
-            RuntimeMax = RuntimeMaxBound;
-            QueueApplyFilter();
+            UpdateActivePresetHighlight(null);
+            IsCurrentFilterSavedAsPreset = false;
+            ApplyFilter();
         }
+
+        [RelayCommand]
+        public async Task SaveCurrentAsPresetAsync()
+        {
+            if (_presetProvider == null || !HasActiveFilters || IsCurrentFilterSavedAsPreset)
+            {
+                return;
+            }
+
+            var autoName = BuildDefaultPresetName();
+            var uniqueName = EnsureUniquePresetName(autoName);
+            var model = CaptureCurrentPresetModel(uniqueName, isCustomName: false);
+
+            LibraryPresetModel created;
+            using (_databaseChangeMonitor?.BeginInternalWrite())
+            {
+                created = await _presetProvider.CreatePresetAsync(model);
+            }
+
+            var updatedPresets = Presets.ToList();
+            updatedPresets.Add(CreatePresetViewModel(created));
+            Presets.ReplaceAll(updatedPresets);
+
+            IsCurrentFilterSavedAsPreset = true;
+            NotifyPresetBarProperties();
+        }
+
+        [RelayCommand]
+        public void ApplyPreset(LibraryPresetViewModel? preset)
+        {
+            if (preset == null)
+            {
+                return;
+            }
+
+            var model = preset.Model;
+            _filterDebounceTimer?.Stop();
+            _isApplyingBatchChanges = true;
+            try
+            {
+                SearchText = model.SearchText;
+                RatingMin = Math.Clamp(model.RatingMin, 0, 5);
+                RatingMax = Math.Clamp(model.RatingMax, RatingMin, 5);
+
+                var targetRuntimeMax = model.RuntimeMax ?? RuntimeMaxBound;
+                RuntimeMax = Math.Clamp(targetRuntimeMax, 0, RuntimeMaxBound);
+                RuntimeMin = Math.Clamp(model.RuntimeMin, 0, RuntimeMax);
+
+                foreach (var binding in _presetFacetBindings)
+                {
+                    var selection = binding.Getter(model);
+                    binding.Facet.RestoreSelectionsSilently(selection.Included, selection.Excluded);
+                }
+
+                var targetField = Enum.TryParse<LibrarySortField>(model.SortField, out var parsedField)
+                    ? parsedField
+                    : LibrarySortField.AddedDate;
+
+                _isSyncingSort = true;
+                SelectedSortField = SortFieldOptions.First(option => option.Field == targetField);
+                IsSortDescending = model.IsSortDescending;
+                var composedSort = ComposeSortOption(targetField, model.IsSortDescending);
+                if (SortOrder != composedSort)
+                {
+                    SortOrder = composedSort;
+                    _isSortOrderChanging = true;
+                }
+                _isSyncingSort = false;
+            }
+            finally
+            {
+                _isApplyingBatchChanges = false;
+            }
+
+            UpdateActivePresetHighlight(preset.Id);
+            ApplyFilter();
+            IsCurrentFilterSavedAsPreset = true;
+        }
+
+        public bool TryValidatePresetName(string candidateName, int? excludingPresetId, out string? errorMessage)
+        {
+            var trimmed = candidateName.Trim();
+            if (string.IsNullOrWhiteSpace(trimmed))
+            {
+                errorMessage = "Preset name cannot be empty.";
+                return false;
+            }
+
+            var duplicateExists = Presets.Any(preset =>
+                preset.Id != excludingPresetId &&
+                string.Equals(preset.DisplayName, trimmed, StringComparison.OrdinalIgnoreCase));
+
+            if (duplicateExists)
+            {
+                errorMessage = "A preset with this name already exists.";
+                return false;
+            }
+
+            errorMessage = null;
+            return true;
+        }
+
+        public async Task<bool> RenamePresetAsync(LibraryPresetViewModel preset, string newName)
+        {
+            if (_presetProvider == null || !TryValidatePresetName(newName, preset.Id, out _))
+            {
+                return false;
+            }
+
+            var trimmed = newName.Trim();
+            preset.Model.Name = trimmed;
+            preset.Model.IsCustomName = true;
+
+            using (_databaseChangeMonitor?.BeginInternalWrite())
+            {
+                await _presetProvider.UpdatePresetAsync(preset.Model);
+            }
+
+            preset.UpdateFrom(preset.Model, BuildPresetSummary(preset.Model), BuildPresetTooltip(preset.Model));
+            return true;
+        }
+
+        [RelayCommand]
+        public async Task UpdatePresetFromCurrentAsync(LibraryPresetViewModel? preset)
+        {
+            if (_presetProvider == null || preset == null)
+            {
+                return;
+            }
+
+            var isCustomName = preset.Model.IsCustomName;
+            var targetName = isCustomName
+                ? preset.Model.Name
+                : EnsureUniquePresetName(BuildDefaultPresetName(), excludingPresetId: preset.Id);
+
+            var updatedModel = CaptureCurrentPresetModel(targetName, isCustomName);
+            updatedModel.Id = preset.Id;
+            updatedModel.CreatedAt = preset.Model.CreatedAt;
+
+            using (_databaseChangeMonitor?.BeginInternalWrite())
+            {
+                await _presetProvider.UpdatePresetAsync(updatedModel);
+            }
+
+            preset.UpdateFrom(updatedModel, BuildPresetSummary(updatedModel), BuildPresetTooltip(updatedModel));
+            UpdateActivePresetHighlight(preset.Id);
+            IsCurrentFilterSavedAsPreset = true;
+        }
+
+        [RelayCommand]
+        public async Task DeletePresetAsync(LibraryPresetViewModel? preset)
+        {
+            if (_presetProvider == null || preset == null)
+            {
+                return;
+            }
+
+            using (_databaseChangeMonitor?.BeginInternalWrite())
+            {
+                await _presetProvider.DeletePresetAsync(preset.Id);
+            }
+
+            if (_activePresetId == preset.Id)
+            {
+                _activePresetId = null;
+            }
+
+            Presets.ReplaceAll(Presets.Where(entry => entry.Id != preset.Id));
+            IsCurrentFilterSavedAsPreset = false;
+            NotifyPresetBarProperties();
+        }
+
+        public string BuildDefaultPresetName() => BuildPresetSummary(CaptureCurrentPresetModel(string.Empty, isCustomName: false));
 
         public async Task LoadDataAsync()
         {
@@ -327,8 +537,9 @@ namespace Japlayer.ViewModels
             var castTask = _mediaProvider.GetCastAsync();
             var studiosTask = _mediaProvider.GetStudiosAsync();
             var seriesTask = _mediaProvider.GetSeriesAsync();
+            var presetsTask = _presetProvider?.GetPresetsAsync() ?? Task.FromResult<IReadOnlyList<LibraryPresetModel>>([]);
 
-            await Task.WhenAll(itemsTask, tagsTask, genresTask, castTask, studiosTask, seriesTask);
+            await Task.WhenAll(itemsTask, tagsTask, genresTask, castTask, studiosTask, seriesTask, presetsTask);
 
             var items = await itemsTask;
             var existingById = _allMediaItems.ToDictionary(item => item.Id, StringComparer.OrdinalIgnoreCase);
@@ -368,10 +579,10 @@ namespace Japlayer.ViewModels
             }
 
             TagsFacet.Populate(await tagsTask, name => _allMediaItems.Count(item => item.LibraryItem.UserTags.Contains(name, StringComparer.OrdinalIgnoreCase)));
-            GenresFacet.Populate(await genresTask, name => _allMediaItems.Count(item => item.LibraryItem.Genres.Contains(name)));
-            CastFacet.Populate(await castTask, name => _allMediaItems.Count(item => item.LibraryItem.Cast.Contains(name)));
-            StudiosFacet.Populate(await studiosTask, name => _allMediaItems.Count(item => item.LibraryItem.Studios.Contains(name)));
-            SeriesFacet.Populate(await seriesTask, name => _allMediaItems.Count(item => item.LibraryItem.Series.Contains(name)));
+            GenresFacet.Populate(await genresTask, name => _allMediaItems.Count(item => item.LibraryItem.Genres.Contains(name, StringComparer.OrdinalIgnoreCase)));
+            CastFacet.Populate(await castTask, name => _allMediaItems.Count(item => item.LibraryItem.Cast.Contains(name, StringComparer.OrdinalIgnoreCase)));
+            StudiosFacet.Populate(await studiosTask, name => _allMediaItems.Count(item => item.LibraryItem.Studios.Contains(name, StringComparer.OrdinalIgnoreCase)));
+            SeriesFacet.Populate(await seriesTask, name => _allMediaItems.Count(item => item.LibraryItem.Series.Contains(name, StringComparer.OrdinalIgnoreCase)));
 
             if (!isInitialLoad)
             {
@@ -382,11 +593,16 @@ namespace Japlayer.ViewModels
                 }
             }
 
+            var loadedPresets = await presetsTask;
+            Presets.ReplaceAll(loadedPresets.Select(CreatePresetViewModel));
+            UpdateActivePresetHighlight(_activePresetId);
+
             _hasPendingExternalReload = false;
             _hasPendingFilterRefresh = false;
 
             ApplyFilter();
             IsDataLoaded = true;
+            NotifyPresetBarProperties();
             OnPropertyChanged(nameof(ItemCountText));
             OnPropertyChanged(nameof(IsEmptyResult));
         }
@@ -486,6 +702,14 @@ namespace Japlayer.ViewModels
 
         private void QueueApplyFilter()
         {
+            if (_isApplyingBatchChanges)
+            {
+                return;
+            }
+
+            UpdateActivePresetHighlight(null);
+            IsCurrentFilterSavedAsPreset = false;
+
             if (Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread() == null)
             {
                 ApplyFilter();
@@ -603,13 +827,13 @@ namespace Japlayer.ViewModels
             var required = facet.RequiredValues;
             if (required.Count > 0)
             {
-                items = items.Where(item => required.All(value => selector(item).Contains(value)));
+                items = items.Where(item => required.All(value => selector(item).Contains(value, StringComparer.OrdinalIgnoreCase)));
             }
 
             var excluded = facet.ExcludedValues;
             if (excluded.Count > 0)
             {
-                items = items.Where(item => excluded.All(value => !selector(item).Contains(value)));
+                items = items.Where(item => excluded.All(value => !selector(item).Contains(value, StringComparer.OrdinalIgnoreCase)));
             }
 
             return items;
@@ -618,6 +842,16 @@ namespace Japlayer.ViewModels
         private void RebuildActiveFilterChips()
         {
             ActiveFilterChips.Clear();
+
+            if (!string.IsNullOrWhiteSpace(SearchText))
+            {
+                ActiveFilterChips.Add(new ActiveFilterChip(
+                    $"Search: \"{SearchText.Trim()}\"",
+                    false,
+                    false,
+                    true,
+                    () => SearchText = string.Empty));
+            }
 
             foreach (var facet in AllFacets)
             {
@@ -655,7 +889,184 @@ namespace Japlayer.ViewModels
             }
 
             OnPropertyChanged(nameof(HasActiveFilters));
+            OnPropertyChanged(nameof(CanSaveCurrentPreset));
+            NotifyPresetBarProperties();
         }
+
+        private void NotifyPresetBarProperties()
+        {
+            OnPropertyChanged(nameof(HasPresets));
+            OnPropertyChanged(nameof(ShowPresetsBar));
+            OnPropertyChanged(nameof(ShowFilterOrPresetsBar));
+            OnPropertyChanged(nameof(CanSaveCurrentPreset));
+        }
+
+        private void UpdateActivePresetHighlight(int? activePresetId)
+        {
+            _activePresetId = activePresetId;
+            foreach (var preset in Presets)
+            {
+                preset.IsActive = activePresetId.HasValue && preset.Id == activePresetId.Value;
+            }
+        }
+
+        private LibraryPresetViewModel CreatePresetViewModel(LibraryPresetModel model)
+            => new(model, BuildPresetSummary(model), BuildPresetTooltip(model));
+
+        private LibraryPresetModel CaptureCurrentPresetModel(string name, bool isCustomName)
+        {
+            var model = new LibraryPresetModel
+            {
+                Name = name,
+                IsCustomName = isCustomName,
+                SearchText = SearchText.Trim(),
+                SortField = SelectedSortField.Field.ToString(),
+                IsSortDescending = IsSortDescending,
+                RatingMin = RatingMin,
+                RatingMax = RatingMax,
+                RuntimeMin = RuntimeMin,
+                RuntimeMax = IsRuntimeFilterActive && RuntimeMax < RuntimeMaxBound ? RuntimeMax : null
+            };
+
+            foreach (var binding in _presetFacetBindings)
+            {
+                binding.Setter(model, new LibraryPresetFacetSelection
+                {
+                    Included = [.. binding.Facet.RequiredValues],
+                    Excluded = [.. binding.Facet.ExcludedValues]
+                });
+            }
+
+            return model;
+        }
+
+        private string EnsureUniquePresetName(string baseName, int? excludingPresetId = null)
+        {
+            if (TryValidatePresetName(baseName, excludingPresetId, out _))
+            {
+                return baseName;
+            }
+
+            var suffix = 2;
+            while (true)
+            {
+                var candidate = $"{baseName} ({suffix})";
+                if (TryValidatePresetName(candidate, excludingPresetId, out _))
+                {
+                    return candidate;
+                }
+
+                suffix++;
+            }
+        }
+
+        private string BuildPresetSummary(LibraryPresetModel model)
+        {
+            var tokens = new List<string>();
+
+            if (!string.IsNullOrWhiteSpace(model.SearchText))
+            {
+                tokens.Add($"\"{model.SearchText.Trim()}\"");
+            }
+
+            foreach (var binding in _presetFacetBindings)
+            {
+                var selection = binding.Getter(model);
+                foreach (var included in selection.Included)
+                {
+                    tokens.Add($"+{included}");
+                }
+
+                foreach (var excluded in selection.Excluded)
+                {
+                    tokens.Add($"−{excluded}");
+                }
+            }
+
+            if (model.RatingMin > 0 || model.RatingMax < 5)
+            {
+                tokens.Add($"★ {(int)model.RatingMin}–{(int)model.RatingMax}");
+            }
+
+            if (model.RuntimeMin > 0 || model.RuntimeMax.HasValue)
+            {
+                var maxLabel = model.RuntimeMax.HasValue ? $"{(int)model.RuntimeMax.Value}m" : "max";
+                tokens.Add($"⏱ {(int)model.RuntimeMin}m–{maxLabel}");
+            }
+
+            var sortField = Enum.TryParse<LibrarySortField>(model.SortField, out var parsed)
+                ? parsed
+                : LibrarySortField.AddedDate;
+            var sortFieldDisplay = SortFieldOptions.First(option => option.Field == sortField).DisplayName;
+            var sortLabel = sortField == LibrarySortField.Random
+                ? sortFieldDisplay
+                : $"{sortFieldDisplay} {(model.IsSortDescending ? "↓" : "↑")}";
+
+            if (tokens.Count == 0)
+            {
+                return sortLabel;
+            }
+
+            const int maxSummaryTokens = 3;
+            var displayedTokens = tokens.Take(maxSummaryTokens).ToList();
+            var summary = string.Join(", ", displayedTokens);
+            if (tokens.Count > maxSummaryTokens)
+            {
+                summary += $" (+{tokens.Count - maxSummaryTokens})";
+            }
+
+            var isDefaultSort = sortField == LibrarySortField.AddedDate && model.IsSortDescending;
+            return isDefaultSort ? summary : $"{summary} • {sortLabel}";
+        }
+
+        private string BuildPresetTooltip(LibraryPresetModel model)
+        {
+            var lines = new List<string>();
+
+            if (!string.IsNullOrWhiteSpace(model.SearchText))
+            {
+                lines.Add($"Search: \"{model.SearchText.Trim()}\"");
+            }
+
+            foreach (var binding in _presetFacetBindings)
+            {
+                var selection = binding.Getter(model);
+                var parts = new List<string>();
+                parts.AddRange(selection.Included.Select(value => $"+{value}"));
+                parts.AddRange(selection.Excluded.Select(value => $"−{value}"));
+                if (parts.Count > 0)
+                {
+                    lines.Add($"{binding.Facet.Label}: {string.Join(", ", parts)}");
+                }
+            }
+
+            if (model.RatingMin > 0 || model.RatingMax < 5)
+            {
+                lines.Add($"Rating: {(int)model.RatingMin}–{(int)model.RatingMax} stars");
+            }
+
+            if (model.RuntimeMin > 0 || model.RuntimeMax.HasValue)
+            {
+                var maxLabel = model.RuntimeMax.HasValue ? $"{(int)model.RuntimeMax.Value}m" : "max";
+                lines.Add($"Runtime: {(int)model.RuntimeMin}m–{maxLabel}");
+            }
+
+            var sortField = Enum.TryParse<LibrarySortField>(model.SortField, out var parsed)
+                ? parsed
+                : LibrarySortField.AddedDate;
+            var sortFieldDisplay = SortFieldOptions.First(option => option.Field == sortField).DisplayName;
+            var sortLabel = sortField == LibrarySortField.Random
+                ? sortFieldDisplay
+                : $"{sortFieldDisplay} {(model.IsSortDescending ? "↓" : "↑")}";
+            lines.Add($"Sort: {sortLabel}");
+
+            return string.Join(Environment.NewLine, lines);
+        }
+
+        private sealed record FacetPresetBinding(
+            FacetFilterGroup Facet,
+            Func<LibraryPresetModel, LibraryPresetFacetSelection> Getter,
+            Action<LibraryPresetModel, LibraryPresetFacetSelection> Setter);
 
         private static (LibrarySortField Field, bool Descending) DecomposeSortOption(LibrarySortOption option)
         {
