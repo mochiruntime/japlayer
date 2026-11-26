@@ -251,34 +251,36 @@
         </Grid>
 
         <!-- Row 1: Active Filter Chips Bar -->
-        <Grid Grid.Row="1"
-              Visibility="{x:Bind ViewModel.HasActiveFilters, Mode=OneWay}"
-              Padding="24,8,24,10"
-              BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
-              BorderThickness="0,0,0,1">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
-            </Grid.ColumnDefinitions>
+        <Border Grid.Row="1"
+                Visibility="{x:Bind ViewModel.HasActiveFilters, Mode=OneWay}"
+                Padding="24,8,24,10"
+                BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                BorderThickness="0,0,0,1">
+            <Grid HorizontalAlignment="Left">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
 
-            <ItemsControl Grid.Column="0"
-                          ItemsSource="{x:Bind ViewModel.ActiveFilterChips}"
-                          ItemTemplate="{StaticResource ActiveFilterChipTemplate}">
-                <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <controls:WrapPanel HorizontalSpacing="6" VerticalSpacing="6"/>
-                    </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-            </ItemsControl>
+                <ItemsControl Grid.Column="0"
+                              ItemsSource="{x:Bind ViewModel.ActiveFilterChips}"
+                              ItemTemplate="{StaticResource ActiveFilterChipTemplate}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <controls:WrapPanel HorizontalSpacing="6" VerticalSpacing="6"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                </ItemsControl>
 
-            <HyperlinkButton Grid.Column="1"
-                             AutomationProperties.AutomationId="ClearAllFiltersButton"
-                             Content="Clear all"
-                             Command="{x:Bind ViewModel.ClearAllFiltersCommand}"
-                             Padding="6,2"
-                             Margin="8,0,0,0"
-                             VerticalAlignment="Top"/>
-        </Grid>
+                <HyperlinkButton Grid.Column="1"
+                                 AutomationProperties.AutomationId="ClearAllFiltersButton"
+                                 Content="Clear all"
+                                 Command="{x:Bind ViewModel.ClearAllFiltersCommand}"
+                                 Padding="6,2"
+                                 Margin="8,0,0,0"
+                                 VerticalAlignment="Top"/>
+            </Grid>
+        </Border>
 
         <!-- Row 2: Scrollable Media GridView + Empty State -->
         <Grid Grid.Row="2">
