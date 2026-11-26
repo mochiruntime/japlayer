@@ -72,6 +72,7 @@ namespace Japlayer.Controls
                     currentY += rowHeight + VerticalSpacing;
                     currentX = desired.Width;
                     rowHeight = desired.Height;
+                    hasRowItems = true;
                 }
                 else
                 {

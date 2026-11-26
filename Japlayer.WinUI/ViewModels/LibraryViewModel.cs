@@ -569,6 +569,7 @@ namespace Japlayer.ViewModels
         private readonly List<FilterItem> _allItems = [];
         private readonly Action _onChanged = onChanged;
         private bool _suppressCallbacks;
+        private bool _isFlyoutOpen;
 
         public string Label { get; } = label;
         public string CategoryPrefix { get; } = categoryPrefix;
@@ -585,7 +586,15 @@ namespace Japlayer.ViewModels
         public IReadOnlyList<string> ExcludedValues => [.. _allItems.Where(item => item.IsSelected == null).Select(item => item.Name)];
         public IEnumerable<FilterItem> ActiveItems => _allItems.Where(item => item.IsSelected != false);
 
-        partial void OnSearchTextChanged(string value) => RefreshFilteredItems();
+        partial void OnSearchTextChanged(string value) => RebuildFilteredItemsFromCurrentOrder();
+
+        public void BeginInteraction() => _isFlyoutOpen = true;
+
+        public void EndInteraction()
+        {
+            _isFlyoutOpen = false;
+            CommitDisplayOrder();
+        }
 
         public void Populate(IEnumerable<string> names, Func<string, int> countSelector)
         {
@@ -595,7 +604,7 @@ namespace Japlayer.ViewModels
                 _allItems.Add(new FilterItem(name, countSelector(name), HandleItemChanged));
             }
 
-            RefreshFilteredItems();
+            CommitDisplayOrder();
             NotifyActiveStateChanged();
         }
 
@@ -620,12 +629,32 @@ namespace Japlayer.ViewModels
 
         public void RefreshFilteredItems()
         {
-            FilteredItems.Clear();
-            var matchingItems = _allItems
-                .Where(item => string.IsNullOrEmpty(SearchText) || item.Name.Contains(SearchText, StringComparison.OrdinalIgnoreCase))
+            if (_isFlyoutOpen)
+            {
+                return;
+            }
+
+            CommitDisplayOrder();
+        }
+
+        private void CommitDisplayOrder()
+        {
+            var orderedItems = _allItems
                 .OrderByDescending(item => item.IsSelected != false)
                 .ThenByDescending(item => item.IsSelected == true)
-                .ThenBy(item => item.Name);
+                .ThenBy(item => item.Name)
+                .ToList();
+
+            _allItems.Clear();
+            _allItems.AddRange(orderedItems);
+            RebuildFilteredItemsFromCurrentOrder();
+        }
+
+        private void RebuildFilteredItemsFromCurrentOrder()
+        {
+            FilteredItems.Clear();
+            var matchingItems = _allItems
+                .Where(item => string.IsNullOrEmpty(SearchText) || item.Name.Contains(SearchText, StringComparison.OrdinalIgnoreCase));
 
             foreach (var item in matchingItems)
             {

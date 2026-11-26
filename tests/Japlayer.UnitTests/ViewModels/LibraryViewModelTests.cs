@@ -341,5 +341,38 @@ namespace Japlayer.UnitTests.ViewModels
             Assert.AreEqual(LibrarySortOption.Random, viewModel.SortOrder);
             Assert.IsFalse(viewModel.IsNotRandomSort);
         }
+
+        [TestMethod]
+        public async Task FacetFilterGroup_DefersReorderingWhileFlyoutIsOpen()
+        {
+            var mediaProvider = new StubMediaProvider
+            {
+                LibraryItemsToReturn =
+                [
+                    new() { MediaId = "M1", UserTags = ["Alpha", "Zeta"] }
+                ],
+                UserTagsToReturn = ["Alpha", "Zeta"]
+            };
+
+            var viewModel = new LibraryViewModel(mediaProvider, new StubMediaSceneProvider(), CreateServiceProvider());
+            await viewModel.LoadDataAsync();
+
+            Assert.AreEqual("Alpha", viewModel.TagsFacet.FilteredItems[0].Name);
+            Assert.AreEqual("Zeta", viewModel.TagsFacet.FilteredItems[1].Name);
+
+            // While flyout is open, selecting "Zeta" must not move it above "Alpha"
+            viewModel.TagsFacet.BeginInteraction();
+            viewModel.TagsFacet.FilteredItems[1].IsSelected = true;
+            viewModel.ApplyFilterDirect();
+
+            Assert.AreEqual("Alpha", viewModel.TagsFacet.FilteredItems[0].Name);
+            Assert.AreEqual("Zeta", viewModel.TagsFacet.FilteredItems[1].Name);
+
+            // Once flyout closes, "Zeta" moves to the top
+            viewModel.TagsFacet.EndInteraction();
+
+            Assert.AreEqual("Zeta", viewModel.TagsFacet.FilteredItems[0].Name);
+            Assert.AreEqual("Alpha", viewModel.TagsFacet.FilteredItems[1].Name);
+        }
     }
 }

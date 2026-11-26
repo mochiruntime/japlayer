@@ -18,6 +18,10 @@ namespace Japlayer.Views
         {
             ViewModel = App.GetService<LibraryViewModel>();
             this.InitializeComponent();
+
+            FlyoutPassThroughHelper.Attach(RatingFilterButton, () => TopControlsContainer);
+            FlyoutPassThroughHelper.Attach(RuntimeFilterButton, () => TopControlsContainer);
+            FlyoutPassThroughHelper.Attach(SortDropDownButton, () => TopControlsContainer);
         }
 
         protected override async void OnNavigatedTo(NavigationEventArgs e)

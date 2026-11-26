@@ -90,6 +90,32 @@ namespace Japlayer.UITests.Specs
         }
 
         [TestMethod]
+        public void FacetFlyout_DirectSwitchBetweenFilters_AndNoChipOverlap()
+        {
+            WaitForInitialLoad();
+
+            // 1. Open Tags and select VR (without closing)
+            _libraryPage!.OpenFacetFlyout("Tags");
+            _libraryPage.ClickFacetItem("VR");
+
+            // 2. Directly open Cast while Tags is still open (no intermediate CloseFlyout)
+            _libraryPage.OpenFacetFlyout("Cast");
+            _libraryPage.ClickFacetItem("Actor Alpha");
+            _libraryPage.CloseFlyout();
+
+            Assert.IsTrue(_libraryPage.WaitForCardCount(2), "Direct switch from Tags to Cast should apply both filters.");
+
+            // 3. Verify filter buttons do not overlap the active filter chips bar below
+            var tagsButton = _libraryPage.FindFacetButton("Tags");
+            var clearAllButton = _libraryPage.ClearAllFiltersButton;
+            Assert.IsNotNull(tagsButton);
+            Assert.IsNotNull(clearAllButton);
+            Assert.IsTrue(
+                tagsButton.BoundingRectangle.Bottom <= clearAllButton.BoundingRectangle.Top,
+                $"Filter button bottom ({tagsButton.BoundingRectangle.Bottom}) should sit above active chips ({clearAllButton.BoundingRectangle.Top}).");
+        }
+
+        [TestMethod]
         public void CastStudiosSeriesFacets_AndClearAllChips_WorkEndToEnd()
         {
             WaitForInitialLoad();

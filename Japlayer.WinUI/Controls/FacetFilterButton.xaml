@@ -1,0 +1,97 @@
+<UserControl
+    x:Class="Japlayer.Controls.FacetFilterButton"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:vm="using:Japlayer.ViewModels"
+    mc:Ignorable="d">
+
+    <DropDownButton x:Name="FacetDropDownButton"
+                    AutomationProperties.AutomationId="{x:Bind Facet.Label, Mode=OneWay}">
+        <StackPanel Orientation="Horizontal" Spacing="6">
+            <TextBlock Text="{x:Bind Facet.Label, Mode=OneWay}" VerticalAlignment="Center"/>
+            <InfoBadge Value="{x:Bind Facet.ActiveCount, Mode=OneWay}"
+                       Visibility="{x:Bind Facet.HasActiveFilters, Mode=OneWay}"/>
+        </StackPanel>
+        <DropDownButton.Flyout>
+            <Flyout Placement="BottomEdgeAlignedLeft">
+                <StackPanel Width="260" Spacing="10">
+                    <Grid MinHeight="24">
+                        <TextBlock Text="{x:Bind Facet.ActiveCountText, Mode=OneWay}"
+                                   Style="{StaticResource CaptionTextBlockStyle}"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                   VerticalAlignment="Center"/>
+                        <HyperlinkButton AutomationProperties.AutomationId="FacetClearButton"
+                                         Content="Clear"
+                                         Command="{x:Bind Facet.ClearCommand, Mode=OneWay}"
+                                         Visibility="{x:Bind Facet.HasActiveFilters, Mode=OneWay}"
+                                         HorizontalAlignment="Right"
+                                         VerticalAlignment="Center"
+                                         Padding="4,0"/>
+                    </Grid>
+
+                    <TextBox AutomationProperties.AutomationId="FacetSearchTextBox"
+                             Text="{x:Bind Facet.SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                             PlaceholderText="Filter..."
+                             HorizontalAlignment="Stretch"/>
+
+                    <ScrollViewer MaxHeight="260" VerticalScrollBarVisibility="Auto">
+                        <ItemsControl ItemsSource="{x:Bind Facet.FilteredItems, Mode=OneWay}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:FilterItem">
+                                    <Button AutomationProperties.AutomationId="{x:Bind Name}"
+                                            Command="{x:Bind CycleStateCommand}"
+                                            HorizontalAlignment="Stretch"
+                                            HorizontalContentAlignment="Stretch"
+                                            Background="Transparent"
+                                            BorderThickness="0"
+                                            Padding="6,5"
+                                            Margin="0,1">
+                                        <Grid ColumnSpacing="8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+
+                                            <!-- 3-State Indicator: Unset / + Include / − Exclude -->
+                                            <Grid Width="20" Height="20" CornerRadius="4"
+                                                  Background="{ThemeResource ControlFillColorDefaultBrush}"
+                                                  BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
+                                                  BorderThickness="1">
+                                                <Border Background="{ThemeResource SystemFillColorSuccessBrush}"
+                                                        CornerRadius="4"
+                                                        Visibility="{x:Bind IsIncluded, Mode=OneWay}"/>
+                                                <Border Background="{ThemeResource SystemFillColorCriticalBrush}"
+                                                        CornerRadius="4"
+                                                        Visibility="{x:Bind IsExcluded, Mode=OneWay}"/>
+                                                <TextBlock Text="{x:Bind StateSymbol, Mode=OneWay}"
+                                                           Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}"
+                                                           FontWeight="Bold"
+                                                           FontSize="12"
+                                                           HorizontalAlignment="Center"
+                                                           VerticalAlignment="Center"/>
+                                            </Grid>
+
+                                            <TextBlock Grid.Column="1"
+                                                       Text="{x:Bind Name}"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       VerticalAlignment="Center"/>
+
+                                            <TextBlock Grid.Column="2"
+                                                       Text="{x:Bind ItemCount}"
+                                                       Style="{StaticResource CaptionTextBlockStyle}"
+                                                       Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                                       VerticalAlignment="Center"/>
+                                        </Grid>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </StackPanel>
+            </Flyout>
+        </DropDownButton.Flyout>
+    </DropDownButton>
+</UserControl>
