@@ -61,7 +61,19 @@ namespace Japlayer.ViewModels
         }
 
         [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(HasHighlights))]
         public partial int HighlightCount { get; set; }
+
+        public bool HasHighlights => HighlightCount > 0;
+
+        public int Rating => _libraryItem.Rating;
+        public bool HasRating => _libraryItem.Rating > 0;
+        public string RatingDisplay => _libraryItem.Rating.ToString();
+
+        public int SceneCount => _libraryItem.SceneCount;
+        public bool HasScenes => _libraryItem.SceneCount > 0;
+
+        public int? RuntimeMinutes => _libraryItem.RuntimeMinutes;
 
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(DisplayImageSource))]
@@ -73,6 +85,7 @@ namespace Japlayer.ViewModels
         public string Title => _libraryItem.MediaId + " " + (_libraryItem.Title ?? string.Empty);
         public string? OriginalTitle => _libraryItem.Title;
         public DateOnly? ReleaseDate => _libraryItem.ReleaseDate;
+        public string FormattedReleaseDate => _libraryItem.ReleaseDate?.ToString("MMM d, yyyy") ?? string.Empty;
 
         public string? CoverPath
         {

@@ -17,6 +17,9 @@ namespace Japlayer.UnitTests.ViewModels
             public List<LibraryItem> LibraryItemsToReturn { get; set; } = [];
             public List<string> UserTagsToReturn { get; set; } = [];
             public List<string> GenresToReturn { get; set; } = [];
+            public List<string> CastToReturn { get; set; } = [];
+            public List<string> StudiosToReturn { get; set; } = [];
+            public List<string> SeriesToReturn { get; set; } = [];
 
             public Task<IEnumerable<LibraryItem>> GetLibraryItemsAsync()
                 => Task.FromResult<IEnumerable<LibraryItem>>(LibraryItemsToReturn);
@@ -26,6 +29,15 @@ namespace Japlayer.UnitTests.ViewModels
 
             public Task<IEnumerable<string>> GetGenresAsync()
                 => Task.FromResult<IEnumerable<string>>(GenresToReturn);
+
+            public Task<IEnumerable<string>> GetCastAsync()
+                => Task.FromResult<IEnumerable<string>>(CastToReturn);
+
+            public Task<IEnumerable<string>> GetStudiosAsync()
+                => Task.FromResult<IEnumerable<string>>(StudiosToReturn);
+
+            public Task<IEnumerable<string>> GetSeriesAsync()
+                => Task.FromResult<IEnumerable<string>>(SeriesToReturn);
 
             public Task<MediaItem> GetMediaItemAsync(string mediaId)
                 => Task.FromResult(new MediaItem { MediaId = mediaId });
@@ -222,6 +234,112 @@ namespace Japlayer.UnitTests.ViewModels
             Assert.AreEqual("CCC", viewModel.MediaItems[0].Id); // 5
             Assert.AreEqual("BBB", viewModel.MediaItems[1].Id); // 10
             Assert.AreEqual("AAA", viewModel.MediaItems[2].Id); // 20
+        }
+
+        [TestMethod]
+        public async Task CastStudiosSeriesFacets_TriStateLogic_FiltersAndUpdatesActiveChips()
+        {
+            var mediaProvider = new StubMediaProvider
+            {
+                LibraryItemsToReturn =
+                [
+                    new() { MediaId = "M1", Cast = ["Actor A"], Studios = ["Studio X"], Series = ["Series 1"] },
+                    new() { MediaId = "M2", Cast = ["Actor A", "Actor B"], Studios = ["Studio Y"], Series = ["Series 1"] },
+                    new() { MediaId = "M3", Cast = ["Actor B"], Studios = ["Studio X"], Series = ["Series 2"] }
+                ],
+                CastToReturn = ["Actor A", "Actor B"],
+                StudiosToReturn = ["Studio X", "Studio Y"],
+                SeriesToReturn = ["Series 1", "Series 2"]
+            };
+
+            var viewModel = new LibraryViewModel(mediaProvider, new StubMediaSceneProvider(), CreateServiceProvider());
+            await viewModel.LoadDataAsync();
+
+            // Include Actor A, Exclude Studio Y -> should leave only M1
+            viewModel.CastFacet.FilteredItems.First(item => item.Name == "Actor A").IsSelected = true;
+            viewModel.StudiosFacet.FilteredItems.First(item => item.Name == "Studio Y").IsSelected = null;
+            viewModel.ApplyFilterDirect();
+
+            Assert.AreEqual(1, viewModel.MediaItems.Count);
+            Assert.AreEqual("M1", viewModel.MediaItems[0].Id);
+            Assert.AreEqual(2, viewModel.ActiveFilterChips.Count);
+            Assert.IsTrue(viewModel.HasActiveFilters);
+
+            // Clear all filters
+            viewModel.ClearAllFiltersCommand.Execute(null);
+            viewModel.ApplyFilterDirect();
+            Assert.AreEqual(3, viewModel.MediaItems.Count);
+            Assert.IsFalse(viewModel.HasActiveFilters);
+        }
+
+        [TestMethod]
+        public async Task RatingAndRuntimeRangeFilters_FilterAndResetCorrectly()
+        {
+            var mediaProvider = new StubMediaProvider
+            {
+                LibraryItemsToReturn =
+                [
+                    new() { MediaId = "M1", Rating = 2, RuntimeMinutes = 45 },
+                    new() { MediaId = "M2", Rating = 4, RuntimeMinutes = 90 },
+                    new() { MediaId = "M3", Rating = 5, RuntimeMinutes = 150 }
+                ]
+            };
+
+            var viewModel = new LibraryViewModel(mediaProvider, new StubMediaSceneProvider(), CreateServiceProvider());
+            await viewModel.LoadDataAsync();
+
+            viewModel.RatingMin = 4;
+            viewModel.RatingMax = 5;
+            viewModel.RuntimeMin = 60;
+            viewModel.RuntimeMax = 120;
+            viewModel.ApplyFilterDirect();
+
+            Assert.AreEqual(1, viewModel.MediaItems.Count);
+            Assert.AreEqual("M2", viewModel.MediaItems[0].Id);
+            Assert.IsTrue(viewModel.IsRatingFilterActive);
+            Assert.IsTrue(viewModel.IsRuntimeFilterActive);
+
+            viewModel.ResetRatingFilterCommand.Execute(null);
+            viewModel.ResetRuntimeFilterCommand.Execute(null);
+            viewModel.ApplyFilterDirect();
+
+            Assert.AreEqual(3, viewModel.MediaItems.Count);
+            Assert.IsFalse(viewModel.IsRatingFilterActive);
+            Assert.IsFalse(viewModel.IsRuntimeFilterActive);
+        }
+
+        [TestMethod]
+        public async Task SortFieldAndDirection_SynchronizeAndHideDirectionOnRandom()
+        {
+            var mediaProvider = new StubMediaProvider
+            {
+                LibraryItemsToReturn =
+                [
+                    new() { MediaId = "M1", Rating = 2 },
+                    new() { MediaId = "M2", Rating = 5 },
+                    new() { MediaId = "M3", Rating = 3 }
+                ]
+            };
+
+            var viewModel = new LibraryViewModel(mediaProvider, new StubMediaSceneProvider(), CreateServiceProvider());
+            await viewModel.LoadDataAsync();
+
+            viewModel.SelectedSortField = viewModel.SortFieldOptions.First(option => option.Field == LibrarySortField.Rating);
+            viewModel.IsSortDescending = true;
+            viewModel.ApplyFilterDirect();
+
+            Assert.IsTrue(viewModel.IsNotRandomSort);
+            Assert.AreEqual(LibrarySortOption.RatingDescending, viewModel.SortOrder);
+            Assert.AreEqual("M2", viewModel.MediaItems[0].Id);
+
+            viewModel.ToggleSortDirectionCommand.Execute(null);
+            viewModel.ApplyFilterDirect();
+            Assert.AreEqual(LibrarySortOption.RatingAscending, viewModel.SortOrder);
+            Assert.AreEqual("M1", viewModel.MediaItems[0].Id);
+
+            viewModel.ShuffleCommand.Execute(null);
+            Assert.AreEqual(LibrarySortOption.Random, viewModel.SortOrder);
+            Assert.IsFalse(viewModel.IsNotRandomSort);
         }
     }
 }
