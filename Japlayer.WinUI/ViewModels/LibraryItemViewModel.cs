@@ -89,6 +89,8 @@ namespace Japlayer.ViewModels
 
         public string DisplayCover => CoverPath ?? _fallbackThumbnailPath ?? "ms-appx:///Assets/NoCover.png";
 
+        public IReadOnlyList<string> ThumbnailPaths => _thumbnails;
+
         public async Task LoadThumbnailsAsync()
         {
             if (_areThumbnailsLoaded)

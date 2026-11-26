@@ -59,31 +59,54 @@ namespace Japlayer.Views
             }
         }
 
+        private System.Threading.CancellationTokenSource? _hoverPrewarmCancellationTokenSource;
+
+        private void CancelHoverPrewarm()
+        {
+            _hoverPrewarmCancellationTokenSource?.Cancel();
+            _hoverPrewarmCancellationTokenSource?.Dispose();
+            _hoverPrewarmCancellationTokenSource = null;
+        }
+
         private async void MediaItem_PointerEntered(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
         {
             ProtectedCursor = Microsoft.UI.Input.InputSystemCursor.Create(Microsoft.UI.Input.InputSystemCursorShape.Hand);
-            if (sender is FrameworkElement element && element.DataContext is LibraryItemViewModel vm)
+            if (sender is FrameworkElement element && element.DataContext is LibraryItemViewModel viewModel)
             {
-                await vm.LoadThumbnailsAsync();
+                CancelHoverPrewarm();
+                var cancellationTokenSource = new System.Threading.CancellationTokenSource();
+                _hoverPrewarmCancellationTokenSource = cancellationTokenSource;
+
+                await viewModel.LoadThumbnailsAsync();
+                if (!cancellationTokenSource.IsCancellationRequested)
+                {
+                    await Controls.MediaCoverView.PrewarmThumbnailsAsync(
+                        viewModel.ThumbnailPaths,
+                        element.ActualWidth,
+                        cancellationTokenSource.Token);
+                }
             }
         }
 
         private void MediaItem_PointerMoved(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
         {
-            if (sender is FrameworkElement element && element.DataContext is LibraryItemViewModel vm)
+            if (sender is FrameworkElement element && element.DataContext is LibraryItemViewModel viewModel)
             {
                 var point = e.GetCurrentPoint(element);
-                var percent = point.Position.X / element.ActualWidth;
-                vm.ScrubPreview(percent);
+                if (Helpers.ThumbnailDecodeCoordinator.TryCalculateScrubPercent(point.Position.X, element.ActualWidth, out var percent))
+                {
+                    viewModel.ScrubPreview(percent);
+                }
             }
         }
 
         private void MediaItem_PointerExited(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
         {
             ProtectedCursor = null; // Revert to default
-            if (sender is FrameworkElement element && element.DataContext is LibraryItemViewModel vm)
+            CancelHoverPrewarm();
+            if (sender is FrameworkElement element && element.DataContext is LibraryItemViewModel viewModel)
             {
-                vm.ResetPreview();
+                viewModel.ResetPreview();
             }
         }
 

@@ -1,5 +1,11 @@
 #nullable enable
 using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
+using Japlayer.Helpers;
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
@@ -9,6 +15,9 @@ namespace Japlayer.Controls
 {
     public sealed partial class MediaCoverView : UserControl
     {
+        private const int ThumbnailCacheCapacity = 512;
+        private static readonly BoundedLruCache<string, BitmapImage> ThumbnailCache = new(ThumbnailCacheCapacity, StringComparer.OrdinalIgnoreCase);
+
         public static readonly DependencyProperty SourceProperty =
             DependencyProperty.Register("Source", typeof(object), typeof(MediaCoverView), new PropertyMetadata(null, OnSourceChanged));
 
@@ -29,11 +38,68 @@ namespace Japlayer.Controls
 
         private Image? _activeImage;
         private Image? _inactiveImage;
+        private readonly ThumbnailDecodeCoordinator _thumbnailCoordinator = new();
+        private DispatcherQueueTimer? _coalesceTimer;
 
         public MediaCoverView()
         {
             this.InitializeComponent();
+            Unloaded += OnUnloaded;
             UpdateImageSource(Source);
+        }
+
+        public static async Task PrewarmThumbnailsAsync(
+            IReadOnlyList<string> thumbnailPaths,
+            double cardWidth,
+            CancellationToken cancellationToken)
+        {
+            if (thumbnailPaths.Count == 0)
+            {
+                return;
+            }
+
+            var decodePixelWidth = ThumbnailDecodeCoordinator.CalculateDecodePixelWidth(cardWidth);
+            var keyframeIndices = ThumbnailDecodeCoordinator.SelectPrewarmIndices(thumbnailPaths.Count);
+
+            foreach (var index in keyframeIndices)
+            {
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    return;
+                }
+
+                var path = thumbnailPaths[index];
+                if (string.IsNullOrEmpty(path) || ThumbnailCache.TryGetValue(path, out _) || !File.Exists(path))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    await using var fileStream = File.OpenRead(path);
+                    using var randomAccessStream = fileStream.AsRandomAccessStream();
+
+                    var bitmap = new BitmapImage
+                    {
+                        DecodePixelWidth = decodePixelWidth,
+                        DecodePixelType = DecodePixelType.Logical
+                    };
+                    await bitmap.SetSourceAsync(randomAccessStream);
+
+                    if (!cancellationToken.IsCancellationRequested)
+                    {
+                        ThumbnailCache.Set(path, bitmap);
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    return;
+                }
+                catch (Exception exception)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Failed to prewarm thumbnail {path}: {exception.Message}");
+                }
+            }
         }
 
         private static void OnSourceChanged(DependencyObject dependencyObject, DependencyPropertyChangedEventArgs args)
@@ -44,12 +110,21 @@ namespace Japlayer.Controls
             }
         }
 
+        private void OnUnloaded(object sender, RoutedEventArgs e)
+        {
+            _coalesceTimer?.Stop();
+            _thumbnailCoordinator.Reset();
+        }
+
         private void InitializeImages()
         {
             if (CoverImage1 != null && CoverImage2 != null && _activeImage == null)
             {
                 _activeImage = CoverImage1;
                 _inactiveImage = CoverImage2;
+
+                Canvas.SetZIndex(_activeImage, 1);
+                Canvas.SetZIndex(_inactiveImage, 0);
 
                 CoverImage1.ImageOpened += OnImageOpened;
                 CoverImage2.ImageOpened += OnImageOpened;
@@ -59,33 +134,96 @@ namespace Japlayer.Controls
             }
         }
 
+        private void EnsureCoalesceTimer()
+        {
+            if (_coalesceTimer != null)
+            {
+                return;
+            }
+
+            var dispatcherQueue = DispatcherQueue;
+            if (dispatcherQueue == null)
+            {
+                return;
+            }
+
+            _coalesceTimer = dispatcherQueue.CreateTimer();
+            _coalesceTimer.Interval = TimeSpan.FromMilliseconds(ThumbnailDecodeCoordinator.DefaultMinDecodeIntervalMs);
+            _coalesceTimer.IsRepeating = false;
+            _coalesceTimer.Tick += OnCoalesceTimerTick;
+        }
+
+        private void OnCoalesceTimerTick(DispatcherQueueTimer sender, object args)
+        {
+            var nextPath = _thumbnailCoordinator.ConsumePending(Environment.TickCount64, Source as string);
+            if (!string.IsNullOrEmpty(nextPath) && Uri.TryCreate(nextPath, UriKind.Absolute, out var uri))
+            {
+                StartThumbnailDecode(nextPath, uri);
+            }
+        }
+
         private void OnImageOpened(object sender, RoutedEventArgs e)
         {
             if (sender is Image image && image == _inactiveImage && _activeImage != null)
             {
-                // Ensure this loaded image matches the currently requested source path
-                if (image.Tag is string expectedPath && Source as string == expectedPath)
+                if (image.Tag is string openedPath)
                 {
-                    // Transition: Swap active and inactive images
-                    _inactiveImage.Opacity = 1;
-                    _activeImage.Opacity = 0;
+                    if (image.Source is BitmapImage openedBitmap)
+                    {
+                        ThumbnailCache.Set(openedPath, openedBitmap);
+                    }
 
-                    (_inactiveImage, _activeImage) = (_activeImage, _inactiveImage);
+                    // Show any decoded thumbnail as long as the control is still in thumbnail-scrubbing mode
+                    // (do not drop intermediate frames while the pointer is moving fast).
+                    if (Source is string currentSource && ThumbnailDecodeCoordinator.IsThumbnailPath(currentSource))
+                    {
+                        _inactiveImage.Opacity = 1;
+                        Canvas.SetZIndex(_inactiveImage, 1);
+                        Canvas.SetZIndex(_activeImage, 0);
 
-                    // Clear the now inactive image source and tag to release memory
-                    _inactiveImage.Source = null;
-                    _inactiveImage.Tag = null;
+                        (_inactiveImage, _activeImage) = (_activeImage, _inactiveImage);
+                    }
                 }
             }
         }
 
         private void OnImageFailed(object sender, ExceptionRoutedEventArgs e)
         {
-            if (sender is Image image && image == _inactiveImage)
+            // Intentionally do not clear Source inside the callback to avoid re-entrant WinUI image teardown.
+        }
+
+        private void StartThumbnailDecode(string pathString, Uri uri)
+        {
+            if (_inactiveImage == null)
             {
-                _inactiveImage.Source = null;
-                _inactiveImage.Tag = null;
+                return;
             }
+
+            _inactiveImage.Tag = pathString;
+            var bitmap = new BitmapImage
+            {
+                DecodePixelWidth = ThumbnailDecodeCoordinator.CalculateDecodePixelWidth(ActualWidth),
+                DecodePixelType = DecodePixelType.Logical,
+                UriSource = uri
+            };
+            _inactiveImage.Source = bitmap;
+        }
+
+        private void ResetImages()
+        {
+            _coalesceTimer?.Stop();
+            _thumbnailCoordinator.Reset();
+            if (_activeImage == null || _inactiveImage == null)
+            {
+                return;
+            }
+
+            _activeImage.Source = null;
+            _inactiveImage.Source = null;
+            _activeImage.Tag = null;
+            _inactiveImage.Tag = null;
+            _activeImage.Opacity = 1;
+            _inactiveImage.Opacity = 0;
         }
 
         private void UpdateImageSource(object newValue)
@@ -99,17 +237,14 @@ namespace Japlayer.Controls
 
             if (newValue == null)
             {
-                _activeImage.Source = null;
-                _inactiveImage.Source = null;
-                _activeImage.Tag = null;
-                _inactiveImage.Tag = null;
-                _activeImage.Opacity = 1;
-                _inactiveImage.Opacity = 0;
+                ResetImages();
                 return;
             }
 
             if (newValue is ImageSource imageSource)
             {
+                _coalesceTimer?.Stop();
+                _thumbnailCoordinator.Reset();
                 _activeImage.Source = imageSource;
                 _inactiveImage.Source = null;
                 _activeImage.Tag = null;
@@ -123,69 +258,78 @@ namespace Japlayer.Controls
             {
                 if (string.IsNullOrEmpty(pathString))
                 {
-                    _activeImage.Source = null;
-                    _inactiveImage.Source = null;
-                    _activeImage.Tag = null;
-                    _inactiveImage.Tag = null;
-                    _activeImage.Opacity = 1;
-                    _inactiveImage.Opacity = 0;
+                    ResetImages();
                     return;
                 }
 
                 try
                 {
-                    Uri uri;
-                    if (pathString.StartsWith("ms-appx://") || pathString.StartsWith("ms-appdata://") || pathString.StartsWith("http://") || pathString.StartsWith("https://"))
-                    {
-                        uri = new Uri(pathString);
-                    }
-                    else
-                    {
-                        uri = new Uri(pathString);
-                    }
-
-                    // Check if it is a thumbnail path to apply background pre-loading
-                    var isThumbnail = pathString.Contains("thumbs/", StringComparison.OrdinalIgnoreCase) ||
-                                       pathString.Contains("thumbs\\", StringComparison.OrdinalIgnoreCase);
+                    var uri = new Uri(pathString);
+                    var isThumbnail = ThumbnailDecodeCoordinator.IsThumbnailPath(pathString);
 
                     if (!isThumbnail)
                     {
-                        // Reset or set normal cover art instantly to avoid lag on exiting hover
+                        _coalesceTimer?.Stop();
+                        _thumbnailCoordinator.Reset();
+
+                        // Keep previous frame visible underneath while resetting to cover art
+                        if (_inactiveImage.Source == null && _activeImage.Source != null)
+                        {
+                            _inactiveImage.Source = _activeImage.Source;
+                            _inactiveImage.Opacity = 1;
+                        }
+
                         var bitmap = new BitmapImage(uri);
                         _activeImage.Source = bitmap;
-                        _inactiveImage.Source = null;
                         _activeImage.Tag = null;
-                        _inactiveImage.Tag = null;
                         _activeImage.Opacity = 1;
-                        _inactiveImage.Opacity = 0;
+                        Canvas.SetZIndex(_activeImage, 1);
+                        Canvas.SetZIndex(_inactiveImage, 0);
+                    }
+                    else if (ThumbnailCache.TryGetValue(pathString, out var cachedBitmap))
+                    {
+                        _coalesceTimer?.Stop();
+
+                        // Keep the previous frame visible underneath at ZIndex 0 so swapping _activeImage
+                        // never exposes the placeholder icon between frames.
+                        if (_activeImage.Source != null && !ReferenceEquals(_activeImage.Source, cachedBitmap))
+                        {
+                            _inactiveImage.Source = _activeImage.Source;
+                            _inactiveImage.Opacity = 1;
+                        }
+
+                        _activeImage.Source = cachedBitmap;
+                        _activeImage.Tag = pathString;
+                        _activeImage.Opacity = 1;
+                        Canvas.SetZIndex(_activeImage, 1);
+                        Canvas.SetZIndex(_inactiveImage, 0);
                     }
                     else
                     {
-                        // Load thumbnail in the background on the inactive image
-                        _inactiveImage.Tag = pathString;
-                        var bitmap = new BitmapImage(uri);
-                        _inactiveImage.Source = bitmap;
+                        if (_thumbnailCoordinator.RequestOrCoalesce(pathString, Environment.TickCount64))
+                        {
+                            _coalesceTimer?.Stop();
+                            StartThumbnailDecode(pathString, uri);
+                        }
+                        else
+                        {
+                            EnsureCoalesceTimer();
+                            if (_coalesceTimer != null && !_coalesceTimer.IsRunning)
+                            {
+                                _coalesceTimer.Start();
+                            }
+                        }
                     }
                 }
                 catch (Exception exception)
                 {
                     System.Diagnostics.Debug.WriteLine($"Failed to load image uri: {exception.Message}");
-                    _activeImage.Source = null;
-                    _inactiveImage.Source = null;
-                    _activeImage.Tag = null;
-                    _inactiveImage.Tag = null;
-                    _activeImage.Opacity = 1;
-                    _inactiveImage.Opacity = 0;
+                    ResetImages();
                 }
             }
             else
             {
-                _activeImage.Source = null;
-                _inactiveImage.Source = null;
-                _activeImage.Tag = null;
-                _inactiveImage.Tag = null;
-                _activeImage.Opacity = 1;
-                _inactiveImage.Opacity = 0;
+                ResetImages();
             }
         }
     }
