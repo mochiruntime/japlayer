@@ -1,4 +1,5 @@
 #nullable enable
+using System;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 
@@ -6,6 +7,8 @@ namespace Japlayer
 {
     public sealed partial class MainWindow : Window
     {
+        private bool _hasAppliedInitialSize;
+
         public MainWindow()
         {
             this.InitializeComponent();
@@ -14,13 +17,38 @@ namespace Japlayer
             ExtendsContentIntoTitleBar = true;
             SetTitleBar(AppTitleBar);
 
-            // Set window size
-            var hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
-            Microsoft.UI.WindowId windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(hWnd);
-            var appWindow = Microsoft.UI.Windowing.AppWindow.GetFromWindowId(windowId);
-            appWindow.Resize(new Windows.Graphics.SizeInt32(1960, 1080));
+            AppTitleBar.Loaded += AppTitleBar_Loaded;
 
             ContentFrame.Navigate(typeof(Views.LibraryPage));
+        }
+
+        private void AppTitleBar_Loaded(object sender, RoutedEventArgs e)
+        {
+            if (_hasAppliedInitialSize)
+            {
+                return;
+            }
+
+            _hasAppliedInitialSize = true;
+
+            var hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
+            var windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(hWnd);
+            var appWindow = Microsoft.UI.Windowing.AppWindow.GetFromWindowId(windowId);
+            var scale = AppTitleBar.XamlRoot?.RasterizationScale ?? 1.0;
+
+            // 5 columns (5 * 312) + MediaGrid padding (18 + 24) + scrollbar & window frame (~38) = 1640 DIPs
+            // 3 rows (3 * 262) + chrome & MediaGrid padding (~181) + window frame (~16) = 980 DIPs
+            var desiredWidth = (int)Math.Ceiling(1640 * scale);
+            var desiredHeight = (int)Math.Ceiling(980 * scale);
+
+            var displayArea = Microsoft.UI.Windowing.DisplayArea.GetFromWindowId(
+                windowId,
+                Microsoft.UI.Windowing.DisplayAreaFallback.Primary);
+
+            var targetWidth = Math.Min(desiredWidth, displayArea.WorkArea.Width);
+            var targetHeight = Math.Min(desiredHeight, displayArea.WorkArea.Height);
+
+            appWindow.Resize(new Windows.Graphics.SizeInt32(targetWidth, targetHeight));
         }
 
         public Grid FullScreenOverlay => FullScreenOverlayGrid;
