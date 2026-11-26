@@ -184,5 +184,15 @@ namespace Japlayer.UnitTests.ViewModels
             // Assert
             Assert.AreEqual(0, raisedCount);
         }
+
+        [TestMethod]
+        public void TagSuggestionItem_ToString_ReturnsName()
+        {
+            var existingSuggestion = new TagSuggestionItem("2D", false);
+            var newSuggestion = new TagSuggestionItem("CustomTag", true);
+
+            Assert.AreEqual("2D", existingSuggestion.ToString());
+            Assert.AreEqual("CustomTag", newSuggestion.ToString());
+        }
     }
 }

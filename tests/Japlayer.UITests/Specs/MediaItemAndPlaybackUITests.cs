@@ -75,6 +75,23 @@ namespace Japlayer.UITests.Specs
         }
 
         [TestMethod]
+        public void TagSuggestionSelection_DoesNotLeakRecordToStringIntoInput()
+        {
+            Assert.IsNotNull(_mediaItemPage);
+
+            // Focus tag input to open existing suggestions (e.g., "2D"), select it, then interact with rating
+            _mediaItemPage.FocusTagSearchBox();
+            Assert.IsTrue(_mediaItemPage.SelectTagSuggestion("2D"), "Existing suggestion '2D' should appear in the dropdown.");
+            _mediaItemPage.SetRating(4);
+
+            var textAfterSelection = _mediaItemPage.GetTagSearchBoxText();
+            Assert.IsFalse(
+                textAfterSelection.Contains("TagSuggestionItem", StringComparison.Ordinal),
+                $"Tag input leaked record ToString(): '{textAfterSelection}'.");
+            Assert.AreEqual(string.Empty, textAfterSelection, "Tag input should remain empty after selecting a suggestion and moving focus.");
+        }
+
+        [TestMethod]
         public void PlaybackControls_AreAccessibleWhenPlayOverlayClicked()
         {
             Assert.IsNotNull(_mediaItemPage);

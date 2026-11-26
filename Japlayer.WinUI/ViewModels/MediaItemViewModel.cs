@@ -15,6 +15,7 @@ namespace Japlayer.ViewModels
     public record TagSuggestionItem(string Name, bool IsNew)
     {
         public string DisplayLabel => IsNew ? $"+ Create \"{Name}\"" : Name;
+        public override string ToString() => Name;
     }
 
     public partial class MediaItemViewModel(

@@ -189,11 +189,10 @@ namespace Japlayer.Views
             }
         }
 
-        private async void TagAutoSuggestBox_SuggestionChosen(AutoSuggestBox sender, AutoSuggestBoxSuggestionChosenEventArgs eventArgs)
+        private void TagAutoSuggestBox_SuggestionChosen(AutoSuggestBox sender, AutoSuggestBoxSuggestionChosenEventArgs eventArgs)
         {
-            if (eventArgs.SelectedItem is TagSuggestionItem suggestion)
+            if (eventArgs.SelectedItem is TagSuggestionItem)
             {
-                await ViewModel.AddUserTagAsync(suggestion.Name);
                 sender.Text = string.Empty;
             }
         }

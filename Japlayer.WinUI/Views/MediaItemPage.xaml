@@ -294,6 +294,8 @@
                                             <AutoSuggestBox x:Name="TagAutoSuggestBox"
                                                             AutomationProperties.AutomationId="TagAutoSuggestBox"
                                                             PlaceholderText="+ Add tag..."
+                                                            TextMemberPath="Name"
+                                                            UpdateTextOnSelect="False"
                                                             Width="180"
                                                             Height="26"
                                                             MinHeight="26"

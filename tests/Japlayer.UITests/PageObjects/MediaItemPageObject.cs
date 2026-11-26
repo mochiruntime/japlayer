@@ -117,6 +117,45 @@ namespace Japlayer.UITests.PageObjects
             Wait.UntilInputIsProcessed();
         }
 
+        public void FocusTagSearchBox()
+        {
+            _window.SetForeground();
+            var box = RequireElement(WaitForElement(() => TagSearchBox), nameof(TagSearchBox));
+            box.Focus();
+            Wait.UntilInputIsProcessed();
+        }
+
+        public bool SelectTagSuggestion(string tagName)
+        {
+            var suggestionItem = WaitForElement(() =>
+                _window.FindAllDescendants(conditionFactory => conditionFactory.ByControlType(ControlType.ListItem))
+                    .FirstOrDefault(item => string.Equals(item.Name, tagName, StringComparison.OrdinalIgnoreCase)
+                        || item.FindAllDescendants(cf => cf.ByControlType(ControlType.Text))
+                            .Any(text => string.Equals(text.Name, tagName, StringComparison.OrdinalIgnoreCase))));
+            if (suggestionItem == null)
+            {
+                return false;
+            }
+
+            if (suggestionItem.Patterns.Invoke.IsSupported)
+            {
+                suggestionItem.Patterns.Invoke.Pattern.Invoke();
+            }
+            else if (suggestionItem.Patterns.SelectionItem.IsSupported)
+            {
+                suggestionItem.Patterns.SelectionItem.Pattern.Select();
+            }
+            else
+            {
+                ActivateElement(suggestionItem);
+            }
+
+            Wait.UntilInputIsProcessed();
+            return true;
+        }
+
+        public string GetTagSearchBoxText() => TagSearchBox?.Text ?? string.Empty;
+
         public bool HasTagText(string tagName) =>
             _window.FindAllDescendants(conditionFactory => conditionFactory.ByControlType(ControlType.Text))
                 .Any(textElement => string.Equals(textElement.Properties.Name.ValueOrDefault, tagName, StringComparison.OrdinalIgnoreCase));
