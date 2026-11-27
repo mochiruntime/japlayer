@@ -189,4 +189,83 @@ namespace Japlayer.UITests.Specs
             Assert.IsTrue(_mediaItemPage.WaitUntilHidden(() => _mediaItemPage.LightboxCloseButton), "Lightbox should close.");
         }
     }
+
+    [TestClass]
+    public class LibraryNavigationStateUITests
+    {
+        private TestAppFixture? _fixture;
+        private LibraryPageObject? _libraryPage;
+
+        [TestInitialize]
+        public void Setup()
+        {
+            _fixture = new TestAppFixture(extraSeedItemCount: 15);
+            _fixture.StartApp();
+            Assert.IsNotNull(_fixture.MainWindow, "Main window failed to initialize.");
+            _libraryPage = new LibraryPageObject(_fixture.MainWindow);
+            Assert.IsNotNull(_libraryPage.WaitForCard("TEST-001"), "Initial card TEST-001 should be present.");
+            Assert.IsTrue(_libraryPage.WaitForItemCountText("18 items"), "All 18 seeded items should load.");
+        }
+
+        [TestCleanup]
+        public void Teardown() => _fixture?.Dispose();
+
+        [TestMethod]
+        public void RandomSort_EditItemWithMatchingFilter_PreservesOrderSelectionAndViewportOnBack()
+        {
+            Assert.IsNotNull(_libraryPage);
+            Assert.IsNotNull(_fixture?.MainWindow);
+
+            // Filter by +VR (matches TEST-001, TEST-002, and TEST-004..TEST-018 = 17 items) and activate Random sort
+            _libraryPage.OpenFacetFlyout("Tags");
+            _libraryPage.ClickFacetItem("VR");
+            _libraryPage.CloseFlyout();
+            Assert.IsTrue(_libraryPage.WaitForItemCountText("17 of 18"), "17 items should match +VR.");
+
+            var preShuffleOrder = _libraryPage.GetVisibleCardIds();
+            _libraryPage.ClickShuffle();
+            Assert.IsTrue(_libraryPage.WaitUntilHidden(() => _libraryPage.SortDirectionButton), "SortDirectionButton should hide when Random sort activates.");
+            var shuffled = FlaUI.Core.Tools.Retry.WhileFalse(
+                () => !_libraryPage.GetVisibleCardIds().SequenceEqual(preShuffleOrder),
+                TimeSpan.FromSeconds(3),
+                TimeSpan.FromMilliseconds(50)).Success;
+            Assert.IsTrue(shuffled, "Expected card order to update after Random shuffle debounce.");
+
+            // Pick a realized card near the bottom and scroll it into view before snapshotting orderBefore
+            var initialVisible = _libraryPage.GetVisibleCardIds();
+            Assert.IsTrue(initialVisible.Count >= 10, $"Expected at least 10 visible/realized cards in shuffled list, got {initialVisible.Count}.");
+
+            var targetMediaId = initialVisible[^1];
+            _libraryPage.ScrollCardIntoView(targetMediaId);
+            Assert.IsTrue(_libraryPage.IsCardInViewport(targetMediaId), $"Target card '{targetMediaId}' should be scrolled into viewport before clicking.");
+
+            var orderBefore = _libraryPage.GetVisibleCardIds();
+            _libraryPage.ClickCard(targetMediaId);
+
+            var mediaItemPage = new MediaItemPageObject(_fixture.MainWindow);
+            Assert.IsNotNull(mediaItemPage.WaitForElement(() => mediaItemPage.BackButton), "BackButton should appear on MediaItemPage.");
+
+            // Remove the first non-VR tag via UIA Invoke (queues _hasPendingFilterRefresh and writes to SQLite WAL)
+            var initialTagCount = mediaItemPage.GetRemoveTagButtons().Length;
+            Assert.IsTrue(initialTagCount >= 2, $"Expected at least 2 tags on '{targetMediaId}' before editing.");
+            mediaItemPage.RemoveFirstTag();
+            var tagRemoved = FlaUI.Core.Tools.Retry.WhileFalse(
+                () => mediaItemPage.GetRemoveTagButtons().Length == initialTagCount - 1,
+                TimeSpan.FromSeconds(3),
+                TimeSpan.FromMilliseconds(100)).Success;
+            Assert.IsTrue(tagRemoved, "Removing first tag should persist and update UI.");
+
+            mediaItemPage.ClickBack();
+            Assert.IsNotNull(_libraryPage.WaitForElement(() => _libraryPage.MediaGrid), "LibraryPage MediaGrid should appear after navigating back.");
+
+            var selectionRestored = FlaUI.Core.Tools.Retry.WhileFalse(
+                () => _libraryPage.IsCardSelected(targetMediaId) && _libraryPage.IsCardInViewport(targetMediaId),
+                TimeSpan.FromSeconds(3),
+                TimeSpan.FromMilliseconds(50)).Success;
+
+            var orderAfter = _libraryPage.GetVisibleCardIds();
+            CollectionAssert.AreEqual(orderBefore, orderAfter, "Random card ordering should be preserved when navigating back after editing an item.");
+            Assert.IsTrue(selectionRestored, $"Previously clicked card '{targetMediaId}' should remain selected and in viewport on Back navigation.");
+        }
+    }
 }

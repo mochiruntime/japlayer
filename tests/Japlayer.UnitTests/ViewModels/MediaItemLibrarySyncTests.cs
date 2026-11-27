@@ -1,3 +1,4 @@
+using System.Collections.Specialized;
 using CommunityToolkit.Mvvm.Messaging;
 using Japlayer.Contracts;
 using Japlayer.Data.Contracts;
@@ -138,6 +139,84 @@ namespace Japlayer.UnitTests.ViewModels
             await mediaItemViewModel.SelectedScene!.AddHighlightAsync(42);
             Assert.AreEqual(1, libraryItemViewModel.HighlightCount);
             Assert.AreEqual(4, monitor.InternalWriteCount, "Tag add, tag remove, rating save, and highlight add should all mark internal writes.");
+        }
+
+        [TestMethod]
+        public async Task EditingItemOnMediaItemPage_UnderRandomSortAndMatchingFilter_PreservesLibraryOrderOnReturn()
+        {
+            var items = Enumerable.Range(1, 20)
+                .Select(index => new LibraryItem { MediaId = $"M{index:D2}", Title = $"Movie {index:D2}", Rating = 4, UserTags = ["Initial"] })
+                .ToList();
+
+            var targetItem = items[4];
+            var mediaProvider = new StubLibraryAndItemMediaProvider(items);
+            var monitor = new FakeDatabaseChangeMonitor();
+            var messenger = new WeakReferenceMessenger();
+
+            var services = new ServiceCollection();
+            services.AddSingleton<ISettingsService, StubSettingsService>();
+            services.AddSingleton<IMediaThumbnailProvider, StubThumbnailProvider>();
+            var serviceProvider = services.BuildServiceProvider();
+
+            var libraryViewModel = new LibraryViewModel(mediaProvider, new StubSceneProvider(), serviceProvider, monitor, messenger);
+            await libraryViewModel.LoadDataAsync();
+
+            libraryViewModel.ShuffleCommand.Execute(null);
+            libraryViewModel.TagsFacet.FilteredItems.First(tag => tag.Name == "Initial").IsSelected = true;
+            libraryViewModel.ApplyFilterDirect();
+
+            var initialOrder = libraryViewModel.MediaItems.Select(media => media.Id).ToList();
+            var resetCount = 0;
+            libraryViewModel.MediaItems.CollectionChanged += (_, eventArgs) =>
+            {
+                if (eventArgs.Action == NotifyCollectionChangedAction.Reset)
+                {
+                    resetCount++;
+                }
+            };
+
+            // Navigate away to MediaItemPage for M05
+            await libraryViewModel.SetPageActiveAsync(false);
+
+            var mediaItemViewModel = new MediaItemViewModel(
+                targetItem,
+                new StubImageProvider(),
+                new StubSceneProvider(),
+                mediaProvider,
+                new StubSettingsService(),
+                new StubThumbnailProvider(),
+                new StubHighlightProvider(),
+                monitor,
+                messenger);
+            await mediaItemViewModel.LoadDetailsAsync();
+
+            // Add a tag while TagsFacet has +Initial active, then navigate back
+            await mediaItemViewModel.AddUserTagAsync("EditedTag");
+            await libraryViewModel.SetPageActiveAsync(true);
+
+            CollectionAssert.AreEqual(initialOrder, libraryViewModel.MediaItems.Select(media => media.Id).ToList());
+            Assert.AreEqual(0, resetCount);
+        }
+
+        private sealed class StubLibraryAndItemMediaProvider(List<LibraryItem> items) : IMediaProvider
+        {
+            private readonly List<LibraryItem> _items = items;
+
+            public Task<IEnumerable<LibraryItem>> GetLibraryItemsAsync() => Task.FromResult<IEnumerable<LibraryItem>>(_items);
+            public Task<IEnumerable<string>> GetUserTagsAsync() => Task.FromResult<IEnumerable<string>>(["Initial"]);
+            public Task<IEnumerable<string>> GetGenresAsync() => Task.FromResult<IEnumerable<string>>([]);
+            public Task<IEnumerable<string>> GetCastAsync() => Task.FromResult<IEnumerable<string>>([]);
+            public Task<IEnumerable<string>> GetStudiosAsync() => Task.FromResult<IEnumerable<string>>([]);
+            public Task<IEnumerable<string>> GetSeriesAsync() => Task.FromResult<IEnumerable<string>>([]);
+            public Task<MediaItem> GetMediaItemAsync(string mediaId)
+            {
+                var found = _items.First(entry => entry.MediaId == mediaId);
+                return Task.FromResult(new MediaItem { MediaId = found.MediaId, UserTags = [.. found.UserTags], Rating = found.Rating });
+            }
+
+            public Task AddUserTagAsync(string mediaId, string tagName) => Task.CompletedTask;
+            public Task RemoveUserTagAsync(string mediaId, string tagName) => Task.CompletedTask;
+            public Task SetRatingAsync(string mediaId, int rating) => Task.CompletedTask;
         }
     }
 }

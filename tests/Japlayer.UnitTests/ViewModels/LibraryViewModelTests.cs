@@ -1,3 +1,4 @@
+using System.Collections.Specialized;
 using CommunityToolkit.Mvvm.Messaging;
 using Japlayer.Contracts;
 using Japlayer.Data.Contracts;
@@ -743,6 +744,112 @@ namespace Japlayer.UnitTests.ViewModels
 
             Assert.AreEqual(1, viewModel.MediaItems.Count);
             Assert.AreEqual("M1", viewModel.MediaItems[0].Id);
+        }
+
+        [TestMethod]
+        public async Task RandomSort_PreservesOrderAndAvoidsReset_WhenReloadOrPendingFilterRunsOnReturn()
+        {
+            var items = Enumerable.Range(1, 20)
+                .Select(index => new LibraryItem { MediaId = $"M{index:D2}", Title = $"Title {index:D2}", Rating = 4 })
+                .ToList();
+
+            var mediaProvider = new StubMediaProvider { LibraryItemsToReturn = items };
+            var monitor = new FakeDatabaseChangeMonitor();
+            var messenger = new WeakReferenceMessenger();
+            var viewModel = new LibraryViewModel(mediaProvider, new StubMediaSceneProvider(), CreateServiceProvider(), monitor, messenger);
+            await viewModel.LoadDataAsync();
+
+            viewModel.ShuffleCommand.Execute(null);
+            viewModel.RatingMin = 1;
+            viewModel.RatingMax = 5;
+            viewModel.ApplyFilterDirect();
+
+            var initialOrder = viewModel.MediaItems.Select(item => item.Id).ToList();
+            var resetCount = 0;
+            viewModel.MediaItems.CollectionChanged += (_, eventArgs) =>
+            {
+                if (eventArgs.Action == NotifyCollectionChangedAction.Reset)
+                {
+                    resetCount++;
+                }
+            };
+
+            // Simulate navigating away, editing an item within active rating filter + external DB signal, then returning
+            await viewModel.SetPageActiveAsync(false);
+            messenger.Send(new MediaRatingChangedMessage("M05", 5));
+            monitor.RaiseExternalChange();
+            await viewModel.SetPageActiveAsync(true);
+
+            var currentOrder = viewModel.MediaItems.Select(item => item.Id).ToList();
+            CollectionAssert.AreEqual(initialOrder, currentOrder, "Random order should remain stable across pending filter refresh and reload on Back navigation.");
+            Assert.AreEqual(0, resetCount, "Unchanged membership under Random sort should not emit a Reset notification.");
+        }
+
+        [TestMethod]
+        public async Task ExplicitShuffleCommand_ProducesNewRandomOrder()
+        {
+            var items = Enumerable.Range(1, 20)
+                .Select(index => new LibraryItem { MediaId = $"M{index:D2}", Title = $"Title {index:D2}" })
+                .ToList();
+
+            var viewModel = new LibraryViewModel(
+                new StubMediaProvider { LibraryItemsToReturn = items },
+                new StubMediaSceneProvider(),
+                CreateServiceProvider(),
+                messenger: new WeakReferenceMessenger());
+            await viewModel.LoadDataAsync();
+
+            viewModel.ShuffleCommand.Execute(null);
+            viewModel.ApplyFilterDirect();
+            var firstOrder = viewModel.MediaItems.Select(item => item.Id).ToList();
+
+            var sortAppliedCount = 0;
+            viewModel.SortOrderApplied += (_, _) => sortAppliedCount++;
+
+            viewModel.ShuffleCommand.Execute(null);
+            viewModel.ApplyFilterDirect();
+            var secondOrder = viewModel.MediaItems.Select(item => item.Id).ToList();
+
+            Assert.IsFalse(firstOrder.SequenceEqual(secondOrder), "Invoking ShuffleCommand again should generate a new random order.");
+            Assert.IsTrue(sortAppliedCount >= 1);
+        }
+
+        [TestMethod]
+        public async Task NoOpMessagesWhileInactive_DoNotTriggerResetOnReturn()
+        {
+            var items = Enumerable.Range(1, 20)
+                .Select(index => new LibraryItem { MediaId = $"M{index:D2}", Title = $"Title {index:D2}", Rating = 4, HighlightCount = 2 })
+                .ToList();
+
+            var messenger = new WeakReferenceMessenger();
+            var viewModel = new LibraryViewModel(
+                new StubMediaProvider { LibraryItemsToReturn = items },
+                new StubMediaSceneProvider(),
+                CreateServiceProvider(),
+                messenger: messenger);
+            await viewModel.LoadDataAsync();
+
+            viewModel.ShuffleCommand.Execute(null);
+            viewModel.RatingMin = 1;
+            viewModel.ApplyFilterDirect();
+
+            var initialOrder = viewModel.MediaItems.Select(item => item.Id).ToList();
+            var resetCount = 0;
+            viewModel.MediaItems.CollectionChanged += (_, eventArgs) =>
+            {
+                if (eventArgs.Action == NotifyCollectionChangedAction.Reset)
+                {
+                    resetCount++;
+                }
+            };
+
+            await viewModel.SetPageActiveAsync(false);
+            messenger.Send(new MediaRatingChangedMessage("M01", 4));
+            messenger.Send(new MediaHighlightCountChangedMessage("M01", 2));
+            await viewModel.SetPageActiveAsync(true);
+
+            CollectionAssert.AreEqual(initialOrder, viewModel.MediaItems.Select(item => item.Id).ToList());
+            Assert.AreEqual(0, resetCount, "No-op rating and highlight messages should not trigger a GridView Reset on return.");
         }
     }
 }

@@ -358,6 +358,40 @@ namespace Japlayer.UITests.PageObjects
             Wait.UntilInputIsProcessed();
         }
 
+        public void ScrollCardIntoView(string mediaId)
+        {
+            var card = RequireElement(WaitForCard(mediaId), $"Card '{mediaId}'");
+            if (card.Patterns.ScrollItem.IsSupported)
+            {
+                card.Patterns.ScrollItem.Pattern.ScrollIntoView();
+                Wait.UntilInputIsProcessed();
+            }
+        }
+
+        public bool IsCardSelected(string mediaId)
+        {
+            var card = FindCard(mediaId);
+            return card != null &&
+                   card.Patterns.SelectionItem.IsSupported &&
+                   card.Patterns.SelectionItem.Pattern.IsSelected.ValueOrDefault;
+        }
+
+        public bool IsCardInViewport(string mediaId)
+        {
+            var grid = MediaGrid;
+            var card = FindCard(mediaId);
+            if (grid == null || card == null || card.IsOffscreen)
+            {
+                return false;
+            }
+
+            var gridRect = grid.BoundingRectangle;
+            var cardRect = card.BoundingRectangle;
+            return cardRect.Height > 0 &&
+                   cardRect.Bottom > gridRect.Top &&
+                   cardRect.Top < gridRect.Bottom;
+        }
+
         private static void ActivateElement(AutomationElement element)
         {
             if (element.Patterns.Invoke.IsSupported)

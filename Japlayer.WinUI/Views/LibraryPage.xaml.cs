@@ -11,6 +11,8 @@ namespace Japlayer.Views
 {
     public sealed partial class LibraryPage : Page
     {
+        private string? _lastOpenedMediaId;
+
         public LibraryViewModel ViewModel { get; private set; }
 
         public LibraryPage()
@@ -35,6 +37,27 @@ namespace Japlayer.Views
             }
 
             await ViewModel.SetPageActiveAsync(true);
+
+            if (e.NavigationMode == NavigationMode.Back &&
+                IsLoaded &&
+                MediaGrid.SelectedItem == null &&
+                !string.IsNullOrEmpty(_lastOpenedMediaId))
+            {
+                var restoredItem = ViewModel.MediaItems.FirstOrDefault(item =>
+                    string.Equals(item.Id, _lastOpenedMediaId, StringComparison.OrdinalIgnoreCase));
+
+                if (restoredItem != null)
+                {
+                    MediaGrid.SelectedItem = restoredItem;
+                    DispatcherQueue?.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+                    {
+                        if (IsLoaded && MediaGrid.Items.Contains(restoredItem))
+                        {
+                            MediaGrid.ScrollIntoView(restoredItem, ScrollIntoViewAlignment.Default);
+                        }
+                    });
+                }
+            }
         }
 
         protected override void OnNavigatedFrom(NavigationEventArgs e)
@@ -173,6 +196,8 @@ namespace Japlayer.Views
         {
             if (e.ClickedItem is LibraryItemViewModel item)
             {
+                _lastOpenedMediaId = item.Id;
+                MediaGrid.SelectedItem = item;
                 Frame.Navigate(typeof(MediaItemPage), item);
             }
         }

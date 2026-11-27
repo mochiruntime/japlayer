@@ -93,25 +93,27 @@ namespace Japlayer.ViewModels
         public int? RuntimeMinutes => _libraryItem.RuntimeMinutes;
         public string NormalizedId { get; private set; }
 
-        public void AddUserTag(string tagName)
+        public bool AddUserTag(string tagName)
         {
             if (string.IsNullOrWhiteSpace(tagName) ||
                 _libraryItem.UserTags.Any(tag => string.Equals(tag, tagName, StringComparison.OrdinalIgnoreCase)))
             {
-                return;
+                return false;
             }
 
             _libraryItem.UserTags = [.. _libraryItem.UserTags, tagName];
+            return true;
         }
 
-        public void RemoveUserTag(string tagName)
+        public bool RemoveUserTag(string tagName)
         {
             if (!_libraryItem.UserTags.Any(tag => string.Equals(tag, tagName, StringComparison.OrdinalIgnoreCase)))
             {
-                return;
+                return false;
             }
 
             _libraryItem.UserTags = [.. _libraryItem.UserTags.Where(tag => !string.Equals(tag, tagName, StringComparison.OrdinalIgnoreCase))];
+            return true;
         }
 
         /// <summary>

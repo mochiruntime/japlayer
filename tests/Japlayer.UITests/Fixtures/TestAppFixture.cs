@@ -30,8 +30,11 @@ namespace Japlayer.UITests.Fixtures
         public UIA3Automation? Automation { get; private set; }
         public Window? MainWindow { get; private set; }
 
-        public TestAppFixture()
+        private readonly int _extraSeedItemCount;
+
+        public TestAppFixture(int extraSeedItemCount = 0)
         {
+            _extraSeedItemCount = Math.Max(0, extraSeedItemCount);
             var uniqueId = Guid.NewGuid().ToString("N");
             TempDirectory = Path.Combine(Path.GetTempPath(), "JaplayerUITests", uniqueId);
             Directory.CreateDirectory(TempDirectory);
@@ -207,6 +210,40 @@ namespace Japlayer.UITests.Fixtures
             media3.MediaHighlights.Add(new MediaHighlight { MediaId = "TEST-003", Scene = 1, Timestamp = 25 });
 
             context.Media.AddRange(media1, media2, media3);
+
+            if (_extraSeedItemCount > 0)
+            {
+                var extrasTag = new UserTag { Name = "Extras" };
+                for (var index = 0; index < _extraSeedItemCount; index++)
+                {
+                    var itemNumber = index + 4;
+                    var mediaId = $"TEST-{itemNumber:D3}";
+                    var extraMedia = new Media { MediaId = mediaId };
+                    extraMedia.MediaLocations.Add(new MediaLocation
+                    {
+                        MediaId = mediaId,
+                        Scene = 1,
+                        Hostname = "localhost",
+                        Path = DummyVideoPath,
+                        CreatedAt = new DateTime(2024, 1, 1, 10, 0, 0, DateTimeKind.Utc).AddDays(-itemNumber)
+                    });
+                    extraMedia.MediaMetadata.Add(new MediaMetadata
+                    {
+                        MediaId = mediaId,
+                        MetadataUrl = $"https://example.com/meta{itemNumber}",
+                        Title = $"Sample Video {itemNumber:D3}",
+                        ContentId = $"CID-{itemNumber:D3}",
+                        ReleaseDate = new DateOnly(2024, 1, 1).AddDays(-itemNumber),
+                        RuntimeMinutes = 75
+                    });
+                    extraMedia.UserTags.Add(extrasTag);
+                    extraMedia.UserTags.Add(vrTag);
+                    extraMedia.Genres.Add(actionGenre);
+                    extraMedia.UserMediaData = new UserMediaData { MediaId = mediaId, Rating = 4 };
+                    context.Media.Add(extraMedia);
+                }
+            }
+
             context.SaveChanges();
         }
 

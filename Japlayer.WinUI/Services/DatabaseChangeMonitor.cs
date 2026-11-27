@@ -3,6 +3,8 @@ using System;
 using System.IO;
 using System.Threading;
 using Japlayer.Contracts;
+using Japlayer.Data.Contracts;
+using Japlayer.Data.Services;
 using Microsoft.UI.Dispatching;
 
 namespace Japlayer.Services
@@ -23,11 +25,13 @@ namespace Japlayer.Services
     public sealed class DatabaseChangeMonitor(
         ISettingsService settingsService,
         int debounceMilliseconds = 1000,
-        int internalWriteGraceMilliseconds = 250) : IDatabaseChangeMonitor
+        int internalWriteGraceMilliseconds = 250,
+        IDatabaseVersionTracker? versionTracker = null) : IDatabaseChangeMonitor
     {
         private readonly ISettingsService _settingsService = settingsService;
         private readonly int _debounceMilliseconds = debounceMilliseconds;
         private readonly int _internalWriteGraceMilliseconds = internalWriteGraceMilliseconds;
+        private readonly IDatabaseVersionTracker _versionTracker = versionTracker ?? new SqliteDatabaseVersionTracker();
         private readonly object _syncLock = new();
         private FileSystemWatcher? _watcher;
         private Timer? _debounceTimer;
@@ -65,6 +69,8 @@ namespace Japlayer.Services
                 _databaseFileName = Path.GetFileName(databasePath);
                 _walFileName = _databaseFileName + "-wal";
 
+                _versionTracker.Open(databasePath);
+
                 _debounceTimer = new Timer(OnDebounceElapsed, null, Timeout.Infinite, Timeout.Infinite);
 
                 _watcher = new FileSystemWatcher(directory)
@@ -90,7 +96,10 @@ namespace Japlayer.Services
         private void EndInternalWrite()
         {
             Volatile.Write(ref _lastInternalWriteEndTick, Environment.TickCount64);
-            Interlocked.Decrement(ref _activeInternalWrites);
+            if (Interlocked.Decrement(ref _activeInternalWrites) == 0)
+            {
+                _versionTracker.RefreshKnownVersion();
+            }
         }
 
         private void OnFileSystemChanged(object sender, FileSystemEventArgs eventArgs)
@@ -98,6 +107,12 @@ namespace Japlayer.Services
             if (!IsTargetDatabaseFile(eventArgs.Name))
             {
                 return;
+            }
+
+            if (eventArgs.ChangeType == WatcherChangeTypes.Created &&
+                string.Equals(eventArgs.Name, _databaseFileName, StringComparison.OrdinalIgnoreCase))
+            {
+                _versionTracker.Reset();
             }
 
             ScheduleDebouncedNotificationIfExternal();
@@ -108,6 +123,12 @@ namespace Japlayer.Services
             if (!IsTargetDatabaseFile(eventArgs.Name) && !IsTargetDatabaseFile(eventArgs.OldName))
             {
                 return;
+            }
+
+            if (string.Equals(eventArgs.Name, _databaseFileName, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(eventArgs.OldName, _databaseFileName, StringComparison.OrdinalIgnoreCase))
+            {
+                _versionTracker.Reset();
             }
 
             ScheduleDebouncedNotificationIfExternal();
@@ -130,13 +151,7 @@ namespace Japlayer.Services
 
         private void ScheduleDebouncedNotificationIfExternal()
         {
-            if (Volatile.Read(ref _activeInternalWrites) > 0)
-            {
-                return;
-            }
-
-            var elapsedSinceInternalWrite = Environment.TickCount64 - Volatile.Read(ref _lastInternalWriteEndTick);
-            if (elapsedSinceInternalWrite >= 0 && elapsedSinceInternalWrite < _internalWriteGraceMilliseconds)
+            if (IsWithinInternalWriteWindow())
             {
                 return;
             }
@@ -152,9 +167,20 @@ namespace Japlayer.Services
             }
         }
 
+        private bool IsWithinInternalWriteWindow()
+        {
+            if (Volatile.Read(ref _activeInternalWrites) > 0)
+            {
+                return true;
+            }
+
+            var elapsedSinceInternalWrite = Environment.TickCount64 - Volatile.Read(ref _lastInternalWriteEndTick);
+            return elapsedSinceInternalWrite >= 0 && elapsedSinceInternalWrite < _internalWriteGraceMilliseconds;
+        }
+
         private void OnDebounceElapsed(object? state)
         {
-            if (_disposed)
+            if (_disposed || IsWithinInternalWriteWindow() || !_versionTracker.HasExternalChange())
             {
                 return;
             }
@@ -199,19 +225,15 @@ namespace Japlayer.Services
                 _debounceTimer?.Dispose();
                 _debounceTimer = null;
             }
+
+            _versionTracker.Dispose();
         }
 
         private sealed class InternalWriteScope(DatabaseChangeMonitor monitor) : IDisposable
         {
-            private int _disposed;
+            private DatabaseChangeMonitor? _monitor = monitor;
 
-            public void Dispose()
-            {
-                if (Interlocked.Exchange(ref _disposed, 1) == 0)
-                {
-                    monitor.EndInternalWrite();
-                }
-            }
+            public void Dispose() => Interlocked.Exchange(ref _monitor, null)?.EndInternalWrite();
         }
     }
 }

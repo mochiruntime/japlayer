@@ -73,6 +73,7 @@ namespace Japlayer
             services.AddSingleton<Data.Contracts.IMediaThumbnailProvider, DatabaseMediaThumbnailProvider>();
             services.AddSingleton<Data.Contracts.IMediaHighlightProvider, DatabaseMediaHighlightProvider>();
             services.AddSingleton<Data.Contracts.ILibraryPresetProvider, DatabaseLibraryPresetProvider>();
+            services.AddTransient<Data.Contracts.IDatabaseVersionTracker, SqliteDatabaseVersionTracker>();
             services.AddSingleton<IDatabaseChangeMonitor, DatabaseChangeMonitor>();
             services.AddSingleton<IMessenger>(WeakReferenceMessenger.Default);
 

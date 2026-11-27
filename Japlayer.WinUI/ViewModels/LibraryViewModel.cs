@@ -44,6 +44,7 @@ namespace Japlayer.ViewModels
         private bool _isReloading;
         private bool _reloadAgainRequested;
         private int? _activePresetId;
+        private int _randomSortSeed = Random.Shared.Next();
 
         public LibraryViewModel(
             IMediaProvider mediaProvider,
@@ -206,6 +207,11 @@ namespace Japlayer.ViewModels
 
             OnPropertyChanged(nameof(IsNotRandomSort));
             OnPropertyChanged(nameof(SortDirectionGlyph));
+            if (value == LibrarySortOption.Random)
+            {
+                RotateRandomSortSeed();
+            }
+
             _isSortOrderChanging = true;
             QueueApplyFilter();
         }
@@ -252,6 +258,7 @@ namespace Japlayer.ViewModels
             }
             else
             {
+                RotateRandomSortSeed();
                 QueueApplyFilter();
             }
         }
@@ -628,7 +635,7 @@ namespace Japlayer.ViewModels
         public void Receive(MediaRatingChangedMessage message)
         {
             var item = FindMediaItem(message.MediaId);
-            if (item == null)
+            if (item == null || item.Rating == message.Rating)
             {
                 return;
             }
@@ -643,7 +650,10 @@ namespace Japlayer.ViewModels
         public void Receive(MediaUserTagAddedMessage message)
         {
             var item = FindMediaItem(message.MediaId);
-            item?.AddUserTag(message.TagName);
+            if (item == null || !item.AddUserTag(message.TagName))
+            {
+                return;
+            }
 
             var count = _allMediaItems.Count(media => media.LibraryItem.UserTags.Contains(message.TagName, StringComparer.OrdinalIgnoreCase));
             TagsFacet.SyncItemCount(message.TagName, count, insertIfMissing: true);
@@ -657,7 +667,10 @@ namespace Japlayer.ViewModels
         public void Receive(MediaUserTagRemovedMessage message)
         {
             var item = FindMediaItem(message.MediaId);
-            item?.RemoveUserTag(message.TagName);
+            if (item == null || !item.RemoveUserTag(message.TagName))
+            {
+                return;
+            }
 
             var count = _allMediaItems.Count(media => media.LibraryItem.UserTags.Contains(message.TagName, StringComparer.OrdinalIgnoreCase));
             TagsFacet.SyncItemCount(message.TagName, count, insertIfMissing: false);
@@ -671,7 +684,7 @@ namespace Japlayer.ViewModels
         public void Receive(MediaHighlightCountChangedMessage message)
         {
             var item = FindMediaItem(message.MediaId);
-            if (item == null)
+            if (item == null || item.HighlightCount == message.HighlightCount)
             {
                 return;
             }
@@ -799,7 +812,7 @@ namespace Japlayer.ViewModels
                 _ when SortOrder == LibrarySortOption.RatingDescending => filteredItems.OrderByDescending(item => item.Rating),
                 _ when SortOrder == LibrarySortOption.RuntimeAscending => filteredItems.OrderBy(item => item.RuntimeMinutes ?? 0),
                 _ when SortOrder == LibrarySortOption.RuntimeDescending => filteredItems.OrderByDescending(item => item.RuntimeMinutes ?? 0),
-                _ when SortOrder == LibrarySortOption.Random => filteredItems.OrderBy(item => Random.Shared.Next()),
+                _ when SortOrder == LibrarySortOption.Random => filteredItems.OrderBy(item => ComputeShuffleKey(item.Id, _randomSortSeed)),
                 _ => filteredItems.OrderBy(item => item.Title)
             };
 
@@ -1144,6 +1157,38 @@ namespace Japlayer.ViewModels
             LibrarySortField.Random => LibrarySortOption.Random,
             _ => LibrarySortOption.AddedDateDescending
         };
+
+        private void RotateRandomSortSeed()
+        {
+            var nextSeed = Random.Shared.Next();
+            if (nextSeed == _randomSortSeed)
+            {
+                nextSeed = unchecked(_randomSortSeed + 1);
+            }
+
+            _randomSortSeed = nextSeed;
+        }
+
+        private static ulong ComputeShuffleKey(string mediaId, int seed)
+        {
+            const ulong fnvOffsetBasis = 14695981039346656037UL;
+            const ulong fnvPrime = 1099511628211UL;
+
+            var hash = fnvOffsetBasis ^ unchecked((uint)seed);
+            foreach (var character in mediaId)
+            {
+                hash ^= char.ToUpperInvariant(character);
+                hash *= fnvPrime;
+            }
+
+            // SplitMix64 finalizer for uniform dispersion across sequential IDs
+            hash ^= hash >> 30;
+            hash *= 0xbf58476d1ce4e5b9UL;
+            hash ^= hash >> 27;
+            hash *= 0x94d049bb133111ebUL;
+            hash ^= hash >> 31;
+            return hash;
+        }
 
         private static string NormalizeForSearch(string input)
         {
