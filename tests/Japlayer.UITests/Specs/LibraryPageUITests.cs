@@ -7,20 +7,67 @@ namespace Japlayer.UITests.Specs
     [TestClass]
     public class LibraryPageUITests
     {
-        private TestAppFixture? _fixture;
-        private LibraryPageObject? _libraryPage;
+        private static TestAppFixture? _fixture;
+        private static LibraryPageObject? _libraryPage;
 
-        [TestInitialize]
-        public void Setup()
+        [ClassInitialize]
+        public static void ClassSetup(TestContext _)
         {
             _fixture = new TestAppFixture();
             _fixture.StartApp();
             Assert.IsNotNull(_fixture.MainWindow, "Main window failed to initialize.");
             _libraryPage = new LibraryPageObject(_fixture.MainWindow);
+            Assert.IsNotNull(_libraryPage.WaitForCard("TEST-001"), "Initial card TEST-001 should be present.");
+            Assert.IsTrue(_libraryPage.WaitForCardCount(3), "All 3 seeded cards should be visible initially.");
         }
 
-        [TestCleanup]
-        public void Teardown() => _fixture?.Dispose();
+        [ClassCleanup]
+        public static void ClassTeardown()
+        {
+            _fixture?.Dispose();
+            _fixture = null;
+            _libraryPage = null;
+        }
+
+        [TestInitialize]
+        public void Setup()
+        {
+            Assert.IsNotNull(_fixture?.MainWindow);
+            Assert.IsNotNull(_libraryPage);
+
+            _libraryPage.CloseAnyOpenFlyout();
+
+            var mediaItemPage = new MediaItemPageObject(_fixture.MainWindow);
+            if (mediaItemPage.BackButton != null)
+            {
+                mediaItemPage.ClickBack();
+                Assert.IsNotNull(_libraryPage.WaitForElement(() => _libraryPage.SearchBox), "SearchBox should be visible after returning to LibraryPage.");
+            }
+
+            if (_libraryPage.ClearAllFiltersButton != null)
+            {
+                _libraryPage.ClickClearAllFilters();
+            }
+
+            if (!string.IsNullOrEmpty(_libraryPage.SearchBox?.Text))
+            {
+                _libraryPage.ClearSearch();
+            }
+
+            if (_libraryPage.SortDirectionButton == null ||
+                !(_libraryPage.SortDropDownButton?.Name?.Contains("Added", StringComparison.OrdinalIgnoreCase) ?? false))
+            {
+                _libraryPage.SelectSortField("Added Date");
+            }
+
+            WaitForInitialLoad();
+
+            if (!string.Equals(_libraryPage.GetVisibleCardIds().FirstOrDefault(), "TEST-001", StringComparison.OrdinalIgnoreCase))
+            {
+                _libraryPage.ToggleSortDirection();
+                Assert.IsTrue(_libraryPage.WaitForFirstCardId("TEST-001"), "Default AddedDate descending sort should place TEST-001 first.");
+            }
+        }
 
         private void WaitForInitialLoad()
         {
@@ -221,14 +268,35 @@ namespace Japlayer.UITests.Specs
             var searchBox = _libraryPage.WaitForElement(() => _libraryPage.SearchBox);
             Assert.IsNotNull(searchBox, "SearchBox should be visible after navigating back to LibraryPage.");
         }
+    }
+
+    [TestClass]
+    public class LibraryPageDatabaseUITests
+    {
+        private TestAppFixture? _fixture;
+        private LibraryPageObject? _libraryPage;
+
+        [TestInitialize]
+        public void Setup()
+        {
+            _fixture = new TestAppFixture();
+            _fixture.StartApp();
+            Assert.IsNotNull(_fixture.MainWindow, "Main window failed to initialize.");
+            _libraryPage = new LibraryPageObject(_fixture.MainWindow);
+            Assert.IsNotNull(_libraryPage.WaitForCard("TEST-001"), "Initial card TEST-001 should be present.");
+            Assert.IsTrue(_libraryPage.WaitForCardCount(3), "All 3 seeded cards should be visible initially.");
+        }
+
+        [TestCleanup]
+        public void Teardown() => _fixture?.Dispose();
 
         [TestMethod]
         public void ExternalDatabaseInsert_AutoReloadsWhilePreservingActiveFilter()
         {
-            WaitForInitialLoad();
+            Assert.IsNotNull(_libraryPage);
 
             // Filter by Studio Alpha -> 2 cards (TEST-001, TEST-003)
-            _libraryPage!.OpenFacetFlyout("Studios");
+            _libraryPage.OpenFacetFlyout("Studios");
             _libraryPage.ClickFacetItem("Studio Alpha");
             _libraryPage.CloseFlyout();
             Assert.IsTrue(_libraryPage.WaitForCardCount(2), "Only TEST-001 and TEST-003 have Studio Alpha initially.");
@@ -271,10 +339,10 @@ namespace Japlayer.UITests.Specs
         [TestMethod]
         public void Presets_OneClickSaveClearAndApply_WorkEndToEnd()
         {
-            WaitForInitialLoad();
+            Assert.IsNotNull(_libraryPage);
 
             // 1. Apply Studio Alpha filter + Rating sort
-            _libraryPage!.OpenFacetFlyout("Studios");
+            _libraryPage.OpenFacetFlyout("Studios");
             _libraryPage.ClickFacetItem("Studio Alpha");
             _libraryPage.CloseFlyout();
             _libraryPage.SelectSortField("Rating");

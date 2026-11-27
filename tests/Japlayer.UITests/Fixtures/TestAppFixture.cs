@@ -1,8 +1,8 @@
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using FlaUI.Core;
 using FlaUI.Core.AutomationElements;
-using FlaUI.Core.Input;
 using FlaUI.Core.Tools;
 using FlaUI.UIA3;
 using Japlayer.Data.Context;
@@ -19,6 +19,17 @@ namespace Japlayer.UITests.Fixtures
             public string? ImagePath { get; set; }
             public string? SqliteDatabasePath { get; set; }
         }
+
+        private delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+
+        [DllImport("user32.dll")]
+        private static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
+
+        [DllImport("user32.dll")]
+        private static extern bool IsWindowVisible(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
 
         public string TempDirectory { get; }
         public string DatabasePath { get; }
@@ -44,12 +55,44 @@ namespace Japlayer.UITests.Fixtures
 
             DatabasePath = Path.Combine(TempDirectory, "test_medias.db");
             DummyVideoPath = Path.Combine(TempDirectory, "dummy_video.mp4");
-            File.WriteAllBytes(DummyVideoPath, new byte[1024]); // 1KB placeholder file
-
             SettingsFilePath = Path.Combine(TempDirectory, "japlayer.test.settings.json");
 
-            SeedDatabase();
+            if (_extraSeedItemCount == 0 &&
+                !string.IsNullOrEmpty(TestAssemblyHooks.TemplateDatabasePath) &&
+                File.Exists(TestAssemblyHooks.TemplateDatabasePath) &&
+                !string.IsNullOrEmpty(TestAssemblyHooks.TemplateImageDirectory) &&
+                !string.IsNullOrEmpty(TestAssemblyHooks.TemplateDummyVideoPath))
+            {
+                CopyFromTemplate();
+            }
+            else
+            {
+                File.WriteAllBytes(DummyVideoPath, new byte[1024]); // 1KB placeholder file
+                SeedDatabase();
+            }
+
             WriteSettingsFile();
+        }
+
+        private void CopyFromTemplate()
+        {
+            File.Copy(TestAssemblyHooks.TemplateDatabasePath!, DatabasePath, overwrite: true);
+            File.Copy(TestAssemblyHooks.TemplateDummyVideoPath!, DummyVideoPath, overwrite: true);
+
+            foreach (var sourceImage in Directory.GetFiles(TestAssemblyHooks.TemplateImageDirectory!))
+            {
+                var destinationImage = Path.Combine(ImageDirectory, Path.GetFileName(sourceImage));
+                File.Copy(sourceImage, destinationImage, overwrite: true);
+            }
+
+            // Update MediaLocations.Path to point to this fixture's DummyVideoPath
+            using var connection = new SqliteConnection($"Data Source={DatabasePath}");
+            connection.Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = "UPDATE MediaLocations SET Path = $path;";
+            command.Parameters.AddWithValue("$path", DummyVideoPath);
+            command.ExecuteNonQuery();
+            SqliteConnection.ClearAllPools();
         }
 
         private void SeedDatabase()
@@ -61,19 +104,25 @@ namespace Japlayer.UITests.Fixtures
             using var context = new DatabaseContext(options);
             context.Database.Migrate();
 
-            // Create solid 1x1 test image files
-            var cover1Path = Path.Combine(ImageDirectory, "test001_cover.jpg");
-            var thumb1Path = Path.Combine(ImageDirectory, "test001_t10.jpg");
-            var thumb2Path = Path.Combine(ImageDirectory, "test001_t30.jpg");
-            var gallery1Path = Path.Combine(ImageDirectory, "test001_gallery1.jpg");
-            var gallery2Path = Path.Combine(ImageDirectory, "test001_gallery2.jpg");
+            WriteTestImages(ImageDirectory);
+            SeedDefaultData(context, DummyVideoPath, _extraSeedItemCount);
 
-            File.WriteAllBytes(cover1Path, CreateMinimalJpegBytes());
-            File.WriteAllBytes(thumb1Path, CreateMinimalJpegBytes());
-            File.WriteAllBytes(thumb2Path, CreateMinimalJpegBytes());
-            File.WriteAllBytes(gallery1Path, CreateMinimalJpegBytes());
-            File.WriteAllBytes(gallery2Path, CreateMinimalJpegBytes());
+            context.SaveChanges();
+            SqliteConnection.ClearAllPools();
+        }
 
+        internal static void WriteTestImages(string imageDirectory)
+        {
+            var jpegBytes = CreateMinimalJpegBytes();
+            File.WriteAllBytes(Path.Combine(imageDirectory, "test001_cover.jpg"), jpegBytes);
+            File.WriteAllBytes(Path.Combine(imageDirectory, "test001_t10.jpg"), jpegBytes);
+            File.WriteAllBytes(Path.Combine(imageDirectory, "test001_t30.jpg"), jpegBytes);
+            File.WriteAllBytes(Path.Combine(imageDirectory, "test001_gallery1.jpg"), jpegBytes);
+            File.WriteAllBytes(Path.Combine(imageDirectory, "test001_gallery2.jpg"), jpegBytes);
+        }
+
+        internal static void SeedDefaultData(DatabaseContext context, string dummyVideoPath, int extraSeedItemCount)
+        {
             // Shared tags, genres, cast, studios, and series (to satisfy unique constraint)
             var vrTag = new UserTag { Name = "VR" };
             var favoritesTag = new UserTag { Name = "Favorites" };
@@ -107,7 +156,7 @@ namespace Japlayer.UITests.Fixtures
                 MediaId = "TEST-001",
                 Scene = 1,
                 Hostname = "localhost",
-                Path = DummyVideoPath,
+                Path = dummyVideoPath,
                 CreatedAt = new DateTime(2024, 1, 1, 10, 0, 0, DateTimeKind.Utc)
             });
             media1.MediaLocations.Add(new MediaLocation
@@ -115,7 +164,7 @@ namespace Japlayer.UITests.Fixtures
                 MediaId = "TEST-001",
                 Scene = 2,
                 Hostname = "localhost",
-                Path = DummyVideoPath,
+                Path = dummyVideoPath,
                 CreatedAt = new DateTime(2024, 1, 1, 10, 5, 0, DateTimeKind.Utc)
             });
             media1.MediaImages.Add(new MediaImage { MediaId = "TEST-001", Filepath = "test001_cover.jpg", Url = "https://example.com/cover1" });
@@ -150,7 +199,7 @@ namespace Japlayer.UITests.Fixtures
                 MediaId = "TEST-002",
                 Scene = 1,
                 Hostname = "localhost",
-                Path = DummyVideoPath,
+                Path = dummyVideoPath,
                 CreatedAt = new DateTime(2023, 6, 1, 10, 0, 0, DateTimeKind.Utc)
             });
             media2.MediaMetadata.Add(new MediaMetadata
@@ -188,7 +237,7 @@ namespace Japlayer.UITests.Fixtures
                 MediaId = "TEST-003",
                 Scene = 1,
                 Hostname = "localhost",
-                Path = DummyVideoPath,
+                Path = dummyVideoPath,
                 CreatedAt = new DateTime(2022, 1, 1, 10, 0, 0, DateTimeKind.Utc)
             });
             media3.MediaMetadata.Add(new MediaMetadata
@@ -211,10 +260,10 @@ namespace Japlayer.UITests.Fixtures
 
             context.Media.AddRange(media1, media2, media3);
 
-            if (_extraSeedItemCount > 0)
+            if (extraSeedItemCount > 0)
             {
                 var extrasTag = new UserTag { Name = "Extras" };
-                for (var index = 0; index < _extraSeedItemCount; index++)
+                for (var index = 0; index < extraSeedItemCount; index++)
                 {
                     var itemNumber = index + 4;
                     var mediaId = $"TEST-{itemNumber:D3}";
@@ -224,7 +273,7 @@ namespace Japlayer.UITests.Fixtures
                         MediaId = mediaId,
                         Scene = 1,
                         Hostname = "localhost",
-                        Path = DummyVideoPath,
+                        Path = dummyVideoPath,
                         CreatedAt = new DateTime(2024, 1, 1, 10, 0, 0, DateTimeKind.Utc).AddDays(-itemNumber)
                     });
                     extraMedia.MediaMetadata.Add(new MediaMetadata
@@ -243,8 +292,6 @@ namespace Japlayer.UITests.Fixtures
                     context.Media.Add(extraMedia);
                 }
             }
-
-            context.SaveChanges();
         }
 
         private void WriteSettingsFile()
@@ -285,21 +332,19 @@ namespace Japlayer.UITests.Fixtures
 
             App = Application.Launch(processStartInfo);
 
-            // Wait for main window to appear
+            // Wait for main window to appear using Win32 process-filtered HWND lookup
             MainWindow = Retry.WhileNull(
-                () => FindMainWindow(),
+                FindMainWindow,
                 TimeSpan.FromSeconds(15),
-                TimeSpan.FromMilliseconds(250)).Result;
+                TimeSpan.FromMilliseconds(50)).Result;
 
             if (MainWindow == null)
             {
                 throw new TimeoutException("Main window of Japlayer could not be obtained within timeout.");
             }
 
-            // Bring window to focus
             MainWindow.SetForeground();
             MainWindow.Focus();
-            Wait.UntilInputIsProcessed();
         }
 
         private Window? FindMainWindow()
@@ -309,28 +354,52 @@ namespace Japlayer.UITests.Fixtures
                 return null;
             }
 
-            var desktop = Automation.GetDesktop();
-            var processElements = desktop.FindAllChildren(conditionFactory =>
-                conditionFactory.ByProcessId(App.ProcessId));
-
-            // Prefer window that contains AppTitleTextBlock or MediaGrid
-            foreach (var element in processElements)
+            var windowHandles = GetProcessWindowHandles(App.ProcessId);
+            foreach (var handle in windowHandles)
             {
-                if (element.FindFirstDescendant(conditionFactory => conditionFactory.ByAutomationId("AppTitleTextBlock")) != null ||
-                    element.FindFirstDescendant(conditionFactory => conditionFactory.ByAutomationId("MediaGrid")) != null)
+                try
                 {
-                    return element.AsWindow();
+                    var window = Automation.FromHandle(handle).AsWindow();
+                    if (window.FindFirstDescendant(conditionFactory => conditionFactory.ByAutomationId("AppTitleTextBlock")) != null ||
+                        window.FindFirstDescendant(conditionFactory => conditionFactory.ByAutomationId("MediaGrid")) != null)
+                    {
+                        return window;
+                    }
+
+                    if (window.BoundingRectangle.Width > 100)
+                    {
+                        return window;
+                    }
+                }
+                catch
+                {
+                    // Window may still be initializing
                 }
             }
 
-            // Fallback: window with width > 100
-            var largeWindow = processElements.FirstOrDefault(element => element.BoundingRectangle.Width > 100);
-            if (largeWindow != null)
-            {
-                return largeWindow.AsWindow();
-            }
-
             return null;
+        }
+
+        private static List<IntPtr> GetProcessWindowHandles(int processId)
+        {
+            var handles = new List<IntPtr>();
+            EnumWindows((hWnd, lParam) =>
+            {
+                if (!IsWindowVisible(hWnd))
+                {
+                    return true;
+                }
+
+                _ = GetWindowThreadProcessId(hWnd, out var windowProcessId);
+                if (windowProcessId == processId)
+                {
+                    handles.Add(hWnd);
+                }
+
+                return true;
+            }, IntPtr.Zero);
+
+            return handles;
         }
 
         private static string FindSolutionRoot()
@@ -376,18 +445,33 @@ namespace Japlayer.UITests.Fixtures
             }
             catch { }
 
-            // Release SQLite connection pools before attempting directory deletion
             SqliteConnection.ClearAllPools();
-            Thread.Sleep(200);
 
-            try
+            if (!Directory.Exists(TempDirectory))
             {
-                if (Directory.Exists(TempDirectory))
+                return;
+            }
+
+            for (var attempt = 0; attempt < 5; attempt++)
+            {
+                try
                 {
                     Directory.Delete(TempDirectory, true);
+                    return;
+                }
+                catch (IOException) when (attempt < 4)
+                {
+                    Thread.Sleep(50);
+                }
+                catch (UnauthorizedAccessException) when (attempt < 4)
+                {
+                    Thread.Sleep(50);
+                }
+                catch
+                {
+                    return;
                 }
             }
-            catch { }
         }
     }
 }

@@ -80,14 +80,25 @@ namespace Japlayer.UITests.PageObjects
                 return null;
             }
 
+            // LibraryPage.xaml binds AutomationProperties.AutomationId="{x:Bind Id}" on the card's root Grid.
+            var cardContent = grid.FindFirstDescendant(conditionFactory => conditionFactory.ByAutomationId(mediaId));
+            if (cardContent != null)
+            {
+                var current = cardContent;
+                while (current != null && current.ControlType != ControlType.ListItem)
+                {
+                    current = current.Parent;
+                }
+
+                if (current != null)
+                {
+                    return current;
+                }
+            }
+
             var items = grid.FindAllDescendants(conditionFactory => conditionFactory.ByControlType(ControlType.ListItem));
             foreach (var item in items)
             {
-                if (item.FindFirstDescendant(conditionFactory => conditionFactory.ByAutomationId(mediaId)) != null)
-                {
-                    return item;
-                }
-
                 var textElements = item.FindAllDescendants(conditionFactory => conditionFactory.ByControlType(ControlType.Text));
                 if (textElements.Any(textElement =>
                     textElement.Properties.Name.ValueOrDefault?.Contains(mediaId, StringComparison.OrdinalIgnoreCase) == true))
@@ -125,6 +136,13 @@ namespace Japlayer.UITests.PageObjects
             var ids = new List<string>();
             foreach (var item in GetAllVisibleCards())
             {
+                var directChildId = item.FindFirstChild()?.Properties.AutomationId.ValueOrDefault;
+                if (!string.IsNullOrEmpty(directChildId) && directChildId.StartsWith("TEST-", StringComparison.OrdinalIgnoreCase))
+                {
+                    ids.Add(directChildId);
+                    continue;
+                }
+
                 var titleText = item.FindAllDescendants(conditionFactory => conditionFactory.ByControlType(ControlType.Text))
                     .Select(textElement => textElement.Properties.Name.ValueOrDefault)
                     .FirstOrDefault(name => !string.IsNullOrEmpty(name) && name.StartsWith("TEST-", StringComparison.OrdinalIgnoreCase));
@@ -159,7 +177,6 @@ namespace Japlayer.UITests.PageObjects
             var search = RequireElement(SearchBox, nameof(SearchBox));
             search.Focus();
             search.Text = query;
-            Wait.UntilInputIsProcessed();
         }
 
         public void ClearSearch()
@@ -167,14 +184,12 @@ namespace Japlayer.UITests.PageObjects
             var search = RequireElement(SearchBox, nameof(SearchBox));
             search.Focus();
             search.Text = string.Empty;
-            Wait.UntilInputIsProcessed();
         }
 
         public void OpenFacetFlyout(string facetLabel)
         {
             var button = RequireElement(FindFacetButton(facetLabel), $"Facet button '{facetLabel}'");
             ActivateElement(button);
-            Wait.UntilInputIsProcessed();
             RequireElement(
                 WaitForElement(() => _window.FindFirstDescendant(conditionFactory => conditionFactory.ByAutomationId("FacetSearchTextBox"))),
                 "FacetSearchTextBox inside flyout");
@@ -186,7 +201,6 @@ namespace Japlayer.UITests.PageObjects
                 WaitForElement(() => _window.FindFirstDescendant(conditionFactory => conditionFactory.ByAutomationId("FacetSearchTextBox"))?.AsTextBox()),
                 "FacetSearchTextBox");
             searchBox.Text = query;
-            Wait.UntilInputIsProcessed();
         }
 
         public void ClickFacetItem(string itemName)
@@ -204,32 +218,51 @@ namespace Japlayer.UITests.PageObjects
                 WaitForElement(() => _window.FindFirstDescendant(conditionFactory => conditionFactory.ByAutomationId("FacetClearButton"))),
                 "FacetClearButton");
             ActivateElement(clearButton);
-            Wait.UntilInputIsProcessed();
         }
 
         public void CloseFlyout()
         {
-            foreach (var label in new[] { "Tags", "Genres", "Cast", "Studios", "Series", "RatingFilterButton", "RuntimeFilterButton", "SortDropDownButton" })
+            if (CloseAnyOpenFlyout())
             {
-                var button = _window.FindFirstDescendant(conditionFactory => conditionFactory.ByAutomationId(label));
-                if (button != null && button.Patterns.ExpandCollapse.IsSupported &&
-                    button.Patterns.ExpandCollapse.Pattern.ExpandCollapseState == ExpandCollapseState.Expanded)
-                {
-                    button.Patterns.ExpandCollapse.Pattern.Collapse();
-                    Wait.UntilInputIsProcessed();
-                    return;
-                }
+                return;
             }
 
             Keyboard.Type(VirtualKeyShort.ESCAPE);
             Wait.UntilInputIsProcessed();
         }
 
+        public bool CloseAnyOpenFlyout()
+        {
+            var flyoutIds = new HashSet<string>(StringComparer.Ordinal)
+            {
+                "Tags", "Genres", "Cast", "Studios", "Series",
+                "RatingFilterButton", "RuntimeFilterButton", "SortDropDownButton"
+            };
+
+            foreach (var button in _window.FindAllDescendants(conditionFactory => conditionFactory.ByControlType(ControlType.Button)))
+            {
+                var automationId = button.Properties.AutomationId.ValueOrDefault;
+                if (automationId != null &&
+                    flyoutIds.Contains(automationId) &&
+                    button.Patterns.ExpandCollapse.IsSupported &&
+                    button.Patterns.ExpandCollapse.Pattern.ExpandCollapseState == ExpandCollapseState.Expanded)
+                {
+                    button.Patterns.ExpandCollapse.Pattern.Collapse();
+                    Retry.WhileTrue(
+                        () => button.Patterns.ExpandCollapse.Pattern.ExpandCollapseState == ExpandCollapseState.Expanded,
+                        TimeSpan.FromSeconds(1),
+                        TimeSpan.FromMilliseconds(25));
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         public void SelectSortField(string fieldDisplayName)
         {
             var sortButton = RequireElement(SortDropDownButton, nameof(SortDropDownButton));
             ActivateElement(sortButton);
-            Wait.UntilInputIsProcessed();
 
             var targetItem = RequireElement(
                 WaitForElement(() =>
@@ -242,21 +275,18 @@ namespace Japlayer.UITests.PageObjects
                 $"Sort option '{fieldDisplayName}'");
 
             ActivateElement(targetItem);
-            Wait.UntilInputIsProcessed();
         }
 
         public void ToggleSortDirection()
         {
             var directionButton = RequireElement(SortDirectionButton, nameof(SortDirectionButton));
             ActivateElement(directionButton);
-            Wait.UntilInputIsProcessed();
         }
 
         public void ClickShuffle()
         {
             var shuffleButton = RequireElement(ShuffleButton, nameof(ShuffleButton));
             ActivateElement(shuffleButton);
-            Wait.UntilInputIsProcessed();
         }
 
         public void AdjustRangeSlider(Button? filterButton, string flyoutMarkerAutomationId, double minDeltaFraction, double maxDeltaFraction)
@@ -264,24 +294,24 @@ namespace Japlayer.UITests.PageObjects
             _window.SetForeground();
             var button = RequireElement(filterButton, $"Range filter button for '{flyoutMarkerAutomationId}'");
             ActivateElement(button);
-            Wait.UntilInputIsProcessed();
 
             var rangeTextElement = RequireElement(
                 WaitForElement(() => _window.FindFirstDescendant(conditionFactory => conditionFactory.ByAutomationId(flyoutMarkerAutomationId))),
                 flyoutMarkerAutomationId);
             var initialRangeText = rangeTextElement.Name;
 
-            // Allow Flyout entrance animation to settle before reading thumb coordinates
-            Thread.Sleep(250);
-
-            var thumbs = _window.FindAllDescendants(conditionFactory => conditionFactory.ByControlType(ControlType.Thumb))
-                .Where(thumb => thumb.BoundingRectangle.Width > 0 && thumb.BoundingRectangle.Width <= 40)
-                .OrderBy(thumb => thumb.BoundingRectangle.Left)
-                .ToArray();
-
-            if (thumbs.Length < 2)
+            var thumbs = Retry.WhileNull(() =>
             {
-                throw new InvalidOperationException($"Expected 2 range thumbs for '{flyoutMarkerAutomationId}', found {thumbs.Length}.");
+                var found = _window.FindAllDescendants(conditionFactory => conditionFactory.ByControlType(ControlType.Thumb))
+                    .Where(thumb => thumb.BoundingRectangle.Width > 0 && thumb.BoundingRectangle.Width <= 40)
+                    .OrderBy(thumb => thumb.BoundingRectangle.Left)
+                    .ToArray();
+                return found.Length >= 2 ? found : null;
+            }, DefaultTimeout, PollInterval).Result;
+
+            if (thumbs == null || thumbs.Length < 2)
+            {
+                throw new InvalidOperationException($"Expected 2 range thumbs for '{flyoutMarkerAutomationId}', found {thumbs?.Length ?? 0}.");
             }
 
             var minThumb = thumbs[0];
@@ -313,13 +343,11 @@ namespace Japlayer.UITests.PageObjects
         {
             var button = RequireElement(filterButton, $"Range filter button for '{resetButtonAutomationId}'");
             ActivateElement(button);
-            Wait.UntilInputIsProcessed();
 
             var resetButton = RequireElement(
                 WaitForElement(() => _window.FindFirstDescendant(conditionFactory => conditionFactory.ByAutomationId(resetButtonAutomationId))),
                 resetButtonAutomationId);
             ActivateElement(resetButton);
-            Wait.UntilInputIsProcessed();
 
             CloseFlyout();
         }
@@ -330,7 +358,6 @@ namespace Japlayer.UITests.PageObjects
                 WaitForElement(() => _window.FindFirstDescendant(conditionFactory => conditionFactory.ByAutomationId("RemoveFilterChipButton"))),
                 "RemoveFilterChipButton");
             ActivateElement(removeButton);
-            Wait.UntilInputIsProcessed();
         }
 
         public void ClickClearAllFilters()
@@ -339,7 +366,6 @@ namespace Japlayer.UITests.PageObjects
                 WaitForElement(() => ClearAllFiltersButton),
                 nameof(ClearAllFiltersButton));
             ActivateElement(clearButton);
-            Wait.UntilInputIsProcessed();
         }
 
         public void ClickResetAllFilters()
@@ -348,14 +374,12 @@ namespace Japlayer.UITests.PageObjects
                 WaitForElement(() => ResetAllFiltersButton),
                 nameof(ResetAllFiltersButton));
             ActivateElement(resetButton);
-            Wait.UntilInputIsProcessed();
         }
 
         public void ClickCard(string mediaId)
         {
             var card = RequireElement(WaitForCard(mediaId), $"Card '{mediaId}'");
             ActivateElement(card);
-            Wait.UntilInputIsProcessed();
         }
 
         public void ScrollCardIntoView(string mediaId)

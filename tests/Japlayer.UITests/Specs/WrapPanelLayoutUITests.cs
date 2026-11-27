@@ -8,11 +8,11 @@ namespace Japlayer.UITests.Specs
     [TestClass]
     public class WrapPanelLayoutUITests
     {
-        private TestAppFixture? _fixture;
-        private LibraryPageObject? _libraryPage;
+        private static TestAppFixture? _fixture;
+        private static LibraryPageObject? _libraryPage;
 
-        [TestInitialize]
-        public void Setup()
+        [ClassInitialize]
+        public static void ClassSetup(TestContext _)
         {
             _fixture = new TestAppFixture();
             _fixture.StartApp();
@@ -21,8 +21,37 @@ namespace Japlayer.UITests.Specs
             Assert.IsNotNull(_libraryPage.WaitForCard("TEST-001"), "Initial card TEST-001 should be present.");
         }
 
-        [TestCleanup]
-        public void Teardown() => _fixture?.Dispose();
+        [ClassCleanup]
+        public static void ClassTeardown()
+        {
+            _fixture?.Dispose();
+            _fixture = null;
+            _libraryPage = null;
+        }
+
+        [TestInitialize]
+        public void Setup()
+        {
+            Assert.IsNotNull(_fixture?.MainWindow);
+            Assert.IsNotNull(_libraryPage);
+
+            _libraryPage.CloseAnyOpenFlyout();
+
+            var mediaItemPage = new MediaItemPageObject(_fixture.MainWindow);
+            if (mediaItemPage.BackButton != null)
+            {
+                mediaItemPage.ClickBack();
+                Assert.IsNotNull(_libraryPage.WaitForElement(() => _libraryPage.SearchBox), "SearchBox should be visible after returning to LibraryPage.");
+            }
+
+            if (_libraryPage.ClearAllFiltersButton != null)
+            {
+                _libraryPage.ClickClearAllFilters();
+            }
+
+            Assert.IsNotNull(_libraryPage.WaitForCard("TEST-001"), "Initial card TEST-001 should be present.");
+            Assert.IsTrue(_libraryPage.WaitForCardCount(3), "All 3 seeded cards should be visible initially.");
+        }
 
         [TestMethod]
         public void ActiveFiltersBar_IncludeIndieAndExcludeVR_StayOnSingleRow()
@@ -108,19 +137,28 @@ namespace Japlayer.UITests.Specs
             Assert.IsNotNull(mediaItemPage.WaitForElement(() => mediaItemPage.BackButton), "BackButton should appear after navigating to MediaItemPage.");
 
             var tagsReady = Retry.WhileFalse(
-                () => mediaItemPage.GetRemoveTagButtons().Length >= 2,
+                () => mediaItemPage.GetRemoveTagButtons().Length == 3,
                 TimeSpan.FromSeconds(5),
                 TimeSpan.FromMilliseconds(100)).Success;
             Assert.IsTrue(tagsReady, "Expected seeded tags (VR, Clips, HDR) on TEST-002.");
 
+            var singleRowSettled = Retry.WhileFalse(() =>
+            {
+                var buttons = mediaItemPage.GetRemoveTagButtons();
+                if (buttons.Length < 3)
+                {
+                    return false;
+                }
+
+                var firstTop = buttons[0].BoundingRectangle.Top;
+                return buttons.All(button => Math.Abs(button.BoundingRectangle.Top - firstTop) <= 2);
+            }, TimeSpan.FromSeconds(3), TimeSpan.FromMilliseconds(50)).Success;
+
             var tagButtons = mediaItemPage.GetRemoveTagButtons();
             var firstTop = tagButtons[0].BoundingRectangle.Top;
-            foreach (var button in tagButtons)
-            {
-                Assert.IsTrue(
-                    Math.Abs(button.BoundingRectangle.Top - firstTop) <= 2,
-                    $"Expected tags on 1 row, but found Top={button.BoundingRectangle.Top} vs firstTop={firstTop}.");
-            }
+            Assert.IsTrue(
+                singleRowSettled,
+                $"Expected tags on 1 row, but found Tops: {string.Join(", ", tagButtons.Select(button => button.BoundingRectangle.Top))}.");
         }
     }
 }

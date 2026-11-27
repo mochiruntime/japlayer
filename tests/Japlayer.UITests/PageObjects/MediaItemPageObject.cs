@@ -133,7 +133,6 @@ namespace Japlayer.UITests.PageObjects
             var box = RequireElement(WaitForElement(() => TagSearchBox), nameof(TagSearchBox));
             box.Focus();
             box.Text = text;
-            Wait.UntilInputIsProcessed();
         }
 
         public void ClickTagSearchBox()
@@ -199,7 +198,6 @@ namespace Japlayer.UITests.PageObjects
                 ActivateElement(suggestionItem);
             }
 
-            Wait.UntilInputIsProcessed();
             return true;
         }
 
@@ -214,7 +212,6 @@ namespace Japlayer.UITests.PageObjects
                 WaitForElement(() => _window.FindFirstDescendant(conditionFactory => conditionFactory.ByAutomationId("RemoveTagButton"))?.AsButton()),
                 "RemoveTagButton");
             ActivateElement(removeButton);
-            Wait.UntilInputIsProcessed();
         }
 
         public void RemoveTag(string tagName)
@@ -225,70 +222,60 @@ namespace Japlayer.UITests.PageObjects
                     ?.AsButton()),
                 $"RemoveTagButton for '{tagName}'");
             ActivateElement(removeButton);
-            Wait.UntilInputIsProcessed();
         }
 
         public void OpenGalleryLightbox()
         {
             var imageButton = RequireElement(WaitForElement(() => GalleryImageButton), nameof(GalleryImageButton));
             ActivateElement(imageButton);
-            Wait.UntilInputIsProcessed();
         }
 
         public void ClickLightboxNext()
         {
             var nextButton = RequireElement(WaitForElement(() => LightboxNextButton), nameof(LightboxNextButton));
             ActivateElement(nextButton);
-            Wait.UntilInputIsProcessed();
         }
 
         public void ClickLightboxPrevious()
         {
             var prevButton = RequireElement(WaitForElement(() => LightboxPreviousButton), nameof(LightboxPreviousButton));
             ActivateElement(prevButton);
-            Wait.UntilInputIsProcessed();
         }
 
         public void SwitchToGridView()
         {
             var gridButton = RequireElement(WaitForElement(() => GridViewButton), nameof(GridViewButton));
             ActivateElement(gridButton);
-            Wait.UntilInputIsProcessed();
         }
 
         public void SwitchToFocusView()
         {
             var focusButton = RequireElement(WaitForElement(() => FocusViewButton), nameof(FocusViewButton));
             ActivateElement(focusButton);
-            Wait.UntilInputIsProcessed();
         }
 
         public void ToggleFullscreen()
         {
             var fullWindow = RequireElement(WaitForElement(() => FullWindowButton), nameof(FullWindowButton));
             ActivateElement(fullWindow);
-            Wait.UntilInputIsProcessed();
         }
 
         public void CloseGalleryLightbox()
         {
             var closeButton = RequireElement(WaitForElement(() => LightboxCloseButton), nameof(LightboxCloseButton));
             ActivateElement(closeButton);
-            Wait.UntilInputIsProcessed();
         }
 
         public void ClickPlayOverlay()
         {
             var overlay = RequireElement(WaitForElement(() => PlayOverlayButton), nameof(PlayOverlayButton));
             ActivateElement(overlay);
-            Wait.UntilInputIsProcessed();
         }
 
         public void ClickBack()
         {
             var back = RequireElement(WaitForElement(() => BackButton), nameof(BackButton));
             ActivateElement(back);
-            Wait.UntilInputIsProcessed();
         }
 
         private static void ActivateElement(AutomationElement element)
