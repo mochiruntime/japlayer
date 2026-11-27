@@ -7,6 +7,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Messaging;
+using Japlayer.Collections;
 using Japlayer.Contracts;
 using Japlayer.Data.Contracts;
 using Japlayer.Data.Models;
@@ -135,7 +136,13 @@ namespace Japlayer.ViewModels
         public partial ObservableCollection<string>? GalleryImages { get; set; }
 
         public ObservableCollection<string> UserTags { get; } = [];
+        public BatchObservableCollection<TagSuggestionItem> TagSuggestions { get; } = [];
         public List<string> AllAvailableTags { get; private set; } = [];
+
+        [ObservableProperty]
+        public partial string TagSearchText { get; set; } = string.Empty;
+
+        partial void OnTagSearchTextChanged(string value) => UpdateTagSuggestions();
 
         public string Id => _libraryItem.MediaId;
         public string Title => !string.IsNullOrWhiteSpace(MediaItemData?.Title)
@@ -261,6 +268,8 @@ namespace Japlayer.ViewModels
             return suggestions;
         }
 
+        private void UpdateTagSuggestions() => TagSuggestions.ReplaceAll(GetTagSuggestions(TagSearchText));
+
         public async Task AddUserTagAsync(string tagName)
         {
             var trimmedTagName = tagName.Trim();
@@ -274,20 +283,25 @@ namespace Japlayer.ViewModels
                 return;
             }
 
+            var canonicalTagName = AllAvailableTags.FirstOrDefault(tag =>
+                string.Equals(tag, trimmedTagName, StringComparison.OrdinalIgnoreCase))
+                ?? trimmedTagName;
+
             using (_databaseChangeMonitor?.BeginInternalWrite())
             {
-                await _mediaProvider.AddUserTagAsync(Id, trimmedTagName);
+                await _mediaProvider.AddUserTagAsync(Id, canonicalTagName);
             }
 
-            UserTags.Add(trimmedTagName);
+            UserTags.Add(canonicalTagName);
 
-            if (!AllAvailableTags.Any(tag => string.Equals(tag, trimmedTagName, StringComparison.OrdinalIgnoreCase)))
+            if (!AllAvailableTags.Contains(canonicalTagName, StringComparer.OrdinalIgnoreCase))
             {
-                AllAvailableTags.Add(trimmedTagName);
+                AllAvailableTags.Add(canonicalTagName);
                 AllAvailableTags.Sort(StringComparer.OrdinalIgnoreCase);
             }
 
-            _messenger.Send(new MediaUserTagAddedMessage(Id, trimmedTagName));
+            UpdateTagSuggestions();
+            _messenger.Send(new MediaUserTagAddedMessage(Id, canonicalTagName));
         }
 
         public async Task RemoveUserTagAsync(string tagName)
@@ -304,6 +318,7 @@ namespace Japlayer.ViewModels
             }
 
             UserTags.Remove(existing);
+            UpdateTagSuggestions();
             _messenger.Send(new MediaUserTagRemovedMessage(Id, existing));
         }
 
@@ -329,6 +344,8 @@ namespace Japlayer.ViewModels
                 Rating = MediaItemData.Rating <= 0 ? -1 : MediaItemData.Rating;
                 _isInitializingRating = false;
             }
+
+            UpdateTagSuggestions();
 
             var scenes = await _sceneProvider.GetMediaScenesAsync(Id);
             var thumbnails = await _thumbnailProvider.GetThumbnailsAsync(Id);

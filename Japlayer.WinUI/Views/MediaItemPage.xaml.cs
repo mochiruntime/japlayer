@@ -22,13 +22,21 @@ namespace Japlayer.Views
         private int _lightboxIndex;
         private bool _isDockedToScenes;
         private double _lastGenresAvailableWidth;
+        private bool _isSuppressingPostSubmitReopen;
+        private int _tagDropdownCloseGeneration;
         private readonly PointerEventHandler _highlightsWheelHandler;
+        private readonly PointerEventHandler _rootGridPointerPressedHandler;
+        private readonly PointerEventHandler _tagBoxPointerPressedHandler;
 
         public MediaItemPage()
         {
             this.InitializeComponent();
             _highlightsWheelHandler = new PointerEventHandler(HighlightsScrollViewer_PointerWheelChanged);
+            _rootGridPointerPressedHandler = new PointerEventHandler(RootGrid_PointerPressed);
+            _tagBoxPointerPressedHandler = new PointerEventHandler(TagAutoSuggestBox_PointerPressed);
             GalleryScrollViewer.AddHandler(UIElement.PointerWheelChangedEvent, new PointerEventHandler(GalleryScrollViewer_PointerWheelChanged), true);
+            RootGrid.AddHandler(UIElement.PointerPressedEvent, _rootGridPointerPressedHandler, true);
+            TagAutoSuggestBox.AddHandler(UIElement.PointerPressedEvent, _tagBoxPointerPressedHandler, true);
             this.Unloaded += MediaItemPage_Unloaded;
         }
 
@@ -168,46 +176,152 @@ namespace Japlayer.Views
         {
             if (sender is FrameworkElement element && element.Tag is string tagName)
             {
+                var wasDropdownOpen = TagAutoSuggestBox.IsSuggestionListOpen;
+                if (!wasDropdownOpen)
+                {
+                    FocusNeutralSink();
+                }
+
                 await ViewModel.RemoveUserTagAsync(tagName);
+                if (IsLoaded && !wasDropdownOpen)
+                {
+                    CloseTagDropdownDeferred(suppressGotFocus: false);
+                }
             }
+        }
+
+        private void CloseTagDropdownDeferred(bool suppressGotFocus)
+        {
+            _isSuppressingPostSubmitReopen = suppressGotFocus;
+            var closeGeneration = ++_tagDropdownCloseGeneration;
+            TagAutoSuggestBox.IsSuggestionListOpen = false;
+            DispatcherQueue?.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+            {
+                _isSuppressingPostSubmitReopen = false;
+                if (IsLoaded && _tagDropdownCloseGeneration == closeGeneration)
+                {
+                    TagAutoSuggestBox.IsSuggestionListOpen = false;
+                }
+            });
         }
 
         private void TagAutoSuggestBox_GotFocus(object sender, RoutedEventArgs eventArgs)
         {
-            if (sender is AutoSuggestBox autoSuggestBox)
+            if (_isSuppressingPostSubmitReopen)
             {
-                autoSuggestBox.ItemsSource = ViewModel.GetTagSuggestions(autoSuggestBox.Text);
-                autoSuggestBox.IsSuggestionListOpen = true;
+                return;
             }
+
+            OpenTagSuggestionsIfAvailable();
         }
 
-        private void TagAutoSuggestBox_TextChanged(AutoSuggestBox sender, AutoSuggestBoxTextChangedEventArgs eventArgs)
+        private void TagAutoSuggestBox_PointerPressed(object sender, PointerRoutedEventArgs eventArgs)
         {
-            if (eventArgs.Reason == AutoSuggestionBoxTextChangeReason.UserInput)
+            _isSuppressingPostSubmitReopen = false;
+            OpenTagSuggestionsIfAvailable();
+        }
+
+        private void OpenTagSuggestionsIfAvailable()
+        {
+            _tagDropdownCloseGeneration++;
+            if (ViewModel != null && !TagAutoSuggestBox.IsSuggestionListOpen)
             {
-                sender.ItemsSource = ViewModel.GetTagSuggestions(sender.Text);
+                TagAutoSuggestBox.IsSuggestionListOpen = ViewModel.TagSuggestions.Count > 0;
             }
         }
 
         private void TagAutoSuggestBox_SuggestionChosen(AutoSuggestBox sender, AutoSuggestBoxSuggestionChosenEventArgs eventArgs)
         {
-            if (eventArgs.SelectedItem is TagSuggestionItem)
+            if (eventArgs.SelectedItem is TagSuggestionItem && ViewModel != null)
             {
-                sender.Text = string.Empty;
+                _isSuppressingPostSubmitReopen = true;
             }
         }
 
         private async void TagAutoSuggestBox_QuerySubmitted(AutoSuggestBox sender, AutoSuggestBoxQuerySubmittedEventArgs eventArgs)
         {
+            if (ViewModel == null)
+            {
+                return;
+            }
+
             var tagName = eventArgs.ChosenSuggestion is TagSuggestionItem suggestion
                 ? suggestion.Name
                 : eventArgs.QueryText;
 
+            ViewModel.TagSearchText = string.Empty;
+            CloseTagDropdownDeferred(suppressGotFocus: true);
+            var closeGeneration = _tagDropdownCloseGeneration;
+
             if (!string.IsNullOrWhiteSpace(tagName))
             {
                 await ViewModel.AddUserTagAsync(tagName);
-                sender.Text = string.Empty;
+                if (IsLoaded && _tagDropdownCloseGeneration == closeGeneration)
+                {
+                    CloseTagDropdownDeferred(suppressGotFocus: true);
+                }
             }
+        }
+
+        private void RootGrid_PointerPressed(object sender, PointerRoutedEventArgs eventArgs)
+        {
+            if (eventArgs.OriginalSource is DependencyObject source && IsDescendantOf(source, TagAutoSuggestBox))
+            {
+                return;
+            }
+
+            if (TagAutoSuggestBox.IsSuggestionListOpen)
+            {
+                TagAutoSuggestBox.IsSuggestionListOpen = false;
+            }
+
+            if (IsTagAutoSuggestBoxFocused())
+            {
+                DispatcherQueue?.TryEnqueue(BlurTagAutoSuggestBox);
+            }
+        }
+
+        private bool IsTagAutoSuggestBoxFocused() =>
+            XamlRoot != null &&
+            FocusManager.GetFocusedElement(XamlRoot) is DependencyObject focusedElement &&
+            IsDescendantOf(focusedElement, TagAutoSuggestBox);
+
+        private void BlurTagAutoSuggestBox()
+        {
+            if (!IsLoaded || !IsTagAutoSuggestBoxFocused())
+            {
+                return;
+            }
+
+            FocusNeutralSink();
+        }
+
+        private void FocusNeutralSink()
+        {
+            if (!IsLoaded)
+            {
+                return;
+            }
+
+            NeutralFocusSink.IsTabStop = true;
+            NeutralFocusSink.Focus(FocusState.Programmatic);
+            DispatcherQueue?.TryEnqueue(() => NeutralFocusSink.IsTabStop = false);
+        }
+
+        private static bool IsDescendantOf(DependencyObject? element, DependencyObject ancestor)
+        {
+            var current = element;
+            while (current is UIElement)
+            {
+                if (ReferenceEquals(current, ancestor))
+                {
+                    return true;
+                }
+
+                current = VisualTreeHelper.GetParent(current);
+            }
+
+            return false;
         }
 
         private void GalleryScrollViewer_PointerWheelChanged(object sender, PointerRoutedEventArgs eventArgs) => HandleHorizontalWheelScroll(GalleryScrollViewer, eventArgs);
@@ -608,6 +722,9 @@ namespace Japlayer.Views
 
         private void MediaItemPage_Unloaded(object sender, RoutedEventArgs eventArgs)
         {
+            RootGrid.RemoveHandler(UIElement.PointerPressedEvent, _rootGridPointerPressedHandler);
+            TagAutoSuggestBox.RemoveHandler(UIElement.PointerPressedEvent, _tagBoxPointerPressedHandler);
+
             if (_fullScreenPlayer != null)
             {
                 ToggleFullScreen(_fullScreenPlayer);

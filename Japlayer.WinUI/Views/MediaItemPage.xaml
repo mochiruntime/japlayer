@@ -10,6 +10,7 @@
     xmlns:helpers="using:Japlayer.Helpers"
     mc:Ignorable="d"
     Background="Transparent"
+    UseSystemFocusVisuals="False"
     PreviewKeyDown="Page_PreviewKeyDown">
 
     <Page.Resources>
@@ -17,11 +18,25 @@
         <converters:PathToImageSourceConverter x:Key="PathToImageSourceConverter"/>
     </Page.Resources>
 
-    <Grid Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+    <Grid x:Name="RootGrid" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
         <Grid.RowDefinitions>
             <RowDefinition Height="64"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
+
+        <Button x:Name="NeutralFocusSink"
+                Width="1"
+                Height="1"
+                MinWidth="0"
+                MinHeight="0"
+                Padding="0"
+                BorderThickness="0"
+                Background="Transparent"
+                HorizontalAlignment="Left"
+                VerticalAlignment="Top"
+                IsHitTestVisible="False"
+                IsTabStop="False"
+                UseSystemFocusVisuals="False"/>
 
         <!-- Fixed Acrylic Header (64px) -->
         <Border Grid.Row="0"
@@ -276,6 +291,8 @@
                                                             <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
                                                                 <TextBlock Text="{x:Bind}" FontSize="12" VerticalAlignment="Center"/>
                                                                 <Button AutomationProperties.AutomationId="RemoveTagButton"
+                                                                        AutomationProperties.HelpText="{x:Bind}"
+                                                                        AllowFocusOnInteraction="False"
                                                                         Content="×"
                                                                         Tag="{x:Bind}"
                                                                         Click="RemoveTag_Click"
@@ -296,13 +313,14 @@
                                                             PlaceholderText="+ Add tag..."
                                                             TextMemberPath="Name"
                                                             UpdateTextOnSelect="False"
+                                                            Text="{x:Bind ViewModel.TagSearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                            ItemsSource="{x:Bind ViewModel.TagSuggestions, Mode=OneWay}"
                                                             Width="180"
                                                             Height="26"
                                                             MinHeight="26"
                                                             FontSize="12"
                                                             VerticalAlignment="Center"
                                                             GotFocus="TagAutoSuggestBox_GotFocus"
-                                                            TextChanged="TagAutoSuggestBox_TextChanged"
                                                             SuggestionChosen="TagAutoSuggestBox_SuggestionChosen"
                                                             QuerySubmitted="TagAutoSuggestBox_QuerySubmitted">
                                                 <AutoSuggestBox.Resources>

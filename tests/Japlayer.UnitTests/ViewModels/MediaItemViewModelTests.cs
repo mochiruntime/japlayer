@@ -1,3 +1,4 @@
+using System.Collections.Specialized;
 using Japlayer.Contracts;
 using Japlayer.Data.Contracts;
 using Japlayer.Data.Entities;
@@ -193,6 +194,102 @@ namespace Japlayer.UnitTests.ViewModels
 
             Assert.AreEqual("2D", existingSuggestion.ToString());
             Assert.AreEqual("CustomTag", newSuggestion.ToString());
+        }
+
+        private sealed class TagConfigurableMediaProvider(IEnumerable<string> availableTags, IEnumerable<string> itemTags) : IMediaProvider
+        {
+            private readonly List<string> _availableTags = [.. availableTags];
+            private readonly List<string> _itemTags = [.. itemTags];
+
+            public Task<IEnumerable<LibraryItem>> GetLibraryItemsAsync() => Task.FromResult<IEnumerable<LibraryItem>>([]);
+            public Task<IEnumerable<string>> GetUserTagsAsync() => Task.FromResult<IEnumerable<string>>(_availableTags);
+            public Task<IEnumerable<string>> GetGenresAsync() => Task.FromResult<IEnumerable<string>>([]);
+            public Task<IEnumerable<string>> GetCastAsync() => Task.FromResult<IEnumerable<string>>([]);
+            public Task<IEnumerable<string>> GetStudiosAsync() => Task.FromResult<IEnumerable<string>>([]);
+            public Task<IEnumerable<string>> GetSeriesAsync() => Task.FromResult<IEnumerable<string>>([]);
+
+            public Task<MediaItem> GetMediaItemAsync(string mediaId) => Task.FromResult(new MediaItem
+            {
+                MediaId = mediaId,
+                Title = "Tag Test Item",
+                UserTags = [.. _itemTags]
+            });
+
+            public Task AddUserTagAsync(string mediaId, string tagName) => Task.CompletedTask;
+            public Task RemoveUserTagAsync(string mediaId, string tagName) => Task.CompletedTask;
+            public Task SetRatingAsync(string mediaId, int rating) => Task.CompletedTask;
+        }
+
+        [TestMethod]
+        public async Task TagSuggestions_ReactivelyUpdateOnLoadSearchAddAndRemove()
+        {
+            var libraryItem = new LibraryItem { MediaId = "TAG-001", Title = "Tag Test" };
+            var viewModel = new MediaItemViewModel(
+                libraryItem,
+                new StubImageProvider(),
+                new StubSceneProvider(),
+                new TagConfigurableMediaProvider(["2D", "VR"], ["VR"]),
+                new StubSettingsService(),
+                new EmptyThumbnailProvider(),
+                new StubHighlightProvider());
+
+            var initialCollection = viewModel.TagSuggestions;
+            var resetCount = 0;
+            viewModel.TagSuggestions.CollectionChanged += (_, eventArgs) =>
+            {
+                if (eventArgs.Action == NotifyCollectionChangedAction.Reset)
+                {
+                    resetCount++;
+                }
+            };
+
+            await viewModel.LoadDetailsAsync();
+
+            Assert.AreSame(initialCollection, viewModel.TagSuggestions);
+            Assert.AreEqual(1, viewModel.TagSuggestions.Count);
+            Assert.AreEqual(new TagSuggestionItem("2D", false), viewModel.TagSuggestions[0]);
+
+            viewModel.TagSearchText = "NewTag";
+            Assert.AreEqual(1, viewModel.TagSuggestions.Count);
+            Assert.AreEqual(new TagSuggestionItem("NewTag", true), viewModel.TagSuggestions[0]);
+
+            await viewModel.AddUserTagAsync("NewTag");
+            viewModel.TagSearchText = string.Empty;
+
+            CollectionAssert.Contains(viewModel.UserTags, "NewTag");
+            CollectionAssert.Contains(viewModel.AllAvailableTags, "NewTag");
+            Assert.AreEqual(1, viewModel.TagSuggestions.Count);
+            Assert.AreEqual(new TagSuggestionItem("2D", false), viewModel.TagSuggestions[0]);
+
+            await viewModel.RemoveUserTagAsync("NewTag");
+
+            Assert.AreEqual(2, viewModel.TagSuggestions.Count);
+            CollectionAssert.AreEqual(
+                new[] { new TagSuggestionItem("2D", false), new TagSuggestionItem("NewTag", false) },
+                viewModel.TagSuggestions.ToList());
+            Assert.IsTrue(resetCount >= 4);
+        }
+
+        [TestMethod]
+        public async Task AddUserTagAsync_WhenTagMatchesExistingCaseInsensitively_UsesCanonicalCasing()
+        {
+            var libraryItem = new LibraryItem { MediaId = "TAG-002", Title = "Tag Casing Test" };
+            var viewModel = new MediaItemViewModel(
+                libraryItem,
+                new StubImageProvider(),
+                new StubSceneProvider(),
+                new TagConfigurableMediaProvider(["2D", "VR"], ["VR"]),
+                new StubSettingsService(),
+                new EmptyThumbnailProvider(),
+                new StubHighlightProvider());
+
+            await viewModel.LoadDetailsAsync();
+            await viewModel.AddUserTagAsync("2d");
+
+            CollectionAssert.Contains(viewModel.UserTags, "2D");
+            CollectionAssert.DoesNotContain(viewModel.UserTags, "2d");
+            Assert.AreEqual(2, viewModel.AllAvailableTags.Count);
+            Assert.AreEqual(0, viewModel.TagSuggestions.Count);
         }
     }
 }

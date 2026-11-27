@@ -92,6 +92,65 @@ namespace Japlayer.UITests.Specs
         }
 
         [TestMethod]
+        public void TagDropdown_RefreshesSuggestionsAfterCreatingAndRemovingTag_WithoutReloading()
+        {
+            Assert.IsNotNull(_mediaItemPage);
+            Assert.IsNotNull(_libraryPage);
+
+            _mediaItemPage.FocusTagSearchBox();
+            _mediaItemPage.SetTagSearchBoxText("BrandNewUITag");
+            Assert.IsTrue(
+                _mediaItemPage.SelectTagSuggestion("+ Create \"BrandNewUITag\""),
+                "Creating a new tag should show and allow selecting '+ Create \"BrandNewUITag\"'.");
+
+            var tagAppeared = FlaUI.Core.Tools.Retry.WhileFalse(
+                () => _mediaItemPage.HasTagText("BrandNewUITag"),
+                TimeSpan.FromSeconds(3),
+                TimeSpan.FromMilliseconds(100)).Success;
+            Assert.IsTrue(tagAppeared, "Added tag 'BrandNewUITag' should appear.");
+            Assert.IsTrue(_mediaItemPage.WaitUntilTagSuggestionsClosed(), "Suggestion dropdown should close after submitting a new tag.");
+            Assert.AreEqual(string.Empty, _mediaItemPage.GetTagSearchBoxText(), "Tag input should clear after submitting a new tag.");
+
+            // Removing the tag should immediately make it available in the dropdown without leaving the item view
+            _mediaItemPage.RemoveTag("BrandNewUITag");
+            var tagRemoved = FlaUI.Core.Tools.Retry.WhileTrue(
+                () => _mediaItemPage.HasTagText("BrandNewUITag"),
+                TimeSpan.FromSeconds(3),
+                TimeSpan.FromMilliseconds(100)).Success;
+            Assert.IsTrue(tagRemoved, "Removed tag 'BrandNewUITag' should disappear from tag chips.");
+            Assert.IsTrue(_mediaItemPage.WaitUntilTagSuggestionsClosed(), "Removing a tag chip should not unexpectedly reopen the dropdown.");
+
+            _mediaItemPage.SetRating(4);
+            _mediaItemPage.FocusTagSearchBox();
+            Assert.IsTrue(_mediaItemPage.HasTagSuggestion("2D"), "Dropdown should reopen with existing unassigned tags.");
+            Assert.IsTrue(_mediaItemPage.HasTagSuggestion("BrandNewUITag"), "Removed tag 'BrandNewUITag' should appear in dropdown suggestions immediately.");
+
+            // Navigating to another item should also expose the created tag
+            _mediaItemPage.ClickBack();
+            Assert.IsNotNull(_libraryPage.WaitForCard("TEST-002"), "TEST-002 should be visible on LibraryPage.");
+            _libraryPage.ClickCard("TEST-002");
+            Assert.IsNotNull(_mediaItemPage.WaitForElement(() => _mediaItemPage.BackButton), "BackButton should appear on TEST-002.");
+
+            _mediaItemPage.FocusTagSearchBox();
+            Assert.IsTrue(_mediaItemPage.HasTagSuggestion("BrandNewUITag"), "Created tag 'BrandNewUITag' should be available in TEST-002 dropdown.");
+        }
+
+        [TestMethod]
+        public void TagDropdown_ClosesWhenClickingNeutralContainer_AndReopensOnInputClick()
+        {
+            Assert.IsNotNull(_mediaItemPage);
+
+            _mediaItemPage.ClickTagSearchBox();
+            Assert.IsTrue(_mediaItemPage.HasTagSuggestion("2D"), "Suggestion dropdown should open when clicking tag input.");
+
+            _mediaItemPage.ClickNeutralTitleArea();
+            Assert.IsTrue(_mediaItemPage.WaitUntilTagSuggestionsClosed(), "Suggestion dropdown should close when clicking a neutral non-interactable element.");
+
+            _mediaItemPage.ClickTagSearchBox();
+            Assert.IsTrue(_mediaItemPage.HasTagSuggestion("2D"), "Suggestion dropdown should reopen cleanly when clicking tag input again.");
+        }
+
+        [TestMethod]
         public void RatingChangeOnMediaItemPage_SynchronizesBackToLibraryCard()
         {
             Assert.IsNotNull(_mediaItemPage);

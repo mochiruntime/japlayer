@@ -128,6 +128,52 @@ namespace Japlayer.UITests.PageObjects
             Wait.UntilInputIsProcessed();
         }
 
+        public void SetTagSearchBoxText(string text)
+        {
+            var box = RequireElement(WaitForElement(() => TagSearchBox), nameof(TagSearchBox));
+            box.Focus();
+            box.Text = text;
+            Wait.UntilInputIsProcessed();
+        }
+
+        public void ClickTagSearchBox()
+        {
+            _window.SetForeground();
+            var box = RequireElement(WaitForElement(() => TagSearchBox), nameof(TagSearchBox));
+            box.Click();
+            Wait.UntilInputIsProcessed();
+        }
+
+        public void ClickNeutralTitleArea()
+        {
+            _window.SetForeground();
+            var title = RequireElement(WaitForElement(() => TitleText), nameof(TitleText));
+            title.Click();
+            Wait.UntilInputIsProcessed();
+        }
+
+        public List<string> GetVisibleTagSuggestions() =>
+            [.. _window.FindAllDescendants(conditionFactory => conditionFactory.ByControlType(ControlType.ListItem))
+                .Select(item =>
+                {
+                    var text = item.FindFirstDescendant(conditionFactory => conditionFactory.ByControlType(ControlType.Text))
+                        ?.Properties.Name.ValueOrDefault;
+                    return !string.IsNullOrWhiteSpace(text) ? text : (item.Properties.Name.ValueOrDefault ?? string.Empty);
+                })
+                .Where(label => !string.IsNullOrWhiteSpace(label))];
+
+        public bool HasTagSuggestion(string suggestionLabel, TimeSpan? timeout = null) =>
+            Retry.WhileFalse(
+                () => GetVisibleTagSuggestions().Any(label => string.Equals(label, suggestionLabel, StringComparison.OrdinalIgnoreCase)),
+                timeout ?? DefaultTimeout,
+                PollInterval).Success;
+
+        public bool WaitUntilTagSuggestionsClosed(TimeSpan? timeout = null) =>
+            Retry.WhileTrue(
+                () => _window.FindAllDescendants(conditionFactory => conditionFactory.ByControlType(ControlType.ListItem)).Length > 0,
+                timeout ?? DefaultTimeout,
+                PollInterval).Success;
+
         public bool SelectTagSuggestion(string tagName)
         {
             var suggestionItem = WaitForElement(() =>
@@ -160,14 +206,24 @@ namespace Japlayer.UITests.PageObjects
         public string GetTagSearchBoxText() => TagSearchBox?.Text ?? string.Empty;
 
         public bool HasTagText(string tagName) =>
-            _window.FindAllDescendants(conditionFactory => conditionFactory.ByControlType(ControlType.Text))
-                .Any(textElement => string.Equals(textElement.Properties.Name.ValueOrDefault, tagName, StringComparison.OrdinalIgnoreCase));
+            GetRemoveTagButtons().Any(button => string.Equals(button.Properties.HelpText.ValueOrDefault, tagName, StringComparison.OrdinalIgnoreCase));
 
         public void RemoveFirstTag()
         {
             var removeButton = RequireElement(
                 WaitForElement(() => _window.FindFirstDescendant(conditionFactory => conditionFactory.ByAutomationId("RemoveTagButton"))?.AsButton()),
                 "RemoveTagButton");
+            ActivateElement(removeButton);
+            Wait.UntilInputIsProcessed();
+        }
+
+        public void RemoveTag(string tagName)
+        {
+            var removeButton = RequireElement(
+                WaitForElement(() => _window.FindAllDescendants(conditionFactory => conditionFactory.ByAutomationId("RemoveTagButton"))
+                    .FirstOrDefault(button => string.Equals(button.Properties.HelpText.ValueOrDefault, tagName, StringComparison.OrdinalIgnoreCase))
+                    ?.AsButton()),
+                $"RemoveTagButton for '{tagName}'");
             ActivateElement(removeButton);
             Wait.UntilInputIsProcessed();
         }
