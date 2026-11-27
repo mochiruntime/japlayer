@@ -124,7 +124,7 @@ namespace Japlayer.UnitTests.ViewModels
             Assert.AreEqual("CID-12345", viewModel.ContentId);
             Assert.AreEqual(2, viewModel.Genres.Count);
             Assert.AreEqual(2, viewModel.Scenes!.Count);
-            Assert.AreEqual(2, viewModel.GalleryImages!.Count);
+            Assert.AreEqual(2, viewModel.GalleryImages.Count);
 
             // Verify poster selection chose closest to 75% mark for scene 1 (target is 75, closest is 50 or 100)
             Assert.IsNotNull(viewModel.Scenes[0].PosterPath);
@@ -290,6 +290,70 @@ namespace Japlayer.UnitTests.ViewModels
             CollectionAssert.DoesNotContain(viewModel.UserTags, "2d");
             Assert.AreEqual(2, viewModel.AllAvailableTags.Count);
             Assert.AreEqual(0, viewModel.TagSuggestions.Count);
+        }
+
+        private class MutableImageProvider(IEnumerable<string> initialPaths) : IImageProvider
+        {
+            public List<string> Paths { get; set; } = [.. initialPaths];
+
+            public Task<IEnumerable<string>> GetGalleryPathsAsync(string mediaId)
+                => Task.FromResult<IEnumerable<string>>(Paths);
+        }
+
+        [TestMethod]
+        public async Task LoadDetailsAsync_PreservesGalleryImagesCollectionInstanceAndAvoidsNoOpChurn()
+        {
+            // Arrange
+            var imageProvider = new MutableImageProvider(["gallery1.jpg", "gallery2.jpg"]);
+            var viewModel = new MediaItemViewModel(
+                new LibraryItem { MediaId = "GAL-001", Title = "Gallery Stability Test" },
+                imageProvider,
+                new StubSceneProvider(),
+                new StubMediaProvider(),
+                new StubSettingsService(),
+                new EmptyThumbnailProvider(),
+                new StubHighlightProvider());
+
+            var initialCollection = viewModel.GalleryImages;
+            var changedProperties = new List<string>();
+            viewModel.PropertyChanged += (_, eventArgs) =>
+            {
+                if (eventArgs.PropertyName is nameof(MediaItemViewModel.HasGalleryImages)
+                    or nameof(MediaItemViewModel.GalleryCountText))
+                {
+                    changedProperties.Add(eventArgs.PropertyName);
+                }
+            };
+
+            // Act 1: Initial load
+            await viewModel.LoadDetailsAsync();
+
+            Assert.AreSame(initialCollection, viewModel.GalleryImages);
+            Assert.IsTrue(viewModel.HasGalleryImages);
+            Assert.AreEqual("(2)", viewModel.GalleryCountText);
+            CollectionAssert.AreEquivalent(
+                new[] { nameof(MediaItemViewModel.HasGalleryImages), nameof(MediaItemViewModel.GalleryCountText) },
+                changedProperties);
+
+            // Act 2: Identical reload should not churn PropertyChanged
+            changedProperties.Clear();
+            viewModel.MediaItemData = null;
+            await viewModel.LoadDetailsAsync();
+
+            Assert.AreSame(initialCollection, viewModel.GalleryImages);
+            Assert.AreEqual(0, changedProperties.Count);
+
+            // Act 3: Updated gallery items preserve instance and notify once
+            imageProvider.Paths = ["gallery1.jpg", "gallery2.jpg", "gallery3.jpg"];
+            viewModel.MediaItemData = null;
+            await viewModel.LoadDetailsAsync();
+
+            Assert.AreSame(initialCollection, viewModel.GalleryImages);
+            Assert.AreEqual(3, viewModel.GalleryImages.Count);
+            Assert.AreEqual("(3)", viewModel.GalleryCountText);
+            CollectionAssert.AreEquivalent(
+                new[] { nameof(MediaItemViewModel.HasGalleryImages), nameof(MediaItemViewModel.GalleryCountText) },
+                changedProperties);
         }
     }
 }

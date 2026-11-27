@@ -7,13 +7,14 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
-using Microsoft.UI.Xaml.Media.Imaging;
 using Microsoft.UI.Xaml.Navigation;
 
 namespace Japlayer.Views
 {
     public sealed partial class MediaItemPage : Page
     {
+        private const int LightboxMaxDecodePixelHeight = 660;
+
         public MediaItemViewModel ViewModel { get; private set; } = null!;
         private MediaPlayerElement? _fullScreenPlayer;
         private Grid? _originalPlayerParent;
@@ -24,6 +25,9 @@ namespace Japlayer.Views
         private double _lastGenresAvailableWidth;
         private bool _isSuppressingPostSubmitReopen;
         private int _tagDropdownCloseGeneration;
+        private double? _galleryTargetHorizontalOffset;
+        private int _galleryScrollCorrelationId = -1;
+        private readonly PointerEventHandler _galleryWheelHandler;
         private readonly PointerEventHandler _highlightsWheelHandler;
         private readonly PointerEventHandler _rootGridPointerPressedHandler;
         private readonly PointerEventHandler _tagBoxPointerPressedHandler;
@@ -31,10 +35,11 @@ namespace Japlayer.Views
         public MediaItemPage()
         {
             this.InitializeComponent();
+            _galleryWheelHandler = new PointerEventHandler(GalleryScrollViewer_PointerWheelChanged);
             _highlightsWheelHandler = new PointerEventHandler(HighlightsScrollViewer_PointerWheelChanged);
             _rootGridPointerPressedHandler = new PointerEventHandler(RootGrid_PointerPressed);
             _tagBoxPointerPressedHandler = new PointerEventHandler(TagAutoSuggestBox_PointerPressed);
-            GalleryScrollViewer.AddHandler(UIElement.PointerWheelChangedEvent, new PointerEventHandler(GalleryScrollViewer_PointerWheelChanged), true);
+            GalleryWheelTarget.AddHandler(UIElement.PointerWheelChangedEvent, _galleryWheelHandler, true);
             RootGrid.AddHandler(UIElement.PointerPressedEvent, _rootGridPointerPressedHandler, true);
             TagAutoSuggestBox.AddHandler(UIElement.PointerPressedEvent, _tagBoxPointerPressedHandler, true);
             this.Unloaded += MediaItemPage_Unloaded;
@@ -55,6 +60,12 @@ namespace Japlayer.Views
                 UpdateGenreCollapseLimit();
                 UpdateSceneRailColumnWidth();
             }
+        }
+
+        protected override void OnNavigatedFrom(NavigationEventArgs eventArgs)
+        {
+            base.OnNavigatedFrom(eventArgs);
+            DecodedImageCache.Clear();
         }
 
         private void BackButton_Click(object sender, RoutedEventArgs eventArgs)
@@ -85,7 +96,13 @@ namespace Japlayer.Views
             }
         }
 
-        private void RootScrollViewer_SizeChanged(object sender, SizeChangedEventArgs eventArgs) => UpdateLightboxImageHeight();
+        private void RootScrollViewer_SizeChanged(object sender, SizeChangedEventArgs eventArgs)
+        {
+            if (LightboxOverlay.Visibility == Visibility.Visible)
+            {
+                UpdateLightboxImageHeight();
+            }
+        }
 
         private void RootScrollViewer_ViewChanged(object sender, ScrollViewerViewChangedEventArgs eventArgs)
         {
@@ -324,7 +341,46 @@ namespace Japlayer.Views
             return false;
         }
 
-        private void GalleryScrollViewer_PointerWheelChanged(object sender, PointerRoutedEventArgs eventArgs) => HandleHorizontalWheelScroll(GalleryScrollViewer, eventArgs);
+        private void GalleryScrollViewer_PointerWheelChanged(object sender, PointerRoutedEventArgs eventArgs)
+        {
+            var pointerPoint = eventArgs.GetCurrentPoint(GalleryScrollViewer);
+            if (pointerPoint.Properties.IsHorizontalMouseWheel || GalleryScrollViewer.ScrollableWidth <= 0)
+            {
+                return;
+            }
+
+            var currentOffset = GalleryScrollViewer.HorizontalOffset;
+            var baseOffset = _galleryTargetHorizontalOffset ?? currentOffset;
+            var targetOffset = LayoutHelper.ComputeCumulativeScrollTarget(
+                currentOffset,
+                _galleryTargetHorizontalOffset,
+                GalleryScrollViewer.ScrollableWidth,
+                pointerPoint.Properties.MouseWheelDelta);
+
+            eventArgs.Handled = true;
+
+            if (Math.Abs(targetOffset - baseOffset) < 0.5 && Math.Abs(targetOffset - currentOffset) < 0.5)
+            {
+                _galleryTargetHorizontalOffset = null;
+                _galleryScrollCorrelationId = -1;
+                return;
+            }
+
+            _galleryTargetHorizontalOffset = targetOffset;
+            _galleryScrollCorrelationId = GalleryScrollViewer.ScrollTo(
+                targetOffset,
+                0,
+                new ScrollingScrollOptions(ScrollingAnimationMode.Enabled, ScrollingSnapPointsMode.Ignore));
+        }
+
+        private void GalleryScrollViewer_ScrollCompleted(ScrollView sender, ScrollingScrollCompletedEventArgs args)
+        {
+            if (args.CorrelationId == _galleryScrollCorrelationId)
+            {
+                _galleryTargetHorizontalOffset = null;
+                _galleryScrollCorrelationId = -1;
+            }
+        }
 
         private void HighlightsScrollViewer_Loaded(object sender, RoutedEventArgs eventArgs)
         {
@@ -359,7 +415,7 @@ namespace Japlayer.Views
 
         private void GalleryImage_Click(object sender, RoutedEventArgs eventArgs)
         {
-            if (sender is FrameworkElement element && element.Tag is string imagePath && ViewModel.GalleryImages != null)
+            if (sender is FrameworkElement element && element.Tag is string imagePath)
             {
                 var index = ViewModel.GalleryImages.IndexOf(imagePath);
                 OpenLightbox(Math.Max(0, index));
@@ -368,16 +424,16 @@ namespace Japlayer.Views
 
         private void OpenLightbox(int index)
         {
-            if (ViewModel.GalleryImages == null || ViewModel.GalleryImages.Count == 0)
+            if (ViewModel.GalleryImages.Count == 0)
             {
                 return;
             }
 
             _lightboxIndex = Math.Clamp(index, 0, ViewModel.GalleryImages.Count - 1);
             var imagePath = ViewModel.GalleryImages[_lightboxIndex];
-            LightboxImage.Source = new BitmapImage(new Uri(imagePath));
-            LightboxCounterText.Text = $"{_lightboxIndex + 1} / {ViewModel.GalleryImages.Count}";
             UpdateLightboxImageHeight();
+            LightboxImage.Source = DecodedImageCache.GetOrCreate(imagePath, DecodedImageAxis.Height, LightboxMaxDecodePixelHeight);
+            LightboxCounterText.Text = $"{_lightboxIndex + 1} / {ViewModel.GalleryImages.Count}";
             LightboxOverlay.Visibility = Visibility.Visible;
         }
 
@@ -388,17 +444,23 @@ namespace Japlayer.Views
                 return;
             }
 
-            var targetHeight = Math.Clamp(ActualHeight * 0.72, 320, 660);
-            LightboxImage.Height = targetHeight;
+            var targetHeight = Math.Floor(Math.Clamp(ActualHeight * 0.72, 320, LightboxMaxDecodePixelHeight));
+            LayoutHelper.SetHeightIfChanged(LightboxImage, targetHeight);
             if (LightboxImage.Parent is FrameworkElement parentBorder)
             {
-                parentBorder.Height = targetHeight;
+                LayoutHelper.SetHeightIfChanged(parentBorder, targetHeight);
             }
+        }
+
+        private void CloseLightbox()
+        {
+            LightboxOverlay.Visibility = Visibility.Collapsed;
+            LightboxImage.Source = null;
         }
 
         private void LightboxPrevious_Click(object sender, RoutedEventArgs eventArgs)
         {
-            if (ViewModel.GalleryImages == null || ViewModel.GalleryImages.Count == 0)
+            if (ViewModel.GalleryImages.Count == 0)
             {
                 return;
             }
@@ -409,7 +471,7 @@ namespace Japlayer.Views
 
         private void LightboxNext_Click(object sender, RoutedEventArgs eventArgs)
         {
-            if (ViewModel.GalleryImages == null || ViewModel.GalleryImages.Count == 0)
+            if (ViewModel.GalleryImages.Count == 0)
             {
                 return;
             }
@@ -418,13 +480,13 @@ namespace Japlayer.Views
             OpenLightbox(nextIndex);
         }
 
-        private void LightboxClose_Click(object sender, RoutedEventArgs eventArgs) => LightboxOverlay.Visibility = Visibility.Collapsed;
+        private void LightboxClose_Click(object sender, RoutedEventArgs eventArgs) => CloseLightbox();
 
         private void LightboxOverlay_PointerPressed(object sender, PointerRoutedEventArgs eventArgs)
         {
             if (ReferenceEquals(eventArgs.OriginalSource, LightboxOverlay))
             {
-                LightboxOverlay.Visibility = Visibility.Collapsed;
+                CloseLightbox();
             }
         }
 
@@ -437,7 +499,7 @@ namespace Japlayer.Views
 
             if (eventArgs.Key == Windows.System.VirtualKey.Escape)
             {
-                LightboxOverlay.Visibility = Visibility.Collapsed;
+                CloseLightbox();
                 eventArgs.Handled = true;
             }
             else if (eventArgs.Key == Windows.System.VirtualKey.Left)
@@ -722,8 +784,13 @@ namespace Japlayer.Views
 
         private void MediaItemPage_Unloaded(object sender, RoutedEventArgs eventArgs)
         {
+            GalleryWheelTarget.RemoveHandler(UIElement.PointerWheelChangedEvent, _galleryWheelHandler);
             RootGrid.RemoveHandler(UIElement.PointerPressedEvent, _rootGridPointerPressedHandler);
             TagAutoSuggestBox.RemoveHandler(UIElement.PointerPressedEvent, _tagBoxPointerPressedHandler);
+            _galleryTargetHorizontalOffset = null;
+            _galleryScrollCorrelationId = -1;
+            CloseLightbox();
+            DecodedImageCache.Clear();
 
             if (_fullScreenPlayer != null)
             {

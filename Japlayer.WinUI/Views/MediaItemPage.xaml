@@ -14,6 +14,7 @@
     PreviewKeyDown="Page_PreviewKeyDown">
 
     <Page.Resources>
+        <x:Double x:Key="GalleryThumbnailHeight">120</x:Double>
         <converters:PathToMediaSourceConverter x:Key="PathToMediaSourceConverter"/>
         <converters:PathToImageSourceConverter x:Key="PathToImageSourceConverter"/>
     </Page.Resources>
@@ -363,35 +364,44 @@
                                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                                 </Grid>
 
-                                <ScrollViewer x:Name="GalleryScrollViewer"
-                                              HorizontalScrollBarVisibility="Auto"
-                                              VerticalScrollBarVisibility="Disabled">
-                                    <ItemsControl x:Name="GalleryItemsControl"
-                                                  AutomationProperties.AutomationId="GalleryItemsControl"
-                                                  ItemsSource="{x:Bind ViewModel.GalleryImages, Mode=OneWay}">
-                                        <ItemsControl.ItemsPanel>
-                                            <ItemsPanelTemplate>
-                                                <StackPanel Orientation="Horizontal" Spacing="10"/>
-                                            </ItemsPanelTemplate>
-                                        </ItemsControl.ItemsPanel>
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate x:DataType="x:String">
-                                                <Button AutomationProperties.AutomationId="GalleryImageButton"
-                                                        Click="GalleryImage_Click"
-                                                        Tag="{x:Bind}"
-                                                        Padding="0"
-                                                        BorderThickness="1"
-                                                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                                                        CornerRadius="4"
-                                                        Background="Transparent"
-                                                        PointerEntered="Button_PointerEntered"
-                                                        PointerExited="Button_PointerExited">
-                                                    <Image Source="{x:Bind}" Height="120" Stretch="Uniform"/>
-                                                </Button>
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-                                </ScrollViewer>
+                                <ScrollView x:Name="GalleryScrollViewer"
+                                            ContentOrientation="Horizontal"
+                                            HorizontalScrollMode="Enabled"
+                                            HorizontalScrollBarVisibility="Visible"
+                                            VerticalScrollMode="Disabled"
+                                            VerticalScrollBarVisibility="Hidden"
+                                            ZoomMode="Disabled"
+                                            ScrollCompleted="GalleryScrollViewer_ScrollCompleted">
+                                    <Grid x:Name="GalleryWheelTarget" Background="Transparent">
+                                        <ItemsRepeater x:Name="GalleryItemsControl"
+                                                       AutomationProperties.AutomationId="GalleryItemsControl"
+                                                       Margin="0,0,0,14"
+                                                       HorizontalCacheLength="4.0"
+                                                       ItemsSource="{x:Bind ViewModel.GalleryImages, Mode=OneWay}">
+                                            <ItemsRepeater.Layout>
+                                                <StackLayout Orientation="Horizontal" Spacing="10"/>
+                                            </ItemsRepeater.Layout>
+                                            <ItemsRepeater.ItemTemplate>
+                                                <DataTemplate x:DataType="x:String">
+                                                    <Button AutomationProperties.AutomationId="GalleryImageButton"
+                                                            Click="GalleryImage_Click"
+                                                            Tag="{x:Bind}"
+                                                            Padding="0"
+                                                            BorderThickness="1"
+                                                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                                            CornerRadius="4"
+                                                            Background="Transparent"
+                                                            PointerEntered="Button_PointerEntered"
+                                                            PointerExited="Button_PointerExited">
+                                                        <Image Source="{x:Bind Converter={StaticResource PathToImageSourceConverter}, ConverterParameter={StaticResource GalleryThumbnailHeight}}"
+                                                               Height="{StaticResource GalleryThumbnailHeight}"
+                                                               Stretch="Uniform"/>
+                                                    </Button>
+                                                </DataTemplate>
+                                            </ItemsRepeater.ItemTemplate>
+                                        </ItemsRepeater>
+                                    </Grid>
+                                </ScrollView>
                             </StackPanel>
                         </Border>
                     </Grid>
@@ -537,7 +547,7 @@
                                                 BorderThickness="0"
                                                 Background="Transparent">
                                             <Grid>
-                                                <Image Source="{x:Bind ViewModel.SelectedScene.PosterPath, Converter={StaticResource PathToImageSourceConverter}, Mode=OneWay}"
+                                                <Image Source="{x:Bind ViewModel.SelectedScene.PosterPath, Converter={StaticResource PathToImageSourceConverter}, ConverterParameter=h:540, Mode=OneWay}"
                                                        Stretch="Uniform"
                                                        Opacity="0.78"/>
                                                 <Border Width="64" Height="64" CornerRadius="32"
@@ -585,7 +595,7 @@
                                                                         PointerEntered="Button_PointerEntered"
                                                                         PointerExited="Button_PointerExited">
                                                                     <Grid Width="100" Height="56">
-                                                                        <Image Source="{x:Bind ThumbnailPath, Converter={StaticResource PathToImageSourceConverter}}" Stretch="UniformToFill"/>
+                                                                        <Image Source="{x:Bind ThumbnailPath, Converter={StaticResource PathToImageSourceConverter}, ConverterParameter=w:100}" Stretch="UniformToFill"/>
                                                                         <Border HorizontalAlignment="Right" VerticalAlignment="Bottom"
                                                                                 Margin="4" Padding="4,1" CornerRadius="3"
                                                                                 Background="#CC000000">
@@ -641,7 +651,7 @@
                                                     <RowDefinition Height="Auto"/>
                                                 </Grid.RowDefinitions>
                                                 <Grid Grid.Row="0" Background="Black">
-                                                    <Image Source="{x:Bind PosterPath, Converter={StaticResource PathToImageSourceConverter}, Mode=OneWay}" Stretch="UniformToFill" Opacity="0.85"/>
+                                                    <Image Source="{x:Bind PosterPath, Converter={StaticResource PathToImageSourceConverter}, ConverterParameter=w:320, Mode=OneWay}" Stretch="UniformToFill" Opacity="0.85"/>
                                                     <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="8"
                                                             Background="#BF000000" CornerRadius="4" Padding="8,2">
                                                         <TextBlock Text="{x:Bind SceneDisplayTitle}" FontSize="11" FontWeight="SemiBold" Foreground="White"/>
@@ -740,7 +750,7 @@
                                                             BorderThickness="0"
                                                             Background="Transparent">
                                                         <Grid>
-                                                            <Image Source="{x:Bind PosterPath, Converter={StaticResource PathToImageSourceConverter}, Mode=OneWay}" Stretch="Uniform" Opacity="0.78"/>
+                                                            <Image Source="{x:Bind PosterPath, Converter={StaticResource PathToImageSourceConverter}, ConverterParameter=h:360, Mode=OneWay}" Stretch="Uniform" Opacity="0.78"/>
                                                             <Border Width="52" Height="52" CornerRadius="26"
                                                                     Background="#A6000000" BorderBrush="#40FFFFFF" BorderThickness="1"
                                                                     HorizontalAlignment="Center" VerticalAlignment="Center">
@@ -774,7 +784,7 @@
                                                                                 PointerEntered="Button_PointerEntered"
                                                                                 PointerExited="Button_PointerExited">
                                                                             <Grid Width="78" Height="44">
-                                                                                <Image Source="{x:Bind ThumbnailPath, Converter={StaticResource PathToImageSourceConverter}}" Stretch="UniformToFill"/>
+                                                                                <Image Source="{x:Bind ThumbnailPath, Converter={StaticResource PathToImageSourceConverter}, ConverterParameter=w:78}" Stretch="UniformToFill"/>
                                                                                 <Border HorizontalAlignment="Right" VerticalAlignment="Bottom"
                                                                                         Margin="3" Padding="3,1" CornerRadius="2" Background="#CC000000">
                                                                                     <TextBlock Text="{x:Bind FormattedTimestamp}" FontSize="9" Foreground="{ThemeResource SystemAccentColorLight2}"/>

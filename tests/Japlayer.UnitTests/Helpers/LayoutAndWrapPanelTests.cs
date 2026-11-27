@@ -118,6 +118,62 @@ namespace Japlayer.UnitTests.Helpers
             Assert.AreEqual(1.0d, LayoutHelper.GetRasterizationScale(null));
         }
 
+        [TestMethod]
+        public void ComputeCumulativeScrollTarget_AccumulatesRapidTicksAndClampsToBounds()
+        {
+            const double scrollableExtent = 1000d;
+
+            // Tick 1 from rest (0) -> 300
+            var firstTarget = LayoutHelper.ComputeCumulativeScrollTarget(
+                currentOffset: 0d,
+                pendingTargetOffset: null,
+                scrollableExtent: scrollableExtent,
+                wheelDelta: -120);
+            Assert.AreEqual(300d, firstTarget, 1e-9d);
+
+            // Tick 2 while animated currentOffset only reached 15 -> accumulates from 300 to 600 (not 315)
+            var secondTarget = LayoutHelper.ComputeCumulativeScrollTarget(
+                currentOffset: 15d,
+                pendingTargetOffset: firstTarget,
+                scrollableExtent: scrollableExtent,
+                wheelDelta: -120);
+            Assert.AreEqual(600d, secondTarget, 1e-9d);
+
+            // Tick 3 and 4 clamp cleanly at scrollableExtent (1000)
+            var thirdTarget = LayoutHelper.ComputeCumulativeScrollTarget(
+                currentOffset: 40d,
+                pendingTargetOffset: secondTarget,
+                scrollableExtent: scrollableExtent,
+                wheelDelta: -120);
+            Assert.AreEqual(900d, thirdTarget, 1e-9d);
+
+            var clampedEndTarget = LayoutHelper.ComputeCumulativeScrollTarget(
+                currentOffset: 80d,
+                pendingTargetOffset: thirdTarget,
+                scrollableExtent: scrollableExtent,
+                wheelDelta: -120);
+            Assert.AreEqual(1000d, clampedEndTarget, 1e-9d);
+
+            // Reverse direction mid-flight subtracts from pending target (1000 -> 700)
+            var reversedTarget = LayoutHelper.ComputeCumulativeScrollTarget(
+                currentOffset: 120d,
+                pendingTargetOffset: clampedEndTarget,
+                scrollableExtent: scrollableExtent,
+                wheelDelta: 120);
+            Assert.AreEqual(700d, reversedTarget, 1e-9d);
+
+            // Scrolling past the start clamps cleanly at 0
+            var clampedStartTarget = LayoutHelper.ComputeCumulativeScrollTarget(
+                currentOffset: 50d,
+                pendingTargetOffset: null,
+                scrollableExtent: scrollableExtent,
+                wheelDelta: 120);
+            Assert.AreEqual(0d, clampedStartTarget, 1e-9d);
+
+            // Non-scrollable extent always returns 0
+            Assert.AreEqual(0d, LayoutHelper.ComputeCumulativeScrollTarget(0d, null, 0d, -120), 1e-9d);
+        }
+
         private static int CountDistinctRows(IReadOnlyList<Rect> bounds)
         {
             var rows = new HashSet<double>();

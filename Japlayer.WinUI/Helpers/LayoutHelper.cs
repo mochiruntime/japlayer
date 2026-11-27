@@ -71,6 +71,22 @@ namespace Japlayer.Helpers
             return (0.5d / scale) + 1e-3d;
         }
 
+        public static double ComputeCumulativeScrollTarget(
+            double currentOffset,
+            double? pendingTargetOffset,
+            double scrollableExtent,
+            int wheelDelta,
+            double scrollMultiplier = 2.5d)
+        {
+            if (scrollableExtent <= 0d)
+            {
+                return 0d;
+            }
+
+            var baseOffset = pendingTargetOffset ?? currentOffset;
+            return Math.Clamp(baseOffset - (wheelDelta * scrollMultiplier), 0d, scrollableExtent);
+        }
+
         private static double NormalizeScale(double rasterizationScale)
             => rasterizationScale > 0d && !double.IsNaN(rasterizationScale) && !double.IsInfinity(rasterizationScale)
                 ? rasterizationScale

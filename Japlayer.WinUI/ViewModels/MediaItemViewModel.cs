@@ -22,29 +22,48 @@ namespace Japlayer.ViewModels
         public override string ToString() => Name;
     }
 
-    public partial class MediaItemViewModel(
-        LibraryItem libraryItem,
-        IImageProvider imageProvider,
-        IMediaSceneProvider sceneProvider,
-        IMediaProvider mediaProvider,
-        ISettingsService settingsService,
-        IMediaThumbnailProvider thumbnailProvider,
-        IMediaHighlightProvider highlightProvider,
-        IDatabaseChangeMonitor? databaseChangeMonitor = null,
-        IMessenger? messenger = null) : ObservableObject
+    public partial class MediaItemViewModel : ObservableObject
     {
         private int _genreCollapseLimit = 6;
 
-        private readonly LibraryItem _libraryItem = libraryItem;
-        private readonly IImageProvider _imageProvider = imageProvider;
-        private readonly IMediaSceneProvider _sceneProvider = sceneProvider;
-        private readonly IMediaProvider _mediaProvider = mediaProvider;
-        private readonly ISettingsService _settingsService = settingsService;
-        private readonly IMediaThumbnailProvider _thumbnailProvider = thumbnailProvider;
-        private readonly IMediaHighlightProvider _highlightProvider = highlightProvider;
-        private readonly IDatabaseChangeMonitor? _databaseChangeMonitor = databaseChangeMonitor;
-        private readonly IMessenger _messenger = messenger ?? WeakReferenceMessenger.Default;
+        private readonly LibraryItem _libraryItem;
+        private readonly IImageProvider _imageProvider;
+        private readonly IMediaSceneProvider _sceneProvider;
+        private readonly IMediaProvider _mediaProvider;
+        private readonly ISettingsService _settingsService;
+        private readonly IMediaThumbnailProvider _thumbnailProvider;
+        private readonly IMediaHighlightProvider _highlightProvider;
+        private readonly IDatabaseChangeMonitor? _databaseChangeMonitor;
+        private readonly IMessenger _messenger;
         private bool _isInitializingRating;
+
+        public MediaItemViewModel(
+            LibraryItem libraryItem,
+            IImageProvider imageProvider,
+            IMediaSceneProvider sceneProvider,
+            IMediaProvider mediaProvider,
+            ISettingsService settingsService,
+            IMediaThumbnailProvider thumbnailProvider,
+            IMediaHighlightProvider highlightProvider,
+            IDatabaseChangeMonitor? databaseChangeMonitor = null,
+            IMessenger? messenger = null)
+        {
+            _libraryItem = libraryItem;
+            _imageProvider = imageProvider;
+            _sceneProvider = sceneProvider;
+            _mediaProvider = mediaProvider;
+            _settingsService = settingsService;
+            _thumbnailProvider = thumbnailProvider;
+            _highlightProvider = highlightProvider;
+            _databaseChangeMonitor = databaseChangeMonitor;
+            _messenger = messenger ?? WeakReferenceMessenger.Default;
+
+            GalleryImages.CollectionChanged += (_, _) =>
+            {
+                OnPropertyChanged(nameof(GalleryCountText));
+                OnPropertyChanged(nameof(HasGalleryImages));
+            };
+        }
 
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(Title))]
@@ -130,10 +149,7 @@ namespace Japlayer.ViewModels
 
         public LibraryItemViewModel? LibraryItemViewModel { get; set; }
 
-        [ObservableProperty]
-        [NotifyPropertyChangedFor(nameof(GalleryCountText))]
-        [NotifyPropertyChangedFor(nameof(HasGalleryImages))]
-        public partial ObservableCollection<string>? GalleryImages { get; set; }
+        public BatchObservableCollection<string> GalleryImages { get; } = [];
 
         public ObservableCollection<string> UserTags { get; } = [];
         public BatchObservableCollection<TagSuggestionItem> TagSuggestions { get; } = [];
@@ -239,8 +255,8 @@ namespace Japlayer.ViewModels
             }
         }
 
-        public string GalleryCountText => $"({GalleryImages?.Count ?? 0})";
-        public bool HasGalleryImages => GalleryImages != null && GalleryImages.Count > 0;
+        public string GalleryCountText => $"({GalleryImages.Count})";
+        public bool HasGalleryImages => GalleryImages.Count > 0;
 
         public bool IsDetailsLoaded => MediaItemData != null;
 
@@ -426,7 +442,7 @@ namespace Japlayer.ViewModels
 
             var gallery = await _imageProvider.GetGalleryPathsAsync(Id);
             var fullPaths = gallery.Select(path => Path.Combine(_settingsService.ImagePath, path));
-            GalleryImages = new ObservableCollection<string>(fullPaths);
+            GalleryImages.ReplaceAll(fullPaths);
         }
 
         private void UpdateHighlightCount()
