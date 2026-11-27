@@ -323,6 +323,8 @@
 
         <!-- Row 1: Active Filter Chips Bar / Saved Presets Bar -->
         <Border Grid.Row="1"
+                AutomationProperties.AutomationId="ActiveFiltersBar"
+                AutomationProperties.Name="Active filters bar"
                 Visibility="{x:Bind ViewModel.ShowFilterOrPresetsBar, Mode=OneWay}"
                 Padding="24,8,24,10"
                 BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"

@@ -75,9 +75,22 @@ namespace Japlayer.UITests.Fixtures
             var vrTag = new UserTag { Name = "VR" };
             var favoritesTag = new UserTag { Name = "Favorites" };
             var twoDTag = new UserTag { Name = "2D" };
+            var clipsTag = new UserTag { Name = "Clips" };
+            var hdrTag = new UserTag { Name = "HDR" };
+            var indieTag = new UserTag { Name = "Indie" };
             var actionGenre = new MediaGenre { Name = "Action" };
             var sciFiGenre = new MediaGenre { Name = "Sci-Fi" };
             var documentaryGenre = new MediaGenre { Name = "Documentary" };
+            var adventureGenre = new MediaGenre { Name = "Adventure" };
+            var animationGenre = new MediaGenre { Name = "Animation" };
+            var comedyGenre = new MediaGenre { Name = "Comedy" };
+            var cyberpunkGenre = new MediaGenre { Name = "Cyberpunk" };
+            var dramaGenre = new MediaGenre { Name = "Drama" };
+            var fantasyGenre = new MediaGenre { Name = "Fantasy" };
+            var horrorGenre = new MediaGenre { Name = "Horror" };
+            var mysteryGenre = new MediaGenre { Name = "Mystery" };
+            var romanceGenre = new MediaGenre { Name = "Romance" };
+            var thrillerGenre = new MediaGenre { Name = "Thriller" };
             var actorAlpha = new MediaPerson { Name = "Actor Alpha" };
             var actorBeta = new MediaPerson { Name = "Actor Beta" };
             var studioAlpha = new MediaStudio { Name = "Studio Alpha" };
@@ -147,7 +160,19 @@ namespace Japlayer.UITests.Fixtures
                 RuntimeMinutes = 60
             });
             media2.UserTags.Add(vrTag);
+            media2.UserTags.Add(clipsTag);
+            media2.UserTags.Add(hdrTag);
             media2.Genres.Add(documentaryGenre);
+            media2.Genres.Add(adventureGenre);
+            media2.Genres.Add(animationGenre);
+            media2.Genres.Add(comedyGenre);
+            media2.Genres.Add(cyberpunkGenre);
+            media2.Genres.Add(dramaGenre);
+            media2.Genres.Add(fantasyGenre);
+            media2.Genres.Add(horrorGenre);
+            media2.Genres.Add(mysteryGenre);
+            media2.Genres.Add(romanceGenre);
+            media2.Genres.Add(thrillerGenre);
             media2.People.Add(actorAlpha);
             media2.People.Add(actorBeta);
             media2.Studios.Add(studioBeta);
@@ -173,6 +198,7 @@ namespace Japlayer.UITests.Fixtures
                 RuntimeMinutes = 110
             });
             media3.UserTags.Add(twoDTag);
+            media3.UserTags.Add(indieTag);
             media3.Genres.Add(actionGenre);
             media3.People.Add(actorBeta);
             media3.Studios.Add(studioAlpha);

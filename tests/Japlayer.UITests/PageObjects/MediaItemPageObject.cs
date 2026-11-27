@@ -32,6 +32,9 @@ namespace Japlayer.UITests.PageObjects
                    ?.FindFirstDescendant(conditionFactory => conditionFactory.ByControlType(ControlType.Edit))?.AsTextBox()
             ?? _window.FindFirstDescendant(conditionFactory => conditionFactory.ByAutomationId("TagAutoSuggestBox"))?.AsTextBox();
 
+        public AutomationElement[] GetRemoveTagButtons() =>
+            _window.FindAllDescendants(conditionFactory => conditionFactory.ByAutomationId("RemoveTagButton"));
+
         public Button? GalleryImageButton =>
             _window.FindFirstDescendant(conditionFactory => conditionFactory.ByAutomationId("GalleryImageButton"))?.AsButton();
 

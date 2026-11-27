@@ -1,11 +1,15 @@
 #nullable enable
 using System;
+using System.Collections.Generic;
+using Japlayer.Helpers;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Windows.Foundation;
 
 namespace Japlayer.Controls
 {
+    internal readonly record struct WrapPanelLayout(Size MeasuredSize, IReadOnlyList<Rect> ItemBounds);
+
     public sealed class WrapPanel : Panel
     {
         public static readonly DependencyProperty HorizontalSpacingProperty =
@@ -42,13 +46,55 @@ namespace Japlayer.Controls
             }
         }
 
-        protected override Size MeasureOverride(Size availableSize)
+        internal static WrapPanelLayout ComputeLayout(
+            IReadOnlyList<Size> itemSizes,
+            double availableWidth,
+            double horizontalSpacing,
+            double verticalSpacing,
+            double wrapTolerance = 0d)
         {
+            var placements = new List<Rect>(itemSizes.Count);
             var currentX = 0d;
             var currentY = 0d;
             var rowHeight = 0d;
             var maxWidth = 0d;
             var hasRowItems = false;
+
+            foreach (var desired in itemSizes)
+            {
+                if (desired.Width <= 0 && desired.Height <= 0)
+                {
+                    placements.Add(new Rect(0, 0, 0, 0));
+                    continue;
+                }
+
+                var nextX = hasRowItems ? currentX + horizontalSpacing + desired.Width : desired.Width;
+
+                if (hasRowItems && !double.IsInfinity(availableWidth) && nextX > availableWidth + wrapTolerance)
+                {
+                    maxWidth = Math.Max(maxWidth, currentX);
+                    currentY += rowHeight + verticalSpacing;
+                    currentX = 0d;
+                    rowHeight = 0d;
+                    hasRowItems = false;
+                }
+
+                var arrangeX = hasRowItems ? currentX + horizontalSpacing : 0d;
+                placements.Add(new Rect(arrangeX, currentY, desired.Width, desired.Height));
+
+                currentX = arrangeX + desired.Width;
+                rowHeight = Math.Max(rowHeight, desired.Height);
+                hasRowItems = true;
+            }
+
+            maxWidth = Math.Max(maxWidth, currentX);
+            var totalHeight = hasRowItems ? currentY + rowHeight : 0d;
+            return new WrapPanelLayout(new Size(maxWidth, totalHeight), placements);
+        }
+
+        protected override Size MeasureOverride(Size availableSize)
+        {
+            var visibleItemSizes = new List<Size>(Children.Count);
 
             foreach (var child in Children)
             {
@@ -64,35 +110,20 @@ namespace Japlayer.Controls
                     continue;
                 }
 
-                var nextX = hasRowItems ? currentX + HorizontalSpacing + desired.Width : desired.Width;
-
-                if (hasRowItems && !double.IsInfinity(availableSize.Width) && nextX > availableSize.Width)
-                {
-                    maxWidth = Math.Max(maxWidth, currentX);
-                    currentY += rowHeight + VerticalSpacing;
-                    currentX = desired.Width;
-                    rowHeight = desired.Height;
-                    hasRowItems = true;
-                }
-                else
-                {
-                    currentX = nextX;
-                    rowHeight = Math.Max(rowHeight, desired.Height);
-                    hasRowItems = true;
-                }
+                visibleItemSizes.Add(desired);
             }
 
-            maxWidth = Math.Max(maxWidth, currentX);
-            var totalHeight = hasRowItems ? currentY + rowHeight : 0d;
-            return new Size(maxWidth, totalHeight);
+            var layout = ComputeLayout(visibleItemSizes, availableSize.Width, HorizontalSpacing, VerticalSpacing);
+            var scale = LayoutHelper.GetRasterizationScale(this);
+            return new Size(
+                LayoutHelper.CeilingToLayoutPixel(layout.MeasuredSize.Width, scale),
+                LayoutHelper.CeilingToLayoutPixel(layout.MeasuredSize.Height, scale));
         }
 
         protected override Size ArrangeOverride(Size finalSize)
         {
-            var currentX = 0d;
-            var currentY = 0d;
-            var rowHeight = 0d;
-            var hasRowItems = false;
+            var visibleChildren = new List<UIElement>(Children.Count);
+            var visibleItemSizes = new List<Size>(Children.Count);
 
             foreach (var child in Children)
             {
@@ -107,22 +138,17 @@ namespace Japlayer.Controls
                     continue;
                 }
 
-                var nextX = hasRowItems ? currentX + HorizontalSpacing + desired.Width : desired.Width;
+                visibleChildren.Add(child);
+                visibleItemSizes.Add(desired);
+            }
 
-                if (hasRowItems && nextX > finalSize.Width)
-                {
-                    currentY += rowHeight + VerticalSpacing;
-                    currentX = 0d;
-                    rowHeight = 0d;
-                    hasRowItems = false;
-                }
+            var scale = LayoutHelper.GetRasterizationScale(this);
+            var tolerance = LayoutHelper.GetLayoutRoundingTolerance(scale);
+            var layout = ComputeLayout(visibleItemSizes, finalSize.Width, HorizontalSpacing, VerticalSpacing, tolerance);
 
-                var arrangeX = hasRowItems ? currentX + HorizontalSpacing : 0d;
-                child.Arrange(new Rect(arrangeX, currentY, desired.Width, desired.Height));
-
-                currentX = arrangeX + desired.Width;
-                rowHeight = Math.Max(rowHeight, desired.Height);
-                hasRowItems = true;
+            for (var index = 0; index < visibleChildren.Count; index++)
+            {
+                visibleChildren[index].Arrange(layout.ItemBounds[index]);
             }
 
             return finalSize;

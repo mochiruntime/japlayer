@@ -34,7 +34,7 @@ namespace Japlayer
             var hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
             var windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(hWnd);
             var appWindow = Microsoft.UI.Windowing.AppWindow.GetFromWindowId(windowId);
-            var scale = AppTitleBar.XamlRoot?.RasterizationScale ?? 1.0;
+            var scale = Helpers.LayoutHelper.GetRasterizationScale(AppTitleBar);
 
             // 5 columns (5 * 312) + MediaGrid padding (18 + 24) + scrollbar & window frame (~38) = 1640 DIPs
             // 3 rows (3 * 262) + chrome & MediaGrid padding (~181) + window frame (~16) = 980 DIPs

@@ -35,6 +35,12 @@ namespace Japlayer.UITests.PageObjects
         public AutomationElement? ClearAllFiltersButton =>
             _window.FindFirstDescendant(conditionFactory => conditionFactory.ByAutomationId("ClearAllFiltersButton"));
 
+        public AutomationElement? ActiveFiltersBar =>
+            _window.FindFirstDescendant(conditionFactory => conditionFactory.ByAutomationId("ActiveFiltersBar"));
+
+        public AutomationElement[] GetActiveFilterChipRemoveButtons() =>
+            _window.FindAllDescendants(conditionFactory => conditionFactory.ByAutomationId("RemoveFilterChipButton"));
+
         public Button? SavePresetButton =>
             _window.FindFirstDescendant(conditionFactory => conditionFactory.ByAutomationId("SavePresetButton"))?.AsButton();
 

@@ -28,4 +28,8 @@
   <ItemGroup>
     <ProjectReference Include="..\Japlayer.Data\Japlayer.Data.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Japlayer.UnitTests" />
+  </ItemGroup>
 </Project>

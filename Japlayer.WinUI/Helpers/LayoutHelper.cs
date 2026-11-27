@@ -47,6 +47,35 @@ namespace Japlayer.Helpers
             }
         }
 
+        public static double GetRasterizationScale(UIElement? element)
+        {
+            var scale = element?.XamlRoot?.RasterizationScale ?? 1.0d;
+            return NormalizeScale(scale);
+        }
+
+        public static double CeilingToLayoutPixel(double value, double rasterizationScale)
+        {
+            if (value <= 0d || double.IsNaN(value) || double.IsInfinity(value))
+            {
+                return 0d;
+            }
+
+            var scale = NormalizeScale(rasterizationScale);
+            const double fpGuard = 1e-6d;
+            return Math.Ceiling((value * scale) - fpGuard) / scale;
+        }
+
+        public static double GetLayoutRoundingTolerance(double rasterizationScale)
+        {
+            var scale = NormalizeScale(rasterizationScale);
+            return (0.5d / scale) + 1e-3d;
+        }
+
+        private static double NormalizeScale(double rasterizationScale)
+            => rasterizationScale > 0d && !double.IsNaN(rasterizationScale) && !double.IsInfinity(rasterizationScale)
+                ? rasterizationScale
+                : 1.0d;
+
         private static void OnMatchViewportHeightOfChanged(DependencyObject dependencyObject, DependencyPropertyChangedEventArgs eventArgs)
         {
             if (dependencyObject is not FrameworkElement targetElement)
